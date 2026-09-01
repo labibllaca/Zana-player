@@ -156,7 +156,7 @@ class UpdateManager(private val context: Context) {
             val apkSize = latestApkAsset.optLong("size", 0L)
 
             val currentVersion = BuildConfig.VERSION_NAME
-            val isNewer = isRemoteVersionNewer(tagName, currentVersion, publishedAt)
+            val isNewer = isRemoteVersionNewer(tagName, title, currentVersion)
 
             val now = System.currentTimeMillis()
             prefs.edit().putLong(KEY_LAST_CHECKED, now).apply()
@@ -277,17 +277,29 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    private fun isRemoteVersionNewer(tag: String, currentVersion: String, publishedAt: String): Boolean {
-        val cleanTag = tag.removePrefix("v").trim()
-        val cleanCurrent = currentVersion.removePrefix("v").trim()
+    private fun extractVersionString(input: String): String? {
+        val regex = Regex("(\\d+\\.\\d+\\.\\d+)")
+        return regex.find(input)?.value
+    }
 
-        if (cleanTag.equals("latest-build", ignoreCase = true) || cleanTag.equals("latest", ignoreCase = true)) {
-            // Check if last checked or published date is newer than app build time
-            return true
+    private fun isRemoteVersionNewer(tag: String, title: String, currentVersion: String): Boolean {
+        val cleanCurrent = extractVersionString(currentVersion) ?: currentVersion.removePrefix("v").trim()
+
+        // Try to get clean version from tag first, then title
+        val cleanRemote = extractVersionString(tag) 
+            ?: extractVersionString(title) 
+            ?: tag.removePrefix("v").trim()
+
+        if (cleanRemote.equals("latest-build", ignoreCase = true) || cleanRemote.equals("latest", ignoreCase = true)) {
+            return false
         }
 
-        val tagParts = cleanTag.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
+        val tagParts = cleanRemote.split(".").map { part ->
+            Regex("^\\d+").find(part.trim())?.value?.toIntOrNull() ?: 0
+        }
+        val currentParts = cleanCurrent.split(".").map { part ->
+            Regex("^\\d+").find(part.trim())?.value?.toIntOrNull() ?: 0
+        }
 
         val length = maxOf(tagParts.size, currentParts.size)
         for (i in 0 until length) {

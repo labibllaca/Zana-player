@@ -15,8 +15,8 @@ android {
     applicationId = "com.labix.navirom.audiom"
     minSdk = 24
     targetSdk = 36
-    versionCode = 4
-    versionName = "1.5.0"
+    versionCode = libs.versions.appVersionCode.get().toInt()
+    versionName = libs.versions.appVersionName.get()
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
