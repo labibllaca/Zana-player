@@ -33,6 +33,12 @@ jobs:
       - name: Create Empty .env File
         run: touch .env
 
+      - name: Restore Debug Keystore
+        run: |
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon
 

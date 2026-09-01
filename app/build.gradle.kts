@@ -32,7 +32,9 @@ android {
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      val customKeystore = file("${rootDir}/debug.keystore")
+      val defaultKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+      storeFile = if (customKeystore.exists()) customKeystore else defaultKeystore
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
