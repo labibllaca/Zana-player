@@ -40,6 +40,17 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
+      - name: Ground truth
+        run: |
+          git rev-parse HEAD
+          git status --short
+          grep -n "namespace" app/build.gradle.kts
+          if [ -f "app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt" ]; then
+            sed -n '1,30p' app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt
+          elif [ -f "app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt" ]; then
+            sed -n '1,30p' app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt
+          fi
+
       - name: Build Debug APK
         run: gradle clean assembleDebug --no-daemon
 
