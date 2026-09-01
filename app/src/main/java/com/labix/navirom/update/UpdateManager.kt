@@ -9,6 +9,8 @@ import android.os.Environment
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.labix.BuildConfig
+import com.labix.navirom.diagnostics.AppDiagnostics
+import com.labix.navirom.diagnostics.DiagnosticCodes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +92,8 @@ class UpdateManager(private val context: Context) {
             val repo = _githubRepo.value.ifBlank { DEFAULT_REPO }
             val apiUrl = "https://api.github.com/repos/$repo/releases"
 
+            AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_START_701, TAG, "Checking for updates on repo: $repo (isManual: $isManual)")
+
             val request = Request.Builder()
                 .url(apiUrl)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -100,6 +104,7 @@ class UpdateManager(private val context: Context) {
             if (!response.isSuccessful) {
                 val errMsg = "GitHub API error: ${response.code} ${response.message}"
                 Log.w(TAG, errMsg)
+                AppDiagnostics.logWarn(DiagnosticCodes.UPDATE_CHECK_WARN_703, TAG, errMsg)
                 _updateState.value = if (isManual) UpdateState.Error(errMsg) else UpdateState.Idle
                 return@withContext null
             }
@@ -107,6 +112,7 @@ class UpdateManager(private val context: Context) {
             val bodyString = response.body?.string() ?: ""
             val jsonArray = JSONArray(bodyString)
             if (jsonArray.length() == 0) {
+                AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "No releases found on repo")
                 _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
                 return@withContext null
             }
@@ -135,6 +141,7 @@ class UpdateManager(private val context: Context) {
 
             if (targetRelease == null || latestApkAsset == null) {
                 Log.i(TAG, "No APK asset found in releases for $repo")
+                AppDiagnostics.logWarn(DiagnosticCodes.UPDATE_CHECK_WARN_703, TAG, "No APK asset found in releases")
                 _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
                 return@withContext null
             }
@@ -168,14 +175,17 @@ class UpdateManager(private val context: Context) {
             )
 
             if (isNewer) {
+                AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "New update found: $tagName (current: $currentVersion)")
                 _updateState.value = UpdateState.Available(updateInfo)
                 updateInfo
             } else {
+                AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "App is up-to-date (current: $currentVersion)")
                 _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
                 null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for updates", e)
+            AppDiagnostics.logError(DiagnosticCodes.UPDATE_CHECK_ERR_704, TAG, "Exception: ${e.message}", e)
             _updateState.value = if (isManual) UpdateState.Error(e.localizedMessage ?: "Network error") else UpdateState.Idle
             null
         }
@@ -183,6 +193,7 @@ class UpdateManager(private val context: Context) {
 
     suspend fun downloadAndInstall(updateInfo: AppUpdateInfo) = withContext(Dispatchers.IO) {
         try {
+            AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_DOWNLOAD_START_705, TAG, "Starting download of ${updateInfo.apkName}")
             _updateState.value = UpdateState.Downloading(0f, 0L, updateInfo.apkSize)
 
             val updateDir = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -199,7 +210,9 @@ class UpdateManager(private val context: Context) {
 
             val response = httpClient.newCall(request).execute()
             if (!response.isSuccessful) {
-                throw Exception("Failed to download APK: ${response.code} ${response.message}")
+                val errMsg = "Failed to download APK: ${response.code} ${response.message}"
+                AppDiagnostics.logError(DiagnosticCodes.UPDATE_DOWNLOAD_ERR_706, TAG, errMsg)
+                throw Exception(errMsg)
             }
 
             val responseBody = response.body ?: throw Exception("Response body is empty")
@@ -233,14 +246,18 @@ class UpdateManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed downloading update", e)
+            AppDiagnostics.logError(DiagnosticCodes.UPDATE_DOWNLOAD_ERR_706, TAG, "Download failed: ${e.message}", e)
             _updateState.value = UpdateState.Error("Download fehlgeschlagen: ${e.localizedMessage}")
         }
     }
 
     fun installApk(context: Context, apkFile: File) {
         try {
+            AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_INSTALL_START_707, TAG, "Initiating package installer for ${apkFile.name}")
             if (!apkFile.exists() || apkFile.length() == 0L) {
-                Log.e(TAG, "APK file does not exist or is empty")
+                val errMsg = "APK file does not exist or is empty"
+                Log.e(TAG, errMsg)
+                AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, errMsg)
                 return
             }
 
@@ -255,6 +272,7 @@ class UpdateManager(private val context: Context) {
             context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Error launching package installer", e)
+            AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, "Install failed: ${e.message}", e)
             _updateState.value = UpdateState.Error("Installation konnte nicht gestartet werden: ${e.localizedMessage}")
         }
     }
@@ -284,7 +302,7 @@ class UpdateManager(private val context: Context) {
 
     companion object {
         private const val TAG = "UpdateManager"
-        const val DEFAULT_REPO = "labibllaca/navirom"
+        const val DEFAULT_REPO = "labibllaca/Zana-player"
         private const val KEY_AUTO_CHECK = "auto_check_updates"
         private const val KEY_GITHUB_REPO = "github_repo_slug"
         private const val KEY_LAST_CHECKED = "last_checked_timestamp"

@@ -76,7 +76,7 @@ fun ServerSettingsScreen(
     focusUsernameTrigger: Long = 0L,
     updateState: UpdateState = UpdateState.Idle,
     autoCheckUpdates: Boolean = true,
-    githubRepo: String = "labibllaca/navirom",
+    githubRepo: String = "labibllaca/Zana-player",
     lastUpdateCheckedTime: Long = 0L,
     onCheckForUpdates: () -> Unit = {},
     onDownloadAndInstallUpdate: (AppUpdateInfo) -> Unit = {},
