@@ -12,6 +12,10 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
 
+    env:
+      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
+      GRADLE_OPTS: "-Djava.awt.headless=true -Dorg.gradle.jvmargs='-Xmx4g -Djava.awt.headless=true'"
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
