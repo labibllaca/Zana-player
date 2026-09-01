@@ -1,0 +1,7 @@
+{
+  "name": "Zana",
+  "description": "Clean, minimalist Navidrome and Subsonic audio client with playlist support, offline caching, and responsive layouts for small and large screens.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
