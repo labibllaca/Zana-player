@@ -460,6 +460,7 @@ fun ServerSettingsScreen(
                         val label = when (lang) {
                             AppLanguage.ENGLISH -> str("lang_english")
                             AppLanguage.ALBANIAN -> str("lang_albanian")
+                            AppLanguage.GERMAN -> str("lang_german")
                         }
 
                         Surface(

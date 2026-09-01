@@ -2,19 +2,24 @@ package com.labix.navirom.ui
 
 enum class AppLanguage(val code: String, val displayName: String, val nativeName: String) {
     ENGLISH("en", "English", "English"),
+    GERMAN("de", "German", "Deutsch"),
     ALBANIAN("sq", "Albanian", "Shqip")
 }
 
-enum class AppThemeMode(val titleEn: String, val titleSq: String) {
-    DARK("Dark", "I errët"),
-    LIGHT("Light", "I çelët"),
-    SYSTEM("System Default", "Sipas sistemit")
+enum class AppThemeMode(val titleEn: String, val titleSq: String, val titleDe: String = "Systemstandard") {
+    DARK("Dark", "I errët", "Dunkel"),
+    LIGHT("Light", "I çelët", "Hell"),
+    SYSTEM("System Default", "Sipas sistemit", "Systemstandard")
 }
 
 object NaviromStrings {
 
     fun get(key: String, language: AppLanguage = AppLanguage.ENGLISH): String {
-        val map = if (language == AppLanguage.ALBANIAN) albanianStrings else englishStrings
+        val map = when (language) {
+            AppLanguage.GERMAN -> germanStrings
+            AppLanguage.ALBANIAN -> albanianStrings
+            AppLanguage.ENGLISH -> englishStrings
+        }
         return map[key] ?: englishStrings[key] ?: formatFallbackKey(key)
     }
 
@@ -29,6 +34,14 @@ object NaviromStrings {
     }
 
     private val englishStrings = mapOf(
+        // Greetings
+        "greeting_morning" to "Good morning",
+        "greeting_afternoon" to "Good afternoon",
+        "greeting_evening" to "Good evening",
+        "greeting_night" to "Good night",
+        "greeting_subtitle" to "What would you like to listen to today?",
+        "profile_default_name" to "Music Lover",
+
         // Tabs
         "tab_library" to "Library",
         "tab_home" to "Library",
@@ -38,15 +51,24 @@ object NaviromStrings {
         "tab_downloads" to "Offline",
         "tab_settings" to "Settings",
 
-        // Subtabs
+        // Subtabs & Sections
+        "subtab_overview" to "Overview",
         "subtab_libraries" to "Libraries",
         "subtab_songs" to "Songs",
         "subtab_albums" to "Albums",
         "subtab_artists" to "Artists",
         "subtab_quick_mix" to "Server Mix",
         "subtab_recent" to "Recent",
+        "library_labels_title" to "Library Labels",
         "recently_played_title" to "Recently Played",
         "recently_played_subtitle" to "Your recently played tracks",
+        "recently_added_title" to "Recently Added",
+        "recently_added_subtitle" to "Newest additions to your collection",
+        "most_played_title" to "Most Played",
+        "most_played_subtitle" to "Your top played albums and tracks",
+        "random_albums_title" to "Random from Library",
+        "random_albums_subtitle" to "Rediscover hidden gems from your collection",
+        "btn_refresh_random" to "Shuffle Random",
         "empty_recent_title" to "No Recent Songs",
         "empty_recent_desc" to "Songs you play will appear here for quick access.",
         "server_libraries_title" to "Navidrome Server Libraries",
@@ -235,6 +257,14 @@ object NaviromStrings {
     )
 
     private val albanianStrings = mapOf(
+        // Greetings
+        "greeting_morning" to "Mirëmëngjes",
+        "greeting_afternoon" to "Mirëdita",
+        "greeting_evening" to "Mirëmbrëma",
+        "greeting_night" to "Natën e mirë",
+        "greeting_subtitle" to "Çfarë dëshironi të dëgjoni sot?",
+        "profile_default_name" to "Adhurues Muzike",
+
         // Tabs
         "tab_library" to "Biblioteka",
         "tab_home" to "Biblioteka",
@@ -244,15 +274,24 @@ object NaviromStrings {
         "tab_downloads" to "Offline",
         "tab_settings" to "Cilësimet",
 
-        // Subtabs
+        // Subtabs & Sections
+        "subtab_overview" to "Përmbledhje",
         "subtab_libraries" to "Bibliotekat",
         "subtab_songs" to "Këngët",
         "subtab_albums" to "Albumet",
         "subtab_artists" to "Artistët",
         "subtab_quick_mix" to "Miksi i serverit",
         "subtab_recent" to "Të fundit",
+        "library_labels_title" to "Etiketat e Bibliotekës",
         "recently_played_title" to "Të luajtura së fundmi",
         "recently_played_subtitle" to "Këngët që keni dëgjuar së fundmi",
+        "recently_added_title" to "Të shtuara së fundmi",
+        "recently_added_subtitle" to "Muzika më e re në koleksion",
+        "most_played_title" to "Më të dëgjuarat",
+        "most_played_subtitle" to "Albumet dhe këngët tuaja kryesore",
+        "random_albums_title" to "Rastësore nga Biblioteka",
+        "random_albums_subtitle" to "Zbulo thesare të fshehura nga koleksioni",
+        "btn_refresh_random" to "Përziej rastësisht",
         "empty_recent_title" to "Asnjë këngë e fundit",
         "empty_recent_desc" to "Këngët që luani do të shfaqen këtu për qasje të shpejtë.",
         "server_libraries_title" to "Bibliotekat e serverit Navidrome",
@@ -438,5 +477,229 @@ object NaviromStrings {
         "lyrics_reload" to "Rikërko tekstin",
         "lyrics_tab_artwork" to "Kopertina",
         "lyrics_tab_lyrics" to "Teksti"
+    )
+
+    private val germanStrings = mapOf(
+        // Greetings
+        "greeting_morning" to "Guten Morgen",
+        "greeting_afternoon" to "Guten Tag",
+        "greeting_evening" to "Guten Abend",
+        "greeting_night" to "Gute Nacht",
+        "greeting_subtitle" to "Was möchtest du heute hören?",
+        "profile_default_name" to "Musikliebhaber",
+
+        // Tabs
+        "tab_library" to "Bibliothek",
+        "tab_home" to "Bibliothek",
+        "tab_playlists" to "Playlists",
+        "tab_search" to "Suche",
+        "tab_offline" to "Offline",
+        "tab_downloads" to "Offline",
+        "tab_settings" to "Einstellungen",
+
+        // Subtabs & Sections
+        "subtab_overview" to "Übersicht",
+        "subtab_libraries" to "Bibliotheken",
+        "subtab_songs" to "Titel",
+        "subtab_albums" to "Alben",
+        "subtab_artists" to "Künstler",
+        "subtab_quick_mix" to "Server Mix",
+        "subtab_recent" to "Verlauf",
+        "library_labels_title" to "Bibliotheks-Labels",
+        "recently_played_title" to "Zuletzt Gespielt",
+        "recently_played_subtitle" to "Deine zuletzt gehörten Titel",
+        "recently_added_title" to "Kürzlich Hinzugefügt",
+        "recently_added_subtitle" to "Neuzugänge in deiner Sammlung",
+        "most_played_title" to "Meistgespielt",
+        "most_played_subtitle" to "Deine beliebtesten Alben und Titel",
+        "random_albums_title" to "Zufällig aus der Mediathek",
+        "random_albums_subtitle" to "Entdecke Perlen aus deiner Sammlung wieder",
+        "btn_refresh_random" to "Neu Mischen",
+        "empty_recent_title" to "Keine letzten Titel",
+        "empty_recent_desc" to "Gespielte Titel erscheinen hier für schnellen Zugriff.",
+        "server_libraries_title" to "Navidrome Musikordner",
+        "server_libraries_desc" to "Durchsuche verschiedene konfigurierte Musikordner auf deinem Navidrome-Server.",
+        "btn_browse_library" to "Bibliothek öffnen",
+        "active_library_badge" to "AKTIVE BIBLIOTHEK",
+        "all_libraries_title" to "Alle Musikordner",
+        "all_libraries_desc" to "Kombinierte Sammlung aller Server-Ordner",
+        "switch_library_prompt" to "Aktive Bibliothek",
+        "sidebar_libraries_title" to "Server-Bibliotheken",
+        "sidebar_open" to "Bibliotheken",
+        "sort_by" to "Sortieren nach",
+        "sort_name" to "Name (A-Z)",
+        "sort_duration" to "Dauer",
+        "sort_recent" to "Zuletzt hinzugefügt",
+        "sort_artist" to "Künstler",
+        "shake_detected_toast" to "Schütteln erkannt! Spiele zufälligen Titel aus %s",
+
+        // Deck Actions & General Actions
+        "deck_liked" to "Lieblingslieder",
+        "deck_liked_sub" to "Deine Favoriten",
+        "deck_mix" to "Zufallsmix",
+        "deck_mix_sub" to "25 Zufallstitel",
+        "deck_shuffle" to "Alles Mischen",
+        "deck_shuffle_sub" to "Ganze Bibliothek abspielen",
+        "deck_discover" to "Entdecken",
+        "deck_discover_sub" to "Neue Musik erkunden",
+        "play_all" to "Alle abspielen",
+        "shuffle_all" to "Zufällig wiedergeben",
+        "play_cached" to "Heruntergeladene abspielen",
+        "clear_all_cache" to "Cache leeren",
+        "offline_only" to "Nur Offline",
+        "sync_now" to "Jetzt synchronisieren",
+        "saved_servers" to "Gespeicherte Server",
+        "tracks_count" to "Titel",
+        "settings_crossfade" to "Audio-Überblendung (Crossfade)",
+        "settings_crossfade_duration" to "Überblendungsdauer",
+        "settings_crossfade_seconds" to "Sekunden (1 - 20s)",
+        "settings_crossfade_desc" to "Nahtloser Übergang zwischen aufeinanderfolgenden Titeln.",
+        "multi_libraries_selected" to "%d Bibliotheken ausgewählt",
+        "select_all_libraries" to "Alle auswählen",
+        "clear_library_selection" to "Auswahl aufheben",
+        "all_libraries_combined" to "Alle Bibliotheken (Vereint)",
+        "downloads_title" to "Offline Downloads",
+        "empty_downloads" to "Keine Downloads vorhanden",
+        "empty_downloads_desc" to "Heruntergeladene Titel erscheinen hier für Offline-Wiedergabe.",
+
+        // Library & Empty State
+        "empty_library_title" to "Keine Musik gefunden",
+        "empty_library_desc" to "Verbinde dich in den Einstellungen mit deinem Navidrome-Server.",
+        "btn_connect_server" to "Server einrichten",
+        "btn_scan_network" to "Netzwerk automatisch scannen",
+        "album_tracks_count" to "%d Titel",
+        "album_duration" to "%d Min",
+        "btn_play_all" to "Alle abspielen",
+        "btn_shuffle" to "Mischen",
+        "btn_download_all" to "Alle herunterladen",
+        "badge_offline" to "OFFLINE",
+        "badge_online" to "ONLINE",
+        "top_picks" to "Top Alben",
+        "featured_artists" to "Künstler",
+
+        // Search
+        "search_hint" to "Titel, Alben, Künstler suchen...",
+        "search_tracks" to "Titel",
+        "search_albums" to "Alben",
+        "search_artists" to "Künstler",
+        "search_no_results" to "Keine Ergebnisse für \"%s\"",
+        "search_recent" to "Durchsuche deinen Navidrome-Server",
+        "search_hint_sub" to "Gib Künstler, Album oder Titel ein",
+        "search_history_title" to "Letzte Suchanfragen",
+        "search_history_clear" to "Verlauf löschen",
+
+        // Playlists
+        "playlists_title" to "Wiedergabelisten",
+        "btn_create_playlist" to "Neue Playlist",
+        "dialog_create_playlist" to "Neue Playlist erstellen",
+        "dialog_playlist_name" to "Playlist-Name",
+        "btn_create" to "Erstellen",
+        "btn_cancel" to "Abbrechen",
+        "empty_playlists" to "Keine Playlists vorhanden",
+        "empty_playlists_desc" to "Erstelle eigene Playlists oder synchronisiere sie vom Server.",
+        "delete_playlist" to "Playlist löschen",
+
+        // Offline
+        "offline_title" to "Offline-Speicher",
+        "offline_cached_total" to "Heruntergeladene Musik",
+        "offline_mode_toggle" to "Offline-Modus",
+        "offline_mode_desc" to "Nur heruntergeladene Titel abspielen (spart mobile Daten)",
+        "btn_play_cached" to "Heruntergeladene abspielen",
+        "btn_clear_cache" to "Cache leeren",
+        "empty_cache_title" to "Keine Offline-Titel",
+        "empty_cache_desc" to "Lade beliebige Titel oder ganze Alben für unterwegs herunter.",
+
+        // Settings
+        "settings_title" to "Einstellungen",
+        "server_status_title" to "Server-Status",
+        "server_connected" to "Verbunden",
+        "server_disconnected" to "Getrennt",
+        "server_sync_now" to "Bibliothek synchronisieren",
+        "server_config_title" to "Navidrome Server",
+        "protocol" to "Protokoll",
+        "host" to "Host / IP-Adresse",
+        "host_placeholder" to "192.168.1.50 oder musik.server.de",
+        "port" to "Port (Standard 4533)",
+        "port_placeholder" to "4533",
+        "username" to "Benutzername",
+        "password" to "Passwort",
+        "use_token_auth" to "Token-Authentifizierung (MD5/Salt)",
+        "use_token_auth_desc" to "Empfohlen für Navidrome & Subsonic Sicherheit",
+        "btn_connect" to "Mit Server verbinden",
+        "btn_connecting" to "Verbinde...",
+        "btn_auto_scan" to "Lokales Netzwerk scannen",
+        "btn_stop_auto_scan" to "Scan abbrechen",
+        "btn_scanning" to "Suche nach Navidrome im Subnetz...",
+        "scan_no_network_title" to "Keine Netzwerkverbindung",
+        "scan_no_network_desc" to "Gerät ist offline. Verbinde mit WLAN für Server-Scan.",
+        "library_filter" to "Bibliotheksfilter",
+        "all_libraries" to "Alle Bibliotheken",
+        "select_folder" to "Musikordner wählen",
+
+        // Appearance & Language
+        "appearance_title" to "Erscheinungsbild & Sprache",
+        "theme_mode" to "Design-Modus",
+        "theme_dark" to "Dunkel",
+        "theme_light" to "Hell",
+        "theme_system" to "Systemstandard",
+        "language" to "Sprache",
+        "lang_english" to "English (Englisch)",
+        "lang_german" to "Deutsch",
+        "lang_albanian" to "Shqip (Albanisch)",
+
+        // Player & Queue
+        "now_playing" to "Aktuelle Wiedergabe",
+        "up_next" to "Als Nächstes",
+        "queue_title" to "Warteschlange",
+        "play_next" to "Als Nächstes abspielen",
+        "add_to_queue" to "An Warteschlange anhängen",
+        "quality_hi_res" to "FLAC / Lossless",
+        "quality_standard" to "Standard 320kbps",
+        "playback_speed" to "Geschwindigkeit",
+        "volume" to "Lautstärke",
+        "streaming_direct" to "Direkter Stream",
+        "playing_offline" to "Aus Offline-Cache",
+
+        // Newly added music / Home
+        "newly_added_title" to "Kürzlich Hinzugefügte Musik",
+        "new_albums_title" to "Neueste Alben",
+        "new_songs_title" to "Neu hinzugefügte Titel",
+        "new_badge" to "NEU",
+        "btn_play_all" to "Alle abspielen",
+        "btn_shuffle_all" to "Mischen",
+        "see_all" to "Alle ansehen",
+
+        // Listening Statistics
+        "stats_title" to "Hörstatistiken",
+        "stats_desc" to "Erfahre deine Hörgewohnheiten, Spitzenzeiten und Top-Künstler",
+        "stats_btn_view" to "Statistiken ansehen",
+        "stats_total_listening" to "Gesamte Hörzeit",
+        "stats_today" to "Heute",
+        "stats_this_week" to "Diese Woche",
+        "stats_tracks_played" to "Gespielte Titel",
+        "stats_peak_day" to "Aktivster Wochentag",
+        "stats_peak_hours" to "Aktivste Tageszeit",
+        "stats_day_breakdown" to "Aktivität nach Wochentag",
+        "stats_time_breakdown" to "Aktivität nach Tageszeit",
+        "stats_top_artists" to "Top Künstler",
+        "stats_top_tracks" to "Meistgespielte Titel",
+        "stats_empty_title" to "Noch kein Hörverlauf",
+        "stats_empty_desc" to "Spiele Musik ab, um dein Hörprofil aufzubauen!",
+        "stats_clear" to "Statistiken zurücksetzen",
+        "stats_clear_confirm" to "Möchtest du die Hörstatistiken wirklich zurücksetzen?",
+
+        // Lyrics
+        "lyrics_title" to "Songtext",
+        "lyrics_loading" to "Lade Songtext...",
+        "lyrics_source_label" to "Quelle:",
+        "lyrics_source_file" to "Eingebettet in Audiodatei",
+        "lyrics_source_server" to "Navidrome Server",
+        "lyrics_source_online" to "Online (LrcLib synchronisiert)",
+        "lyrics_not_found" to "Kein Songtext für diesen Titel gefunden",
+        "lyrics_not_found_desc" to "Datei, Navidrome-Server und Online-Datenbank wurden überprüft.",
+        "lyrics_tap_to_seek" to "Tippe auf eine Textzeile zum Springen",
+        "lyrics_reload" to "Songtext neu laden",
+        "lyrics_tab_artwork" to "Cover",
+        "lyrics_tab_lyrics" to "Text"
     )
 }

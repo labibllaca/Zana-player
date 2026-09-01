@@ -1,6 +1,7 @@
 package com.labix.navirom.ui.screens
 
 import androidx.activity.compose.BackHandler
+import java.util.Calendar
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -65,6 +66,10 @@ fun LibraryScreen(
     songSortOrder: SongSortOrder = SongSortOrder.NAME,
     onSetSongSortOrder: (SongSortOrder) -> Unit = {},
     newestAlbums: List<NaviromAlbum> = emptyList(),
+    mostPlayedAlbums: List<NaviromAlbum> = emptyList(),
+    randomAlbums: List<NaviromAlbum> = emptyList(),
+    onRefreshRandomAlbums: () -> Unit = {},
+    profileName: String = "",
     newestTracks: List<NaviromTrack> = emptyList(),
     selectedAlbumId: String?,
     selectedAlbumTracks: List<NaviromTrack>,
@@ -254,18 +259,25 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .testTag("library_screen")
         ) {
-            // Top Active Server Library Pill with Sidebar Trigger
+            // 1. Time-of-day greeting header with profile name
+            GreetingHeader(
+                profileName = profileName,
+                appLanguage = appLanguage,
+                onOpenSidebar = onOpenSidebar
+            )
+
+            // 2. Library Labels & Active Folder Switcher
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                 onClick = { onOpenSidebar() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
                     .testTag("library_folder_switcher")
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -277,8 +289,8 @@ fun LibraryScreen(
                         IconButton(
                             onClick = { onOpenSidebar() },
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
                                 .testTag("open_libraries_sidebar_btn")
                         ) {
@@ -286,7 +298,7 @@ fun LibraryScreen(
                                 imageVector = Icons.Filled.Menu,
                                 contentDescription = str("subtab_libraries"),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -312,7 +324,7 @@ fun LibraryScreen(
                         modifier = Modifier.clickable { onOpenSidebar() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -331,115 +343,43 @@ fun LibraryScreen(
                                 imageVector = Icons.Filled.ChevronRight,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
                 }
             }
 
-            // Recently Played Horizontal Row Section (moved above tabs)
-            if (recentlyPlayedTracks.isNotEmpty()) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Filled.History,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = str("recently_played_title"),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        TextButton(
-                            onClick = { onSubTabSelected(LibrarySubTab.RECENT) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(str("subtab_recent"))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(recentlyPlayedTracks.take(15), key = { "recent_horiz_${it.id}" }) { track ->
-                            val isThisPlaying = currentTrack?.id == track.id
-                            Surface(
-                                onClick = { onTrackClick(track, recentlyPlayedTracks) },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isThisPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.width(135.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Box {
-                                        SongAlbumCover(
-                                            coverArtUrl = track.coverArtUrl,
-                                            contentDescription = track.title,
-                                            isAlbum = false,
-                                            shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(115.dp)
-                                        )
-                                        if (isThisPlaying && isPlaying) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .matchParentSize()
-                                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.PlayArrow,
-                                                    contentDescription = null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(28.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = track.title,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = track.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Sleek filter pills row with SONGS as first-class tab
+            // Library Filter Chips / Labels
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // OVERVIEW subtab chip (Default Home View)
+                FilterChip(
+                    selected = subTab == LibrarySubTab.OVERVIEW,
+                    onClick = { onSubTabSelected(LibrarySubTab.OVERVIEW) },
+                    label = { Text(str("subtab_overview")) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (subTab == LibrarySubTab.OVERVIEW) Icons.Filled.Dashboard else Icons.Outlined.Dashboard,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    shape = RoundedCornerShape(50),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier.testTag("tab_overview")
+                )
+
                 // SONGS subtab chip (List view for songs of a library)
                 FilterChip(
                     selected = subTab == LibrarySubTab.SONGS,
@@ -459,27 +399,6 @@ fun LibraryScreen(
                         selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     modifier = Modifier.testTag("tab_songs")
-                )
-
-                // NEWEST subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.NEWEST,
-                    onClick = { onSubTabSelected(LibrarySubTab.NEWEST) },
-                    label = { Text(str("newly_added_title")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.NEWEST) Icons.Filled.FiberNew else Icons.Outlined.FiberNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_newest")
                 )
 
                 // ALBUMS subtab chip
@@ -522,6 +441,27 @@ fun LibraryScreen(
                         selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     modifier = Modifier.testTag("tab_artists")
+                )
+
+                // NEWEST subtab chip
+                FilterChip(
+                    selected = subTab == LibrarySubTab.NEWEST,
+                    onClick = { onSubTabSelected(LibrarySubTab.NEWEST) },
+                    label = { Text(str("newly_added_title")) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (subTab == LibrarySubTab.NEWEST) Icons.Filled.FiberNew else Icons.Outlined.FiberNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    shape = RoundedCornerShape(50),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier.testTag("tab_newest")
                 )
 
                 // QUICK MIX subtab chip
@@ -570,6 +510,382 @@ fun LibraryScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             when (subTab) {
+                LibrarySubTab.OVERVIEW -> {
+                    // Overview Dashboard with the 4 requested groups:
+                    // 1. Recent Played Songs
+                    // 2. Recent Added (Albums & Tracks)
+                    // 3. Most Played (Albums)
+                    // 4. Random from Library (Albums)
+                    val effectiveNewAlbums = if (newestAlbums.isNotEmpty()) newestAlbums else albums.take(12)
+                    val effectiveMostPlayed = if (mostPlayedAlbums.isNotEmpty()) mostPlayedAlbums else albums.take(12)
+                    val effectiveRandom = if (randomAlbums.isNotEmpty()) randomAlbums else albums.shuffled().take(12)
+
+                    LazyColumn(
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 80.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("library_overview_list")
+                    ) {
+                        // Group 1: 'Recent Played' Songs
+                        item {
+                            Column {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.History,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                        Column {
+                                            Text(
+                                                text = str("recently_played_title"),
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = str("recently_played_subtitle"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    if (recentlyPlayedTracks.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = { onSubTabSelected(LibrarySubTab.RECENT) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(str("see_all"), style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                if (recentlyPlayedTracks.isNotEmpty()) {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(recentlyPlayedTracks.take(15), key = { "overview_recent_${it.id}" }) { track ->
+                                            val isThisPlaying = currentTrack?.id == track.id
+                                            Surface(
+                                                onClick = { onTrackClick(track, recentlyPlayedTracks) },
+                                                shape = RoundedCornerShape(16.dp),
+                                                color = if (isThisPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                                modifier = Modifier.width(135.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp)) {
+                                                    Box {
+                                                        SongAlbumCover(
+                                                            coverArtUrl = track.coverArtUrl,
+                                                            contentDescription = track.title,
+                                                            isAlbum = false,
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(115.dp)
+                                                        )
+                                                        if (isThisPlaying && isPlaying) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .matchParentSize()
+                                                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Filled.PlayArrow,
+                                                                    contentDescription = null,
+                                                                    tint = Color.White,
+                                                                    modifier = Modifier.size(28.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Text(
+                                                        text = track.title,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = track.artist,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Clean empty state card for Recent
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.History,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = str("empty_recent_title"),
+                                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = str("empty_recent_desc"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Group 2: 'Recent Added' (Albums & Music)
+                        if (effectiveNewAlbums.isNotEmpty()) {
+                            item {
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.FiberNew,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = str("recently_added_title"),
+                                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = str("recently_added_subtitle"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        TextButton(
+                                            onClick = { onSubTabSelected(LibrarySubTab.NEWEST) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(str("see_all"), style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(effectiveNewAlbums.take(12), key = { "overview_new_${it.id}" }) { album ->
+                                            Box(modifier = Modifier.width(145.dp)) {
+                                                AlbumCard(
+                                                    album = album,
+                                                    onClick = { onSelectAlbum(album.id) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Group 3: 'Most Played' (Top Albums)
+                        if (effectiveMostPlayed.isNotEmpty()) {
+                            item {
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.TrendingUp,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = str("most_played_title"),
+                                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = str("most_played_subtitle"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(effectiveMostPlayed.take(12), key = { "overview_most_played_${it.id}" }) { album ->
+                                            Box(modifier = Modifier.width(145.dp)) {
+                                                AlbumCard(
+                                                    album = album,
+                                                    onClick = { onSelectAlbum(album.id) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Group 4: 'Random from Library' (Alben)
+                        if (effectiveRandom.isNotEmpty()) {
+                            item {
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Casino,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = str("random_albums_title"),
+                                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = str("random_albums_subtitle"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(
+                                            onClick = onRefreshRandomAlbums,
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Refresh,
+                                                contentDescription = str("btn_refresh_random"),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(effectiveRandom.take(12), key = { "overview_random_${it.id}" }) { album ->
+                                            Box(modifier = Modifier.width(145.dp)) {
+                                                AlbumCard(
+                                                    album = album,
+                                                    onClick = { onSelectAlbum(album.id) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 LibrarySubTab.SONGS -> {
                     // List view for songs in library with sorting controls
                     val effectiveSongs = if (librarySongs.isNotEmpty()) librarySongs else quickMixTracks
@@ -1474,3 +1790,88 @@ fun AlbumDetailView(
     }
     }
 }
+
+@Composable
+private fun GreetingHeader(
+    profileName: String,
+    appLanguage: AppLanguage,
+    onOpenSidebar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    fun str(key: String): String = NaviromStrings.get(key, appLanguage)
+
+    val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val (greetingKey, icon, iconColor) = when (currentHour) {
+        in 5..11 -> Triple("greeting_morning", Icons.Filled.WbSunny, Color(0xFFFFA000))
+        in 12..17 -> Triple("greeting_afternoon", Icons.Filled.WbSunny, Color(0xFFFFB300))
+        in 18..22 -> Triple("greeting_evening", Icons.Filled.WbTwilight, Color(0xFFFF7043))
+        else -> Triple("greeting_night", Icons.Filled.NightsStay, Color(0xFF7E57C2))
+    }
+
+    val greetingPrefix = str(greetingKey)
+    val displayName = if (profileName.isNotBlank()) profileName.trim() else str("profile_default_name")
+    val greetingText = "$greetingPrefix, $displayName"
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .testTag("library_greeting_header")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(
+                        text = greetingText,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = str("greeting_subtitle"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // User Profile avatar badge
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                onClick = onOpenSidebar,
+                modifier = Modifier
+                    .size(42.dp)
+                    .testTag("greeting_profile_avatar")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+

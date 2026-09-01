@@ -73,6 +73,8 @@ fun NaviromApp(
 
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val newestAlbums by viewModel.newestAlbums.collectAsStateWithLifecycle()
+    val mostPlayedAlbums by viewModel.mostPlayedAlbums.collectAsStateWithLifecycle()
+    val randomAlbums by viewModel.randomAlbums.collectAsStateWithLifecycle()
     val newestTracks by viewModel.newestTracks.collectAsStateWithLifecycle()
     val artists by viewModel.artists.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
@@ -329,6 +331,10 @@ fun NaviromApp(
                             onSubTabSelected = { viewModel.setLibrarySubTab(it) },
                             albums = albums,
                             newestAlbums = newestAlbums,
+                            mostPlayedAlbums = mostPlayedAlbums,
+                            randomAlbums = randomAlbums,
+                            onRefreshRandomAlbums = { viewModel.refreshRandomAlbums() },
+                            profileName = serverState.username,
                             newestTracks = newestTracks,
                             artists = artists,
                             playlists = playlists,
@@ -566,6 +572,10 @@ fun NaviromApp(
                         onSubTabSelected = { viewModel.setLibrarySubTab(it) },
                         albums = albums,
                         newestAlbums = newestAlbums,
+                        mostPlayedAlbums = mostPlayedAlbums,
+                        randomAlbums = randomAlbums,
+                        onRefreshRandomAlbums = { viewModel.refreshRandomAlbums() },
+                        profileName = serverState.username,
                         newestTracks = newestTracks,
                         artists = artists,
                         playlists = playlists,
@@ -782,6 +792,10 @@ private fun TabContent(
     onSubTabSelected: (LibrarySubTab) -> Unit,
     albums: List<com.labix.navirom.data.model.NaviromAlbum>,
     newestAlbums: List<com.labix.navirom.data.model.NaviromAlbum> = emptyList(),
+    mostPlayedAlbums: List<com.labix.navirom.data.model.NaviromAlbum> = emptyList(),
+    randomAlbums: List<com.labix.navirom.data.model.NaviromAlbum> = emptyList(),
+    onRefreshRandomAlbums: () -> Unit = {},
+    profileName: String = "",
     newestTracks: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
     artists: List<com.labix.navirom.data.model.NaviromArtist>,
     playlists: List<com.labix.navirom.data.model.NaviromPlaylist>,
@@ -861,6 +875,10 @@ private fun TabContent(
                 onSubTabSelected = onSubTabSelected,
                 albums = albums,
                 newestAlbums = newestAlbums,
+                mostPlayedAlbums = mostPlayedAlbums,
+                randomAlbums = randomAlbums,
+                onRefreshRandomAlbums = onRefreshRandomAlbums,
+                profileName = profileName,
                 newestTracks = newestTracks,
                 artists = artists,
                 quickMixTracks = quickMixTracks,

@@ -42,14 +42,15 @@ enum class NaviromTab {
 }
 
 enum class LibrarySubTab {
-    LIBRARIES,
+    OVERVIEW,
     SONGS,
-    NEWEST,
     ALBUMS,
     ARTISTS,
-    GENRES,
+    NEWEST,
     QUICK_MIX,
-    RECENT
+    RECENT,
+    LIBRARIES,
+    GENRES
 }
 
 enum class SongSortOrder {
@@ -122,7 +123,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _currentTab = MutableStateFlow(NaviromTab.LIBRARY)
     val currentTab: StateFlow<NaviromTab> = _currentTab.asStateFlow()
 
-    private val _librarySubTab = MutableStateFlow(LibrarySubTab.ALBUMS)
+    private val _librarySubTab = MutableStateFlow(LibrarySubTab.OVERVIEW)
     val librarySubTab: StateFlow<LibrarySubTab> = _librarySubTab.asStateFlow()
 
     private val _selectedAlbumId = MutableStateFlow<String?>(null)
@@ -165,6 +166,12 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     private val _newestAlbums = MutableStateFlow<List<NaviromAlbum>>(emptyList())
     val newestAlbums: StateFlow<List<NaviromAlbum>> = _newestAlbums.asStateFlow()
+
+    private val _mostPlayedAlbums = MutableStateFlow<List<NaviromAlbum>>(emptyList())
+    val mostPlayedAlbums: StateFlow<List<NaviromAlbum>> = _mostPlayedAlbums.asStateFlow()
+
+    private val _randomAlbums = MutableStateFlow<List<NaviromAlbum>>(emptyList())
+    val randomAlbums: StateFlow<List<NaviromAlbum>> = _randomAlbums.asStateFlow()
 
     private val _newestTracks = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val newestTracks: StateFlow<List<NaviromTrack>> = _newestTracks.asStateFlow()
@@ -1276,6 +1283,18 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     _playlists.value = list
                 }
 
+                // Fetch Frequent / Most Played Albums
+                val frequentRes = subsonicClient.getAlbums(type = "frequent", size = 20)
+                frequentRes.onSuccess { list ->
+                    _mostPlayedAlbums.value = if (list.isNotEmpty()) list else _albums.value.take(15)
+                }
+
+                // Fetch Random Albums for discovery
+                val randomRes = subsonicClient.getAlbums(type = "random", size = 20)
+                randomRes.onSuccess { list ->
+                    _randomAlbums.value = if (list.isNotEmpty()) list else _albums.value.shuffled().take(15)
+                }
+
                 // Fetch Quick Mix & Newly Added Tracks
                 val mixRes = subsonicClient.getRandomTracks(size = 30)
                 mixRes.onSuccess { list ->
@@ -1307,6 +1326,18 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val playlistsRes = subsonicClient.getPlaylists()
                 playlistsRes.onSuccess { list ->
                     _playlists.value = list
+                }
+
+                // Fetch Frequent / Most Played Albums
+                val frequentRes = subsonicClient.getAlbums(type = "frequent", size = 20)
+                frequentRes.onSuccess { list ->
+                    _mostPlayedAlbums.value = if (list.isNotEmpty()) list else _albums.value.take(15)
+                }
+
+                // Fetch Random Albums for discovery
+                val randomRes = subsonicClient.getAlbums(type = "random", size = 20)
+                randomRes.onSuccess { list ->
+                    _randomAlbums.value = if (list.isNotEmpty()) list else _albums.value.shuffled().take(15)
                 }
 
                 val mixRes = subsonicClient.getRandomTracks(size = 30)
@@ -1348,6 +1379,8 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val albumList = mergedAlbums.values.toList()
                 _albums.value = albumList
                 _newestAlbums.value = albumList.take(15)
+                _mostPlayedAlbums.value = albumList.take(15)
+                _randomAlbums.value = albumList.shuffled().take(15)
                 _artists.value = mergedArtists.values.sortedBy { it.name.lowercase() }
                 _rawLibrarySongs.value = mergedTracks.values.toList()
                 _quickMixTracks.value = mergedMix.distinctBy { it.id }.take(30)
@@ -1355,6 +1388,23 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
                 subsonicClient.getPlaylists().onSuccess { list ->
                     _playlists.value = list
+                }
+            }
+        }
+    }
+
+    fun refreshRandomAlbums() {
+        viewModelScope.launch {
+            val randomRes = subsonicClient.getAlbums(type = "random", size = 20)
+            randomRes.onSuccess { list ->
+                if (list.isNotEmpty()) {
+                    _randomAlbums.value = list
+                } else if (_albums.value.isNotEmpty()) {
+                    _randomAlbums.value = _albums.value.shuffled().take(15)
+                }
+            }.onFailure {
+                if (_albums.value.isNotEmpty()) {
+                    _randomAlbums.value = _albums.value.shuffled().take(15)
                 }
             }
         }
