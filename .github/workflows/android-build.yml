@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
-      GRADLE_OPTS: "-Djava.awt.headless=true"
+      JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true -Didea.headless=true"
+      GRADLE_OPTS: "-Djava.awt.headless=true -Didea.headless=true"
 
     steps:
       - name: Checkout Code
@@ -25,10 +25,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: false
 
       - name: Create Empty .env File
         run: touch .env
