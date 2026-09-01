@@ -53,6 +53,18 @@ jobs:
           fi
           git grep -n "com.example.navirom" -- '*.kt' '*.kts' '*.xml' 2>/dev/null | head -20 || true
 
+      - name: R quick autopsy
+        run: |
+          gradle :app:generateDebugRFile --no-daemon || true
+          echo "=== JAR-Inhalt ==="
+          for j in $(find app/build -name "R.jar" 2>/dev/null); do echo "== $j"; unzip -l "$j" | head -20; done
+          echo "=== Ressourcen im Repo ==="
+          find app/src/main/res -type f | head -30
+          echo "=== Geisterbaum komplett ==="
+          git grep -l "com.example.navirom" || true
+          echo "=== Alle Package-Deklarationen ==="
+          git grep -h "^package " -- "*.kt" 2>/dev/null | sort | uniq -c | sort -rn || true
+
       - name: Build Debug APK
         run: gradle clean assembleDebug --no-daemon
 
