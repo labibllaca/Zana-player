@@ -44,15 +44,33 @@ jobs:
         run: |
           git rev-parse HEAD
           git status --short
+          git log --oneline -3 -- app/build.gradle.kts || true
           grep -n "namespace" app/build.gradle.kts
           if [ -f "app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt" ]; then
             sed -n '1,30p' app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt
           elif [ -f "app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt" ]; then
             sed -n '1,30p' app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt
           fi
+          git grep -n "com.example.navirom" -- '*.kt' '*.kts' '*.xml' 2>/dev/null | head -20 || true
 
       - name: Build Debug APK
         run: gradle clean assembleDebug --no-daemon
+
+      - name: Inspect generated R
+        if: failure()
+        run: |
+          find app/build \( -name "R.java" -o -name "R.jar" -o -iname "*r_class*" \) 2>/dev/null | head -20 || true
+          for f in $(find app/build -name "R.java" 2>/dev/null | head -3); do echo "== $f"; head -5 "$f"; done
+
+      - name: Upload build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            **/build/reports/
+            app/build/generated/
+          if-no-files-found: ignore
 
       - name: Get Current Date
         id: date
