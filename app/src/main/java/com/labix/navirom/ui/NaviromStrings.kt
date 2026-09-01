@@ -253,7 +253,27 @@ object NaviromStrings {
         "lyrics_tap_to_seek" to "Tap any lyric line to jump to that moment",
         "lyrics_reload" to "Refetch Lyrics",
         "lyrics_tab_artwork" to "Cover Art",
-        "lyrics_tab_lyrics" to "Lyrics"
+        "lyrics_tab_lyrics" to "Lyrics",
+
+        // App Updates
+        "updates_section_title" to "App Updates & GitHub Releases",
+        "updates_current_version" to "Installed Version",
+        "updates_check_btn" to "Check for Updates",
+        "updates_checking" to "Checking GitHub releases...",
+        "updates_auto_check" to "Check for updates on launch",
+        "updates_auto_check_desc" to "Automatically notifies when a new APK is released on GitHub",
+        "updates_new_available_title" to "New Update Available!",
+        "updates_uptodate_title" to "App is Up to Date",
+        "updates_uptodate_desc" to "You are running the latest version available on GitHub.",
+        "updates_install_btn" to "Download & Install",
+        "updates_downloading" to "Downloading APK...",
+        "updates_ready_install" to "Ready to install",
+        "updates_changelog" to "What's New",
+        "updates_view_on_github" to "View Release on GitHub",
+        "updates_github_repo" to "GitHub Repository",
+        "updates_dismiss" to "Later",
+        "updates_update_now" to "Update Now",
+        "updates_never_checked" to "Never checked"
     )
 
     private val albanianStrings = mapOf(
@@ -476,7 +496,27 @@ object NaviromStrings {
         "lyrics_tap_to_seek" to "Prek çdo rresht për të kërcyer në atë moment",
         "lyrics_reload" to "Rikërko tekstin",
         "lyrics_tab_artwork" to "Kopertina",
-        "lyrics_tab_lyrics" to "Teksti"
+        "lyrics_tab_lyrics" to "Teksti",
+
+        // App Updates
+        "updates_section_title" to "Përditësimet e Aplikacionit & GitHub",
+        "updates_current_version" to "Versioni i instaluar",
+        "updates_check_btn" to "Kontrollo për përditësime",
+        "updates_checking" to "Duke kontrolluar në GitHub...",
+        "updates_auto_check" to "Kontrollo automatikisht në nisje",
+        "updates_auto_check_desc" to "Njofton automatikisht kur një APK i ri ngarkohet në GitHub",
+        "updates_new_available_title" to "Përditësim i ri në dispozicion!",
+        "updates_uptodate_title" to "Aplikacioni është i përditësuar",
+        "updates_uptodate_desc" to "Po përdorni versionin më të fundit nga GitHub.",
+        "updates_install_btn" to "Shkarko dhe Instalo",
+        "updates_downloading" to "Duke shkarkuar APK...",
+        "updates_ready_install" to "Gati për instalim",
+        "updates_changelog" to "Çfarë ka të re",
+        "updates_view_on_github" to "Shiko në GitHub",
+        "updates_github_repo" to "Depoja në GitHub",
+        "updates_dismiss" to "Më vonë",
+        "updates_update_now" to "Përditëso tani",
+        "updates_never_checked" to "Pa kontrolluar"
     )
 
     private val germanStrings = mapOf(
@@ -700,6 +740,26 @@ object NaviromStrings {
         "lyrics_tap_to_seek" to "Tippe auf eine Textzeile zum Springen",
         "lyrics_reload" to "Songtext neu laden",
         "lyrics_tab_artwork" to "Cover",
-        "lyrics_tab_lyrics" to "Text"
+        "lyrics_tab_lyrics" to "Text",
+
+        // App Updates
+        "updates_section_title" to "App-Updates & GitHub Releases",
+        "updates_current_version" to "Installierte Version",
+        "updates_check_btn" to "Nach Updates suchen",
+        "updates_checking" to "Prüfe GitHub Releases...",
+        "updates_auto_check" to "Beim Start nach Updates suchen",
+        "updates_auto_check_desc" to "Benachrichtigt automatisch, sobald ein neues APK auf GitHub veröffentlicht wird",
+        "updates_new_available_title" to "Neues Update verfügbar!",
+        "updates_uptodate_title" to "App ist auf dem neuesten Stand",
+        "updates_uptodate_desc" to "Du nutzt bereits die aktuellste Version von GitHub.",
+        "updates_install_btn" to "Herunterladen & Installieren",
+        "updates_downloading" to "APK wird heruntergeladen...",
+        "updates_ready_install" to "Bereit zur Installation",
+        "updates_changelog" to "Änderungen / Was ist neu",
+        "updates_view_on_github" to "Release auf GitHub ansehen",
+        "updates_github_repo" to "GitHub Repository",
+        "updates_dismiss" to "Später",
+        "updates_update_now" to "Jetzt aktualisieren",
+        "updates_never_checked" to "Noch nie geprüft"
     )
 }

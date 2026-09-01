@@ -41,7 +41,14 @@ import com.labix.ui.theme.AccentEmerald
 
 import com.labix.navirom.diagnostics.AppDiagnostics
 import com.labix.navirom.ui.components.DebugLogsDialog
+import com.labix.navirom.ui.components.AppUpdateDialog
+import com.labix.navirom.update.AppUpdateInfo
+import com.labix.navirom.update.UpdateState
 import com.labix.navirom.ui.util.rememberNaviromHaptics
+import com.labix.BuildConfig
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +74,15 @@ fun ServerSettingsScreen(
     onToggleMusicFolder: (String) -> Unit = {},
     onSelectAllMusicFolders: () -> Unit = {},
     focusUsernameTrigger: Long = 0L,
+    updateState: UpdateState = UpdateState.Idle,
+    autoCheckUpdates: Boolean = true,
+    githubRepo: String = "labibllaca/navirom",
+    lastUpdateCheckedTime: Long = 0L,
+    onCheckForUpdates: () -> Unit = {},
+    onDownloadAndInstallUpdate: (AppUpdateInfo) -> Unit = {},
+    onSetAutoCheckUpdates: (Boolean) -> Unit = {},
+    onSetGithubRepo: (String) -> Unit = {},
+    onDismissUpdate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberNaviromHaptics()
@@ -1034,6 +1050,239 @@ fun ServerSettingsScreen(
                         Icon(Icons.Outlined.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("View Logs", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // App Updates Card
+        var isEditingRepo by remember { mutableStateOf(false) }
+        var repoInput by remember(githubRepo) { mutableStateOf(githubRepo) }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("app_updates_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = str("updates_section_title"),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${str("updates_current_version")}: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Auto-check switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = str("updates_auto_check"),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = str("updates_auto_check_desc"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = autoCheckUpdates,
+                        onCheckedChange = { onSetAutoCheckUpdates(it) },
+                        modifier = Modifier.testTag("auto_update_switch")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // GitHub Repository Slug Setting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = str("updates_github_repo"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (isEditingRepo) {
+                            OutlinedTextField(
+                                value = repoInput,
+                                onValueChange = { repoInput = it },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                trailingIcon = {
+                                    IconButton(onClick = {
+                                        onSetGithubRepo(repoInput)
+                                        isEditingRepo = false
+                                    }) {
+                                        Icon(Icons.Filled.Check, contentDescription = "Save")
+                                    }
+                                }
+                            )
+                        } else {
+                            Text(
+                                text = githubRepo,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (!isEditingRepo) {
+                        TextButton(onClick = { isEditingRepo = true }) {
+                            Text("Edit", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                if (lastUpdateCheckedTime > 0L) {
+                    val lastDateStr = remember(lastUpdateCheckedTime) {
+                        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                        sdf.format(Date(lastUpdateCheckedTime))
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Letzte Prüfung: $lastDateStr",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Update Status or Check Button
+                when (updateState) {
+                    is UpdateState.Checking -> {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(str("updates_checking"))
+                        }
+                    }
+                    is UpdateState.Available -> {
+                        val info = updateState.updateInfo
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.NewReleases,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${str("updates_new_available_title")} (${info.tagName})",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                if (info.body.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = info.body.take(150) + if (info.body.length > 150) "..." else "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                                        maxLines = 3
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { onDownloadAndInstallUpdate(info) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth().height(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(str("updates_install_btn"), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                    is UpdateState.Downloading -> {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "${str("updates_downloading")} (${(updateState.progress * 100).toInt()}%)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { updateState.progress },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                            )
+                        }
+                    }
+                    else -> {
+                        Button(
+                            onClick = {
+                                haptics.click()
+                                onCheckForUpdates()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(44.dp).testTag("btn_check_app_updates")
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(str("updates_check_btn"))
+                        }
                     }
                 }
             }

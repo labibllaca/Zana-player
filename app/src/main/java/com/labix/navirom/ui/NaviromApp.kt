@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.ui.components.*
+import com.labix.navirom.update.AppUpdateInfo
+import com.labix.navirom.update.UpdateState
 import kotlinx.coroutines.launch
 import com.labix.navirom.ui.util.rememberNaviromHaptics
 import androidx.activity.compose.BackHandler
@@ -132,6 +134,11 @@ fun NaviromApp(
 
     val isFullPlayerVisible by viewModel.isFullPlayerVisible.collectAsStateWithLifecycle()
     val isQueueSheetVisible by viewModel.isQueueSheetVisible.collectAsStateWithLifecycle()
+
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsStateWithLifecycle()
+    val updateGithubRepo by viewModel.updateGithubRepo.collectAsStateWithLifecycle()
+    val lastUpdateCheckedTime by viewModel.lastUpdateCheckedTime.collectAsStateWithLifecycle()
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -402,7 +409,16 @@ fun NaviromApp(
                             focusUsernameTrigger = focusUsernameTrigger,
                             onSelectServer = { viewModel.setServerConfig(it) },
                             onGoToSettings = { viewModel.setTab(NaviromTab.SETTINGS) },
-                            onOpenSidebar = { scope.launch { drawerState.open() } }
+                            onOpenSidebar = { scope.launch { drawerState.open() } },
+                            updateState = updateState,
+                            autoCheckUpdates = autoCheckUpdates,
+                            githubRepo = updateGithubRepo,
+                            lastUpdateCheckedTime = lastUpdateCheckedTime,
+                            onCheckForUpdates = { viewModel.checkForAppUpdates(isManual = true) },
+                            onDownloadAndInstallUpdate = { viewModel.downloadAndInstallUpdate(it) },
+                            onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
+                            onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
+                            onDismissUpdate = { viewModel.dismissAppUpdate() }
                         )
                     }
 
@@ -645,7 +661,16 @@ fun NaviromApp(
                         focusUsernameTrigger = focusUsernameTrigger,
                         onSelectServer = { viewModel.setServerConfig(it) },
                         onGoToSettings = { viewModel.setTab(NaviromTab.SETTINGS) },
-                        onOpenSidebar = { scope.launch { drawerState.open() } }
+                        onOpenSidebar = { scope.launch { drawerState.open() } },
+                        updateState = updateState,
+                        autoCheckUpdates = autoCheckUpdates,
+                        githubRepo = updateGithubRepo,
+                        lastUpdateCheckedTime = lastUpdateCheckedTime,
+                        onCheckForUpdates = { viewModel.checkForAppUpdates(isManual = true) },
+                        onDownloadAndInstallUpdate = { viewModel.downloadAndInstallUpdate(it) },
+                        onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
+                        onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
+                        onDismissUpdate = { viewModel.dismissAppUpdate() }
                     )
                 }
             }
@@ -715,6 +740,14 @@ fun NaviromApp(
                 )
             }
         }
+
+        // GitHub In-App Update Dialog / Download Progress
+        AppUpdateDialog(
+            updateState = updateState,
+            appLanguage = appLanguage,
+            onDismiss = { viewModel.dismissAppUpdate() },
+            onDownloadAndInstall = { viewModel.downloadAndInstallUpdate(it) }
+        )
     }
     }
 }
@@ -866,7 +899,16 @@ private fun TabContent(
     focusUsernameTrigger: Long = 0L,
     onSelectServer: (com.labix.navirom.data.local.ServerConfigEntity) -> Unit,
     onGoToSettings: () -> Unit,
-    onOpenSidebar: () -> Unit
+    onOpenSidebar: () -> Unit,
+    updateState: UpdateState = UpdateState.Idle,
+    autoCheckUpdates: Boolean = true,
+    githubRepo: String = "labibllaca/navirom",
+    lastUpdateCheckedTime: Long = 0L,
+    onCheckForUpdates: () -> Unit = {},
+    onDownloadAndInstallUpdate: (AppUpdateInfo) -> Unit = {},
+    onSetAutoCheckUpdates: (Boolean) -> Unit = {},
+    onSetGithubRepo: (String) -> Unit = {},
+    onDismissUpdate: () -> Unit = {}
 ) {
     when (currentTab) {
         NaviromTab.LIBRARY -> {
@@ -1010,7 +1052,16 @@ private fun TabContent(
                 onSelectMusicFolder = onSelectMusicFolder,
                 onToggleMusicFolder = onToggleMusicFolder,
                 onSelectAllMusicFolders = onSelectAllMusicFolders,
-                focusUsernameTrigger = focusUsernameTrigger
+                focusUsernameTrigger = focusUsernameTrigger,
+                updateState = updateState,
+                autoCheckUpdates = autoCheckUpdates,
+                githubRepo = githubRepo,
+                lastUpdateCheckedTime = lastUpdateCheckedTime,
+                onCheckForUpdates = onCheckForUpdates,
+                onDownloadAndInstallUpdate = onDownloadAndInstallUpdate,
+                onSetAutoCheckUpdates = onSetAutoCheckUpdates,
+                onSetGithubRepo = onSetGithubRepo,
+                onDismissUpdate = onDismissUpdate
             )
         }
     }

@@ -17,6 +17,9 @@ import com.labix.navirom.data.model.*
 import com.labix.navirom.data.stats.ListeningStatsManager
 import com.labix.navirom.data.stats.ListeningStatsSummary
 import com.labix.navirom.player.AudioPlayerController
+import com.labix.navirom.update.AppUpdateInfo
+import com.labix.navirom.update.UpdateManager
+import com.labix.navirom.update.UpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -99,6 +102,12 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     val statsManager = ListeningStatsManager(playbackHistoryDao)
     val lyricsRepository = LyricsRepository(application, lyricsDao, subsonicClient)
     val recentSongsRepository = RecentSongsRepository(recentSongsDao)
+    val updateManager = UpdateManager(application)
+
+    val updateState: StateFlow<UpdateState> = updateManager.updateState
+    val autoCheckUpdates: StateFlow<Boolean> = updateManager.autoCheckEnabled
+    val updateGithubRepo: StateFlow<String> = updateManager.githubRepo
+    val lastUpdateCheckedTime: StateFlow<Long> = updateManager.lastCheckedTime
 
     // Language & Theme states
     private val _appLanguage = MutableStateFlow(
@@ -345,6 +354,36 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+
+        // Automatic background update check on app launch
+        viewModelScope.launch {
+            delay(2500)
+            updateManager.checkForUpdates(isManual = false)
+        }
+    }
+
+    fun checkForAppUpdates(isManual: Boolean = true) {
+        viewModelScope.launch {
+            updateManager.checkForUpdates(isManual = isManual)
+        }
+    }
+
+    fun downloadAndInstallUpdate(updateInfo: AppUpdateInfo) {
+        viewModelScope.launch {
+            updateManager.downloadAndInstall(updateInfo)
+        }
+    }
+
+    fun dismissAppUpdate() {
+        updateManager.dismissUpdate()
+    }
+
+    fun setAutoCheckUpdates(enabled: Boolean) {
+        updateManager.setAutoCheckEnabled(enabled)
+    }
+
+    fun setUpdateGithubRepo(repo: String) {
+        updateManager.setGithubRepo(repo)
     }
 
     private fun loadSearchHistoryFromPrefs() {
