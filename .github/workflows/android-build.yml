@@ -1,0 +1,55 @@
+name: Android CI/CD Build Pipeline
+
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+  pull_request:
+    branches: [ "main", "master", "dev" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew || true
+
+      - name: Create Empty .env File
+        run: touch .env
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Get Current Date
+        id: date
+        run: echo "CURRENT_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Package and Rename APK with Date
+        run: |
+          mkdir -p build-outputs
+          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: APK not found!"
+            exit 1
+          fi
+          cp "$APK_PATH" "build-outputs/navirom-${{ env.CURRENT_DATE }}.apk"
+          echo "Created APK: build-outputs/navirom-${{ env.CURRENT_DATE }}.apk"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: navirom-apk-${{ env.CURRENT_DATE }}
+          path: build-outputs/navirom-${{ env.CURRENT_DATE }}.apk
+          if-no-files-found: error
