@@ -41,7 +41,7 @@ jobs:
           fi
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle clean assembleDebug --no-daemon
 
       - name: Get Current Date
         id: date
