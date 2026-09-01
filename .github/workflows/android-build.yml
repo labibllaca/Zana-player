@@ -40,6 +40,10 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
+      - name: Cleanup Legacy Package Tree
+        run: |
+          rm -rf app/src/main/java/com/example app/src/test/java/com/example app/src/androidTest/java/com/example
+
       - name: Ground truth
         run: |
           git rev-parse HEAD
@@ -48,8 +52,6 @@ jobs:
           grep -n "namespace" app/build.gradle.kts
           if [ -f "app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt" ]; then
             sed -n '1,30p' app/src/main/java/com/labix/navirom/player/NaviromPlaybackService.kt
-          elif [ -f "app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt" ]; then
-            sed -n '1,30p' app/src/main/java/com/example/navirom/player/NaviromPlaybackService.kt
           fi
           git grep -n "com.example.navirom" -- '*.kt' '*.kts' '*.xml' 2>/dev/null | head -20 || true
 
