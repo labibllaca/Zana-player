@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.labix"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.navirom.audiom"
+    applicationId = "com.labix.navirom.audiom"
     minSdk = 24
     targetSdk = 36
     versionCode = 3
