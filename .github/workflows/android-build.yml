@@ -93,20 +93,24 @@ jobs:
         id: date
         run: echo "CURRENT_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Package and Rename APK with Date
+      - name: Package and Rename APK
         run: |
           mkdir -p build-outputs
-          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "Error: APK not found!"
+          echo "=== Searching for generated APKs ==="
+          find app/build/outputs/ -name "*.apk" || true
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "Error: No APK found in app/build/outputs/apk!"
             exit 1
           fi
-          cp "$APK_PATH" "build-outputs/navirom-${{ env.CURRENT_DATE }}.apk"
-          echo "Created APK: build-outputs/navirom-${{ env.CURRENT_DATE }}.apk"
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" "build-outputs/navirom-debug-${{ env.CURRENT_DATE }}.apk"
+          cp "$APK_PATH" "build-outputs/navirom-debug.apk"
+          ls -la build-outputs/
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: navirom-apk-${{ env.CURRENT_DATE }}
-          path: build-outputs/navirom-${{ env.CURRENT_DATE }}.apk
+          name: navirom-debug-apk
+          path: build-outputs/*.apk
           if-no-files-found: error
