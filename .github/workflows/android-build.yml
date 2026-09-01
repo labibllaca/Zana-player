@@ -66,7 +66,10 @@ jobs:
           git grep -h "^package " -- "*.kt" 2>/dev/null | sort | uniq -c | sort -rn || true
 
       - name: Build Debug APK
-        run: gradle clean assembleDebug --no-daemon
+        run: |
+          gradle clean assembleDebug --no-daemon --info --stacktrace 2>&1 | tee build.log
+          echo "=== Compile R Class Jar in build log ==="
+          grep -n "compile_r_class_jar" build.log 2>/dev/null | head -20 || true
 
       - name: Inspect generated R
         if: failure()
