@@ -360,6 +360,42 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             delay(2500)
             updateManager.checkForUpdates(isManual = false)
         }
+
+        // Migrate/seed recently played songs from playback history if recent_songs table is empty
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val existing = recentSongsDao.getRecentSongs(1).firstOrNull()
+                if (existing.isNullOrEmpty()) {
+                    val history = playbackHistoryDao.getRecentHistory(50).firstOrNull()
+                    if (!history.isNullOrEmpty()) {
+                        history.distinctBy { it.trackId }.forEach { item ->
+                            recentSongsRepository.addSong(
+                                NaviromTrack(
+                                    id = item.trackId,
+                                    title = item.title,
+                                    artist = item.artist,
+                                    album = item.album,
+                                    coverArtUrl = item.coverArtUrl,
+                                    durationSeconds = item.durationSeconds
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun clearRecentlyPlayed() {
+        viewModelScope.launch {
+            recentSongsRepository.clearAll()
+        }
+    }
+
+    fun removeRecentlyPlayedTrack(trackId: String) {
+        viewModelScope.launch {
+            recentSongsRepository.removeSong(trackId)
+        }
     }
 
     fun checkForAppUpdates(isManual: Boolean = true) {
