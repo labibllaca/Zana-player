@@ -688,6 +688,7 @@ fun NaviromApp(
                 playbackState = playbackState,
                 isFavorite = favoriteIds.contains(playbackState.currentTrack?.id),
                 downloadStatus = downloadStatuses[playbackState.currentTrack?.id] ?: DownloadStatus.NOT_DOWNLOADED,
+                queueIndex = queueIndex,
                 queueSize = queue.size,
                 lyricsData = currentLyrics,
                 appLanguage = appLanguage,

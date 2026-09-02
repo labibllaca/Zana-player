@@ -70,7 +70,8 @@ fun FullPlayerModal(
     playbackState: PlaybackState,
     isFavorite: Boolean,
     downloadStatus: DownloadStatus,
-    queueSize: Int,
+    queueIndex: Int = 0,
+    queueSize: Int = 0,
     lyricsData: LyricsData = LyricsData(),
     appLanguage: AppLanguage = AppLanguage.ENGLISH,
     onDismiss: () -> Unit,
@@ -335,8 +336,17 @@ fun FullPlayerModal(
                                 }) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textOnCard)
                                 }
+                                val songIndexText = remember(queueIndex, queueSize, track.id) {
+                                    val currentNum = if (queueIndex in 0 until queueSize) {
+                                        queueIndex + 1
+                                    } else {
+                                        1
+                                    }
+                                    val totalNum = if (queueSize > 0) queueSize else 1
+                                    "$currentNum/$totalNum"
+                                }
                                 Text(
-                                    text = "Songs",
+                                    text = songIndexText,
                                     color = textOnCard,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 16.sp
