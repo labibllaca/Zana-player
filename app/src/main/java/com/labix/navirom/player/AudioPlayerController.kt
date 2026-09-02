@@ -495,10 +495,22 @@ class AudioPlayerController(
         }
         applySpeed(_playbackState.value.playbackSpeed)
         
-        if (isCrossfadeEnabled && fadingOutPlayer != null) {
-            startCrossfade(fadingOutPlayer!!, mp)
+        val oldPlayer = fadingOutPlayer
+        if (isCrossfadeEnabled && oldPlayer != null) {
+            val oldIsPlaying = try { oldPlayer.isPlaying } catch (_: Exception) { false }
+            if (oldIsPlaying) {
+                startCrossfade(oldPlayer, mp)
+            } else {
+                crossfadeJob?.cancel()
+                safelyReleasePlayer(oldPlayer)
+                fadingOutPlayer = null
+                mp.setVolume(1.0f, 1.0f)
+            }
         } else {
-            mp.setVolume(1f, 1f)
+            crossfadeJob?.cancel()
+            safelyReleasePlayer(fadingOutPlayer)
+            fadingOutPlayer = null
+            mp.setVolume(1.0f, 1.0f)
         }
         mp.start()
         isPreparingNextForCrossfade = false
@@ -507,21 +519,31 @@ class AudioPlayerController(
 
     private fun startCrossfade(oldPlayer: MediaPlayer, newPlayer: MediaPlayer) {
         crossfadeJob?.cancel()
+        try {
+            newPlayer.setVolume(0f, 0f)
+        } catch (_: Exception) {}
+
         crossfadeJob = scope.launch {
-            val steps = 20
-            val interval = crossfadeDurationMs / steps
+            val steps = 25
+            val interval = (crossfadeDurationMs / steps).coerceAtLeast(30L)
             for (i in 0..steps) {
                 val fraction = i.toFloat() / steps
-                val outVol = 1f - fraction
-                val inVol = fraction
+                val outVol = (1f - fraction).coerceIn(0f, 1f)
+                val inVol = fraction.coerceIn(0f, 1f)
                 
                 try {
                     if (oldPlayer.isPlaying) oldPlayer.setVolume(outVol, outVol)
+                } catch (_: Exception) {}
+                try {
                     if (newPlayer.isPlaying) newPlayer.setVolume(inVol, inVol)
-                } catch (e: Exception) {}
+                } catch (_: Exception) {}
                 
                 delay(interval)
             }
+            // Ensure next/incoming track is guaranteed 100% full original volume
+            try {
+                if (newPlayer.isPlaying) newPlayer.setVolume(1.0f, 1.0f)
+            } catch (_: Exception) {}
             safelyReleasePlayer(oldPlayer)
             if (fadingOutPlayer == oldPlayer) fadingOutPlayer = null
         }
@@ -678,6 +700,14 @@ class AudioPlayerController(
             val safePos = positionMs.coerceIn(0L, _playbackState.value.durationMs.coerceAtLeast(0L))
             mp.seekTo(safePos.toInt())
             _playbackState.update { it.copy(currentPositionMs = safePos) }
+            
+            // If user seeks during crossfade or away from fade zone, cancel crossfade and restore full volume
+            if (fadingOutPlayer != null) {
+                crossfadeJob?.cancel()
+                safelyReleasePlayer(fadingOutPlayer)
+                fadingOutPlayer = null
+                try { mp.setVolume(1.0f, 1.0f) } catch (_: Exception) {}
+            }
         }
     }
 

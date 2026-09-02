@@ -133,22 +133,67 @@ fun FullPlayerModal(
             .fillMaxSize()
             .background(backgroundColor)
             .testTag("full_player_modal")
-            .pointerInput(Unit) {
+            .pointerInput(viewMode) {
+                var totalDragX = 0f
+                var totalDragY = 0f
+                var gestureHandled = false
+
                 detectDragGestures(
-                    onDragEnd = { /* handle end */ },
+                    onDragStart = {
+                        totalDragX = 0f
+                        totalDragY = 0f
+                        gestureHandled = false
+                    },
+                    onDragEnd = {
+                        totalDragX = 0f
+                        totalDragY = 0f
+                        gestureHandled = false
+                    },
+                    onDragCancel = {
+                        totalDragX = 0f
+                        totalDragY = 0f
+                        gestureHandled = false
+                    },
                     onDrag = { change, dragAmount ->
-                        change.consume()
-                        val totalDragX = dragAmount.x
-                        val totalDragY = dragAmount.y
-                        if (totalDragY > 30f && viewMode == PlayerViewMode.ARTWORK) {
-                            haptics.click()
-                            onDismiss()
-                        } else if (totalDragX < -30f && viewMode == PlayerViewMode.ARTWORK) {
-                            haptics.toggle()
-                            viewMode = PlayerViewMode.LYRICS
-                        } else if (totalDragX > 30f && viewMode == PlayerViewMode.LYRICS) {
-                            haptics.toggle()
-                            viewMode = PlayerViewMode.ARTWORK
+                        if (!gestureHandled) {
+                            totalDragX += dragAmount.x
+                            totalDragY += dragAmount.y
+                            val threshold = 55f
+
+                            if (kotlin.math.abs(totalDragX) > kotlin.math.abs(totalDragY) * 1.2f && kotlin.math.abs(totalDragX) > threshold) {
+                                change.consume()
+                                gestureHandled = true
+                                if (totalDragX < -threshold) {
+                                    // Swipe Right to Left -> NEXT SONG
+                                    haptics.click()
+                                    onNext()
+                                } else if (totalDragX > threshold) {
+                                    // Swipe Left to Right -> PREVIOUS SONG
+                                    haptics.click()
+                                    onPrevious()
+                                }
+                            } else if (kotlin.math.abs(totalDragY) > kotlin.math.abs(totalDragX) * 1.2f && kotlin.math.abs(totalDragY) > threshold) {
+                                if (totalDragY < -threshold) {
+                                    // Swipe Bottom to Top (Up) -> SHOW LYRICS VIEW
+                                    if (viewMode == PlayerViewMode.ARTWORK) {
+                                        change.consume()
+                                        gestureHandled = true
+                                        haptics.toggle()
+                                        viewMode = PlayerViewMode.LYRICS
+                                    }
+                                } else if (totalDragY > threshold) {
+                                    // Swipe Top to Bottom (Down) -> MINIMIZE PLAYER
+                                    change.consume()
+                                    gestureHandled = true
+                                    if (viewMode == PlayerViewMode.ARTWORK) {
+                                        haptics.click()
+                                        onDismiss()
+                                    } else if (viewMode == PlayerViewMode.LYRICS) {
+                                        haptics.toggle()
+                                        viewMode = PlayerViewMode.ARTWORK
+                                    }
+                                }
+                            }
                         }
                     }
                 )
@@ -212,25 +257,26 @@ fun FullPlayerModal(
             targetState = viewMode,
             transitionSpec = {
                 if (targetState == PlayerViewMode.LYRICS) {
-                    (slideInHorizontally(
+                    (slideInVertically(
                         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
-                    ) { it / 2 } + fadeIn(animationSpec = tween(280)))
+                    ) { it } + fadeIn(animationSpec = tween(300)))
                         .togetherWith(
-                            slideOutHorizontally(
+                            slideOutVertically(
                                 animationSpec = tween(240)
-                            ) { -it / 2 } + fadeOut(animationSpec = tween(200))
+                            ) { -it / 3 } + fadeOut(animationSpec = tween(200))
                         )
                 } else {
-                    (slideInHorizontally(
+                    (slideInVertically(
                         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
-                    ) { -it / 2 } + fadeIn(animationSpec = tween(280)))
+                    ) { -it / 3 } + fadeIn(animationSpec = tween(300)))
                         .togetherWith(
-                            slideOutHorizontally(
+                            slideOutVertically(
                                 animationSpec = tween(240)
-                            ) { it / 2 } + fadeOut(animationSpec = tween(200))
+                            ) { it } + fadeOut(animationSpec = tween(200))
                         )
                 }
-            }
+            },
+            label = "PlayerViewModeTransition"
         ) { mode ->
             if (mode == PlayerViewMode.ARTWORK) {
                 val validSyncedLines = remember(lyricsData.syncedLines) {
@@ -351,13 +397,45 @@ fun FullPlayerModal(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .pointerInput(Unit) {
+                                            var totalX = 0f
+                                            var totalY = 0f
+                                            var handled = false
                                             detectDragGestures(
-                                                onDragEnd = {},
+                                                onDragStart = { totalX = 0f; totalY = 0f; handled = false },
+                                                onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
+                                                onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
                                                 onDrag = { change, dragAmount ->
-                                                    change.consume()
-                                                    if (dragAmount.y > 20f) {
-                                                        haptics.click()
-                                                        onDismiss()
+                                                    if (!handled) {
+                                                        totalX += dragAmount.x
+                                                        totalY += dragAmount.y
+                                                        val th = 50f
+                                                        if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
+                                                            change.consume()
+                                                            handled = true
+                                                            if (totalX < -th) {
+                                                                // Swipe Left -> Next
+                                                                haptics.click()
+                                                                onNext()
+                                                            } else if (totalX > th) {
+                                                                // Swipe Right -> Previous
+                                                                haptics.click()
+                                                                onPrevious()
+                                                            }
+                                                        } else if (kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.2f && kotlin.math.abs(totalY) > th) {
+                                                            if (totalY < -th) {
+                                                                // Swipe Up -> Lyrics View
+                                                                change.consume()
+                                                                handled = true
+                                                                haptics.toggle()
+                                                                viewMode = PlayerViewMode.LYRICS
+                                                            } else if (totalY > th) {
+                                                                // Swipe Down -> Minimize
+                                                                change.consume()
+                                                                handled = true
+                                                                haptics.click()
+                                                                onDismiss()
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             )
@@ -611,7 +689,40 @@ fun FullPlayerModal(
                     ) {
                         Surface(
                             modifier = Modifier
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .pointerInput(Unit) {
+                                    var totalX = 0f
+                                    var totalY = 0f
+                                    var handled = false
+                                    detectDragGestures(
+                                        onDragStart = { totalX = 0f; totalY = 0f; handled = false },
+                                        onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
+                                        onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
+                                        onDrag = { change, dragAmount ->
+                                            if (!handled) {
+                                                totalX += dragAmount.x
+                                                totalY += dragAmount.y
+                                                val th = 50f
+                                                if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
+                                                    change.consume()
+                                                    handled = true
+                                                    if (totalX < -th) {
+                                                        haptics.click()
+                                                        onNext()
+                                                    } else if (totalX > th) {
+                                                        haptics.click()
+                                                        onPrevious()
+                                                    }
+                                                } else if (totalY > th) {
+                                                    change.consume()
+                                                    handled = true
+                                                    haptics.toggle()
+                                                    viewMode = PlayerViewMode.ARTWORK
+                                                }
+                                            }
+                                        }
+                                    )
+                                },
                             color = cardColor,
                             shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                         ) {
@@ -619,7 +730,7 @@ fun FullPlayerModal(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .statusBarsPadding()
-                                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Row(
@@ -627,31 +738,44 @@ fun FullPlayerModal(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
+                                    IconButton(
+                                        onClick = {
+                                            haptics.click()
+                                            viewMode = PlayerViewMode.ARTWORK
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Back to Player",
+                                            tint = textOnCard
+                                        )
+                                    }
+
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                                     ) {
                                         SongAlbumCover(
                                             coverArtUrl = track.coverArtUrl,
                                             contentDescription = "Cover",
                                             isAlbum = false,
                                             shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.size(48.dp)
+                                            modifier = Modifier.size(44.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Column {
                                             Text(
                                                 text = track.title,
                                                 color = textOnCard,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp,
+                                                fontSize = 15.sp,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = track.artist,
                                                 color = textMutedOnCard,
-                                                fontSize = 14.sp,
+                                                fontSize = 13.sp,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -705,7 +829,7 @@ fun FullPlayerModal(
                                     }
                                 }
                                 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
                                 // Drag handle
                                 Box(
                                     modifier = Modifier
@@ -713,6 +837,10 @@ fun FullPlayerModal(
                                         .height(4.dp)
                                         .clip(CircleShape)
                                         .background(Color.LightGray)
+                                        .clickable {
+                                            haptics.toggle()
+                                            viewMode = PlayerViewMode.ARTWORK
+                                        }
                                 )
                             }
                         }
