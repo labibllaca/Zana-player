@@ -66,6 +66,17 @@ android {
   }
 }
 
+val androidComponents = extensions.getByType<com.android.build.api.variant.ApplicationAndroidComponentsExtension>()
+androidComponents.onVariants { variant ->
+  variant.outputs.forEach { output ->
+    try {
+      val getOutputFileNameMethod = output::class.java.methods.find { it.name.startsWith("getOutputFileName") }
+      val property = getOutputFileNameMethod?.invoke(output) as? org.gradle.api.provider.Property<String>
+      property?.set("navirom-v${libs.versions.appVersionName.get()}-vc${libs.versions.appVersionCode.get()}.apk")
+    } catch (_: Exception) {}
+  }
+}
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
