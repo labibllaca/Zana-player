@@ -429,7 +429,8 @@ fun NaviromApp(
                             playbackState = playbackState,
                             onExpandPlayer = { viewModel.setFullPlayerVisible(true) },
                             onTogglePlayPause = { viewModel.togglePlayPause() },
-                            onNext = { viewModel.next() }
+                            onNext = { viewModel.next() },
+                            onPrevious = { viewModel.previous() }
                         )
                     }
                 }
@@ -476,6 +477,10 @@ fun NaviromApp(
                                 onNext = {
                                     haptics.click()
                                     viewModel.next()
+                                },
+                                onPrevious = {
+                                    haptics.click()
+                                    viewModel.previous()
                                 }
                             )
                         }
