@@ -634,6 +634,60 @@ class NaviromSubsonicClient(
         }
     }
 
+    suspend fun getStarredTracks(): Result<List<NaviromTrack>> {
+        val params = mutableMapOf<String, String>()
+        activeMusicFolderId?.let { params["musicFolderId"] = it }
+
+        // Try getStarred2.view first
+        val res2 = executeRequest("getStarred2.view", params) { root ->
+            val starred = root.subsonicResponse?.starred2 ?: root.subsonicResponse?.starred
+            starred?.song?.map { songDto ->
+                NaviromTrack(
+                    id = songDto.id,
+                    title = songDto.title,
+                    artist = songDto.artist ?: "Unknown Artist",
+                    artistId = songDto.artistId ?: "",
+                    album = songDto.album ?: "Unknown Album",
+                    albumId = songDto.albumId ?: "",
+                    durationSeconds = songDto.duration ?: 0,
+                    coverArtId = songDto.coverArt ?: "",
+                    coverArtUrl = getCoverArtUrl(songDto.coverArt ?: songDto.id),
+                    streamUrl = getStreamUrl(songDto.id),
+                    year = songDto.year,
+                    genre = songDto.genre ?: "",
+                    suffix = songDto.suffix ?: "mp3",
+                    isFavorite = true
+                )
+            } ?: emptyList()
+        }
+        if (res2.isSuccess && res2.getOrNull()?.isNotEmpty() == true) {
+            return res2
+        }
+
+        // Fallback to getStarred.view
+        return executeRequest("getStarred.view", params) { root ->
+            val starred = root.subsonicResponse?.starred2 ?: root.subsonicResponse?.starred
+            starred?.song?.map { songDto ->
+                NaviromTrack(
+                    id = songDto.id,
+                    title = songDto.title,
+                    artist = songDto.artist ?: "Unknown Artist",
+                    artistId = songDto.artistId ?: "",
+                    album = songDto.album ?: "Unknown Album",
+                    albumId = songDto.albumId ?: "",
+                    durationSeconds = songDto.duration ?: 0,
+                    coverArtId = songDto.coverArt ?: "",
+                    coverArtUrl = getCoverArtUrl(songDto.coverArt ?: songDto.id),
+                    streamUrl = getStreamUrl(songDto.id),
+                    year = songDto.year,
+                    genre = songDto.genre ?: "",
+                    suffix = songDto.suffix ?: "mp3",
+                    isFavorite = true
+                )
+            } ?: emptyList()
+        }
+    }
+
     suspend fun getLyrics(artist: String, title: String, songId: String? = null): Result<String?> {
         // 1. Try getLyricsBySongId if songId is provided (OpenSubsonic)
         if (!songId.isNullOrBlank()) {

@@ -62,14 +62,26 @@ interface FavoriteDao {
     @Query("SELECT trackId FROM favorite_tracks")
     fun getAllFavoriteTrackIds(): Flow<List<String>>
 
+    @Query("SELECT * FROM favorite_tracks ORDER BY starredAt DESC")
+    fun getAllFavoriteTracks(): Flow<List<FavoriteTrackEntity>>
+
+    @Query("SELECT * FROM favorite_tracks ORDER BY starredAt DESC")
+    suspend fun getAllFavoriteTracksList(): List<FavoriteTrackEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavorite(favorite: FavoriteTrackEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavorites(favorites: List<FavoriteTrackEntity>)
 
     @Query("DELETE FROM favorite_tracks WHERE trackId = :trackId")
     suspend fun removeFavorite(trackId: String)
 
     @Query("SELECT EXISTS(SELECT 1 FROM favorite_tracks WHERE trackId = :trackId)")
     suspend fun isFavorite(trackId: String): Boolean
+
+    @Query("SELECT * FROM favorite_tracks WHERE trackId = :trackId LIMIT 1")
+    suspend fun getFavorite(trackId: String): FavoriteTrackEntity?
 }
 
 @Dao

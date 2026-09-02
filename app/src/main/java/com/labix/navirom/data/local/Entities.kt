@@ -50,6 +50,18 @@ data class PlaylistItemEntity(
 @Entity(tableName = "favorite_tracks")
 data class FavoriteTrackEntity(
     @PrimaryKey val trackId: String,
+    val title: String = "",
+    val artist: String = "",
+    val artistId: String = "",
+    val album: String = "",
+    val albumId: String = "",
+    val durationSeconds: Int = 0,
+    val coverArtId: String = "",
+    val coverArtUrl: String = "",
+    val streamUrl: String = "",
+    val year: Int? = null,
+    val genre: String = "",
+    val suffix: String = "mp3",
     val starredAt: Long = System.currentTimeMillis()
 )
 

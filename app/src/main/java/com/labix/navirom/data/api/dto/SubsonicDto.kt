@@ -31,7 +31,9 @@ data class SubsonicResponse(
     val genres: GenresContainerDto? = null,
     val musicFolders: MusicFoldersContainerDto? = null,
     val lyrics: LyricsDto? = null,
-    val lyricsList: LyricsListDto? = null
+    val lyricsList: LyricsListDto? = null,
+    val starred: StarredDto? = null,
+    val starred2: StarredDto? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -223,4 +225,11 @@ data class StructuredLyricsDto(
 data class LyricsLineItemDto(
     val start: Long? = 0L,
     val value: String = ""
+)
+
+@JsonClass(generateAdapter = true)
+data class StarredDto(
+    val artist: List<ArtistItemDto> = emptyList(),
+    val album: List<AlbumItemDto> = emptyList(),
+    val song: List<SongDto> = emptyList()
 )

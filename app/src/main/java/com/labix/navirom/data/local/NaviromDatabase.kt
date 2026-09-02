@@ -17,7 +17,7 @@ import androidx.room.RoomDatabase
         PlaybackQueueEntity::class,
         RecentSongEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class NaviromDatabase : RoomDatabase() {

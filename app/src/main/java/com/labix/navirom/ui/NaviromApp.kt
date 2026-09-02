@@ -125,6 +125,7 @@ fun NaviromApp(
     val totalCacheSizeBytes by viewModel.totalCacheSizeBytes.collectAsStateWithLifecycle()
     val isOfflineOnlyMode by viewModel.isOfflineOnlyMode.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
 
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val queue by viewModel.currentQueue.collectAsStateWithLifecycle()
@@ -623,6 +624,7 @@ fun NaviromApp(
                         serverState = serverState,
                         allServers = allServers,
                         favoriteIds = favoriteIds,
+                        favoriteTracks = favoriteTracks,
                         downloadStatuses = downloadStatuses,
                         downloadProgresses = downloadProgresses,
                         playbackState = playbackState,
@@ -865,6 +867,7 @@ private fun TabContent(
     serverState: ServerConnectionUiState,
     allServers: List<com.labix.navirom.data.local.ServerConfigEntity>,
     favoriteIds: List<String>,
+    favoriteTracks: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
     downloadStatuses: Map<String, DownloadStatus>,
     downloadProgresses: Map<String, Float>,
     playbackState: com.labix.navirom.data.model.PlaybackState,
@@ -939,6 +942,7 @@ private fun TabContent(
                 downloadStatuses = downloadStatuses,
                 downloadProgresses = downloadProgresses,
                 favoriteIds = favoriteIds,
+                favoriteTracks = favoriteTracks,
                 appLanguage = appLanguage,
                 musicFolders = serverState.musicFolders,
                 selectedMusicFolderId = serverState.selectedMusicFolderId,

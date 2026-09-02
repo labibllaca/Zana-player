@@ -78,6 +78,7 @@ fun LibraryScreen(
     downloadStatuses: Map<String, DownloadStatus>,
     downloadProgresses: Map<String, Float>,
     favoriteIds: List<String>,
+    favoriteTracks: List<NaviromTrack> = emptyList(),
     appLanguage: AppLanguage,
     musicFolders: List<com.labix.navirom.data.api.dto.MusicFolderDto> = emptyList(),
     selectedMusicFolderId: String? = null,
@@ -1376,8 +1377,12 @@ fun LibraryScreen(
                                         iconBgColor = SleekPillLikedBg,
                                         iconColor = SleekPillLikedIcon,
                                         onClick = {
-                                            val favTracks = quickMixTracks.filter { favoriteIds.contains(it.id) }
-                                            if (favTracks.isNotEmpty()) onPlayAll(favTracks) else onPlayAll(quickMixTracks)
+                                            if (favoriteTracks.isNotEmpty()) {
+                                                onPlayAll(favoriteTracks)
+                                            } else {
+                                                val favTracks = quickMixTracks.filter { favoriteIds.contains(it.id) }
+                                                if (favTracks.isNotEmpty()) onPlayAll(favTracks) else onPlayAll(quickMixTracks)
+                                            }
                                         }
                                     )
                                 }

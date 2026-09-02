@@ -281,13 +281,36 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     val favoriteIds: StateFlow<List<String>> = favoriteDao.getAllFavoriteTrackIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val playlists: StateFlow<List<NaviromPlaylist>> = combine(_playlists, favoriteIds) { plist, favs ->
+    val favoriteTracks: StateFlow<List<NaviromTrack>> = favoriteDao.getAllFavoriteTracks()
+        .map { entities ->
+            entities.map { entity ->
+                NaviromTrack(
+                    id = entity.trackId,
+                    title = entity.title.ifBlank { "Track ${entity.trackId}" },
+                    artist = entity.artist.ifBlank { "Unknown Artist" },
+                    artistId = entity.artistId,
+                    album = entity.album.ifBlank { "Unknown Album" },
+                    albumId = entity.albumId,
+                    durationSeconds = entity.durationSeconds,
+                    coverArtId = entity.coverArtId,
+                    coverArtUrl = entity.coverArtUrl.ifBlank { subsonicClient.getCoverArtUrl(entity.coverArtId.ifBlank { entity.trackId }) },
+                    streamUrl = entity.streamUrl.ifBlank { subsonicClient.getStreamUrl(entity.trackId) },
+                    year = entity.year,
+                    genre = entity.genre,
+                    suffix = entity.suffix,
+                    isFavorite = true
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val playlists: StateFlow<List<NaviromPlaylist>> = combine(_playlists, favoriteTracks) { plist, favs ->
         val favoritePlaylist = NaviromPlaylist(
             id = "favorites_dynamic_playlist_id",
             name = "Favorite Songs",
             comment = "Your favorite tracks",
             songCount = favs.size,
-            durationSeconds = 0,
+            durationSeconds = favs.sumOf { it.durationSeconds },
             coverArt = "",
             isLocal = true
         )
@@ -342,9 +365,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
         // Sync favorite tracks in real-time when the dynamic Favorites playlist is active
         viewModelScope.launch {
-            combine(_selectedPlaylistId, favoriteIds, _rawLibrarySongs) { selectedId, favIds, rawSongs ->
+            combine(_selectedPlaylistId, favoriteTracks) { selectedId, favList ->
                 if (selectedId == "favorites_dynamic_playlist_id") {
-                    rawSongs.filter { it.id in favIds }
+                    favList
                 } else {
                     null
                 }
@@ -1382,6 +1405,31 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 songsRes.onSuccess { list ->
                     _rawLibrarySongs.value = list
                 }
+
+                // Fetch Starred / Favorite Tracks from Subsonic server and sync into local Room DB
+                subsonicClient.getStarredTracks().onSuccess { starredTracks ->
+                    if (starredTracks.isNotEmpty()) {
+                        val entities = starredTracks.map { track ->
+                            FavoriteTrackEntity(
+                                trackId = track.id,
+                                title = track.title,
+                                artist = track.artist,
+                                artistId = track.artistId,
+                                album = track.album,
+                                albumId = track.albumId,
+                                durationSeconds = track.durationSeconds,
+                                coverArtId = track.coverArtId,
+                                coverArtUrl = track.coverArtUrl,
+                                streamUrl = track.streamUrl,
+                                year = track.year,
+                                genre = track.genre,
+                                suffix = track.suffix,
+                                starredAt = System.currentTimeMillis()
+                            )
+                        }
+                        favoriteDao.insertFavorites(entities)
+                    }
+                }
             } else if (selectedIds.size == 1) {
                 // Single folder selected
                 val singleId = selectedIds.first()
@@ -1463,6 +1511,31 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
                 subsonicClient.getPlaylists().onSuccess { list ->
                     _playlists.value = list
+                }
+            }
+
+            // Always fetch Starred / Favorite Tracks from Subsonic server and sync into local Room DB
+            subsonicClient.getStarredTracks().onSuccess { starredTracks ->
+                if (starredTracks.isNotEmpty()) {
+                    val entities = starredTracks.map { track ->
+                        FavoriteTrackEntity(
+                            trackId = track.id,
+                            title = track.title,
+                            artist = track.artist,
+                            artistId = track.artistId,
+                            album = track.album,
+                            albumId = track.albumId,
+                            durationSeconds = track.durationSeconds,
+                            coverArtId = track.coverArtId,
+                            coverArtUrl = track.coverArtUrl,
+                            streamUrl = track.streamUrl,
+                            year = track.year,
+                            genre = track.genre,
+                            suffix = track.suffix,
+                            starredAt = System.currentTimeMillis()
+                        )
+                    }
+                    favoriteDao.insertFavorites(entities)
                 }
             }
         }
@@ -1556,9 +1629,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     fun loadPlaylistDetails(playlistId: String) {
         viewModelScope.launch {
             if (playlistId == "favorites_dynamic_playlist_id") {
-                val favIds = favoriteIds.value
-                val matchedTracks = _rawLibrarySongs.value.filter { it.id in favIds }
-                _currentPlaylistTracks.value = matchedTracks
+                _currentPlaylistTracks.value = favoriteTracks.value
             } else {
                 val res = subsonicClient.getPlaylistDetails(playlistId)
                 res.onSuccess { (_, tracks) ->
@@ -1690,15 +1761,72 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun toggleFavorite(trackId: String) {
+    fun findTrackById(trackId: String): NaviromTrack? {
+        if (playbackState.value.currentTrack?.id == trackId) return playbackState.value.currentTrack
+        currentQueue.value.find { it.id == trackId }?.let { return it }
+        _currentPlaylistTracks.value.find { it.id == trackId }?.let { return it }
+        _currentAlbumTracks.value.find { it.id == trackId }?.let { return it }
+        _currentArtistSongs.value.find { it.id == trackId }?.let { return it }
+        _rawLibrarySongs.value.find { it.id == trackId }?.let { return it }
+        _quickMixTracks.value.find { it.id == trackId }?.let { return it }
+        _newestTracks.value.find { it.id == trackId }?.let { return it }
+        _searchResults.value.third.find { it.id == trackId }?.let { return it }
+        favoriteTracks.value.find { it.id == trackId }?.let { return it }
+        cachedTracks.value.find { it.id == trackId }?.let { entity ->
+            return NaviromTrack(
+                id = entity.id,
+                title = entity.title,
+                artist = entity.artist,
+                artistId = entity.artistId,
+                album = entity.album,
+                albumId = entity.albumId,
+                durationSeconds = entity.durationSeconds,
+                coverArtId = "",
+                coverArtUrl = entity.coverArtUrl,
+                streamUrl = entity.localFilePath.ifBlank { subsonicClient.getStreamUrl(entity.id) },
+                year = entity.year,
+                genre = entity.genre,
+                suffix = entity.format,
+                isFavorite = true
+            )
+        }
+        return null
+    }
+
+    fun toggleFavorite(track: NaviromTrack) {
+        toggleFavorite(track.id, track)
+    }
+
+    fun toggleFavorite(trackId: String, trackInfo: NaviromTrack? = null) {
         viewModelScope.launch {
             val isFav = favoriteDao.isFavorite(trackId)
             if (isFav) {
                 favoriteDao.removeFavorite(trackId)
-                subsonicClient.starTrack(trackId, false)
+                if (_serverState.value.isConnected && !_isOfflineOnlyMode.value) {
+                    subsonicClient.starTrack(trackId, false)
+                }
             } else {
-                favoriteDao.addFavorite(FavoriteTrackEntity(trackId = trackId))
-                subsonicClient.starTrack(trackId, true)
+                val track = trackInfo ?: findTrackById(trackId)
+                val entity = FavoriteTrackEntity(
+                    trackId = trackId,
+                    title = track?.title ?: "Track $trackId",
+                    artist = track?.artist ?: "Unknown Artist",
+                    artistId = track?.artistId ?: "",
+                    album = track?.album ?: "Unknown Album",
+                    albumId = track?.albumId ?: "",
+                    durationSeconds = track?.durationSeconds ?: 0,
+                    coverArtId = track?.coverArtId ?: "",
+                    coverArtUrl = track?.coverArtUrl ?: subsonicClient.getCoverArtUrl(trackId),
+                    streamUrl = track?.streamUrl ?: subsonicClient.getStreamUrl(trackId),
+                    year = track?.year,
+                    genre = track?.genre ?: "",
+                    suffix = track?.suffix ?: "mp3",
+                    starredAt = System.currentTimeMillis()
+                )
+                favoriteDao.addFavorite(entity)
+                if (_serverState.value.isConnected && !_isOfflineOnlyMode.value) {
+                    subsonicClient.starTrack(trackId, true)
+                }
             }
         }
     }
