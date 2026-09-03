@@ -732,176 +732,266 @@ fun FullPlayerModal(
             } else {
                 // Lyrics View
                 val listState = rememberLazyListState()
-                val showTopCard by remember {
-                    derivedStateOf {
-                        listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 15
-                    }
-                }
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Top Mini White Card (Show/hide when scrolling up/down)
-                    AnimatedVisibility(
-                        visible = showTopCard,
-                        enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(200)) { -it },
-                        exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200)) { -it }
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .pointerInput(Unit) {
-                                    var totalX = 0f
-                                    var totalY = 0f
-                                    var handled = false
-                                    detectDragGestures(
-                                        onDragStart = { totalX = 0f; totalY = 0f; handled = false },
-                                        onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
-                                        onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
-                                        onDrag = { change, dragAmount ->
-                                            if (!handled) {
-                                                totalX += dragAmount.x
-                                                totalY += dragAmount.y
-                                                val th = 50f
-                                                if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
-                                                    change.consume()
-                                                    handled = true
-                                                    if (totalX < -th) {
-                                                        haptics.click()
-                                                        onNext()
-                                                    } else if (totalX > th) {
-                                                        haptics.click()
-                                                        onPrevious()
-                                                    }
-                                                } else if (totalY > th) {
-                                                    change.consume()
-                                                    handled = true
-                                                    haptics.toggle()
-                                                    viewMode = PlayerViewMode.ARTWORK
+                    // Top Persistent Mini Player Card (always visible on top of lyrics)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                var totalX = 0f
+                                var totalY = 0f
+                                var handled = false
+                                detectDragGestures(
+                                    onDragStart = { totalX = 0f; totalY = 0f; handled = false },
+                                    onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
+                                    onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
+                                    onDrag = { change, dragAmount ->
+                                        if (!handled) {
+                                            totalX += dragAmount.x
+                                            totalY += dragAmount.y
+                                            val th = 50f
+                                            if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
+                                                change.consume()
+                                                handled = true
+                                                if (totalX < -th) {
+                                                    haptics.click()
+                                                    onNext()
+                                                } else if (totalX > th) {
+                                                    haptics.click()
+                                                    onPrevious()
                                                 }
+                                            } else if (totalY > th) {
+                                                change.consume()
+                                                handled = true
+                                                haptics.toggle()
+                                                viewMode = PlayerViewMode.ARTWORK
                                             }
                                         }
-                                    )
-                                },
-                            color = cardColor,
-                            shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
+                                    }
+                                )
+                            },
+                        color = cardColor,
+                        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                        shadowElevation = 8.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                IconButton(
+                                    onClick = {
+                                        haptics.click()
+                                        viewMode = PlayerViewMode.ARTWORK
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back to Player",
+                                        tint = textOnCard,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                SongAlbumCover(
+                                    coverArtUrl = track.coverArtUrl,
+                                    contentDescription = "Cover",
+                                    isAlbum = false,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clickable {
+                                            haptics.click()
+                                            viewMode = PlayerViewMode.ARTWORK
+                                        }
+                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            haptics.click()
+                                            viewMode = PlayerViewMode.ARTWORK
+                                        }
+                                ) {
+                                    Text(
+                                        text = track.title,
+                                        color = textOnCard,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = track.artist,
+                                        color = textMutedOnCard,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                // Playback controls in the top player header
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     IconButton(
                                         onClick = {
                                             haptics.click()
-                                            viewMode = PlayerViewMode.ARTWORK
-                                        }
+                                            onPrevious()
+                                        },
+                                        modifier = Modifier.size(36.dp)
                                     ) {
                                         Icon(
-                                            Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Back to Player",
-                                            tint = textOnCard
+                                            imageVector = Icons.Filled.SkipPrevious,
+                                            contentDescription = "Previous",
+                                            tint = textOnCard,
+                                            modifier = Modifier.size(22.dp)
                                         )
                                     }
 
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = textOnCard,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                haptics.click()
+                                                onTogglePlayPause()
+                                            }
                                     ) {
-                                        SongAlbumCover(
-                                            coverArtUrl = track.coverArtUrl,
-                                            contentDescription = "Cover",
-                                            isAlbum = false,
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.size(44.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                text = track.title,
-                                                color = textOnCard,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = track.artist,
-                                                color = textMutedOnCard,
-                                                fontSize = 13.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                                                tint = cardColor,
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box {
-                                            IconButton(onClick = {
+
+                                    IconButton(
+                                        onClick = {
+                                            haptics.click()
+                                            onNext()
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.SkipNext,
+                                            contentDescription = "Next",
+                                            tint = textOnCard,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = onToggleFavorite,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                            contentDescription = "Favorite",
+                                            tint = if (isFavorite) Color(0xFF1DB954) else textMutedOnCard,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    Box {
+                                        IconButton(
+                                            onClick = {
                                                 haptics.click()
                                                 showMenu = true
-                                            }) {
-                                                Icon(Icons.Filled.MoreHoriz, contentDescription = "More", tint = textMutedOnCard)
-                                            }
-                                            DropdownMenu(
-                                                expanded = showMenu,
-                                                onDismissRequest = { showMenu = false }
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Go to Artist") },
-                                                    onClick = {
-                                                        showMenu = false
-                                                        onArtistClick?.invoke(track.artistId)
-                                                    },
-                                                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Go to Album") },
-                                                    onClick = {
-                                                        showMenu = false
-                                                        onAlbumClick?.invoke(track.albumId)
-                                                    },
-                                                    leadingIcon = { Icon(Icons.Filled.Album, contentDescription = null) }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Sleep Timer") },
-                                                    onClick = {
-                                                        showMenu = false
-                                                        showSleepTimerDialog = true
-                                                    },
-                                                    leadingIcon = { Icon(Icons.Filled.Timer, contentDescription = null) }
-                                                )
-                                            }
-                                        }
-                                        IconButton(onClick = onToggleFavorite) {
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
                                             Icon(
-                                                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                                contentDescription = "Favorite",
-                                                tint = if (isFavorite) Color(0xFF1DB954) else textMutedOnCard
+                                                Icons.Filled.MoreVert,
+                                                contentDescription = "More",
+                                                tint = textMutedOnCard,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showMenu,
+                                            onDismissRequest = { showMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Go to Artist") },
+                                                onClick = {
+                                                    showMenu = false
+                                                    onArtistClick?.invoke(track.artistId)
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Go to Album") },
+                                                onClick = {
+                                                    showMenu = false
+                                                    onAlbumClick?.invoke(track.albumId)
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Album, contentDescription = null) }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Sleep Timer") },
+                                                onClick = {
+                                                    showMenu = false
+                                                    showSleepTimerDialog = true
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Timer, contentDescription = null) }
                                             )
                                         }
                                     }
                                 }
-                                
-                                Spacer(modifier = Modifier.height(10.dp))
-                                // Drag handle
-                                Box(
-                                    modifier = Modifier
-                                        .width(40.dp)
-                                        .height(4.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.LightGray)
-                                        .clickable {
-                                            haptics.toggle()
-                                            viewMode = PlayerViewMode.ARTWORK
-                                        }
-                                )
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Subtle progress indicator
+                            val progressFraction = if (totalDurationMs > 0L) {
+                                (currentPosMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+                            LinearProgressIndicator(
+                                progress = { progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = Color(0xFFF3D959),
+                                trackColor = textMutedOnCard.copy(alpha = 0.2f)
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Drag handle to slide back down
+                            Box(
+                                modifier = Modifier
+                                    .width(36.dp)
+                                    .height(3.5.dp)
+                                    .clip(CircleShape)
+                                    .background(textMutedOnCard.copy(alpha = 0.35f))
+                                    .clickable {
+                                        haptics.toggle()
+                                        viewMode = PlayerViewMode.ARTWORK
+                                    }
+                            )
                         }
                     }
                     // Lyrics Area
