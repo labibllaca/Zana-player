@@ -17,6 +17,7 @@ android {
     targetSdk = 36
     versionCode = libs.versions.appVersionCode.get().toInt()
     versionName = libs.versions.appVersionName.get()
+    buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -273,7 +273,11 @@ object NaviromStrings {
         "updates_github_repo" to "GitHub Repository",
         "updates_dismiss" to "Later",
         "updates_update_now" to "Update Now",
-        "updates_never_checked" to "Never checked"
+        "updates_never_checked" to "Never checked",
+        "updates_server_build" to "Server Build",
+        "updates_reinstall_btn" to "Install from Server",
+        "updates_last_checked" to "Last checked",
+        "updates_published" to "Uploaded"
     )
 
     private val albanianStrings = mapOf(
@@ -516,7 +520,11 @@ object NaviromStrings {
         "updates_github_repo" to "Depoja në GitHub",
         "updates_dismiss" to "Më vonë",
         "updates_update_now" to "Përditëso tani",
-        "updates_never_checked" to "Pa kontrolluar"
+        "updates_never_checked" to "Pa kontrolluar",
+        "updates_server_build" to "Versioni në server",
+        "updates_reinstall_btn" to "Instalo nga serveri",
+        "updates_last_checked" to "Kontrolluar së fundmi",
+        "updates_published" to "Ngarkuar më"
     )
 
     private val germanStrings = mapOf(
@@ -760,6 +768,10 @@ object NaviromStrings {
         "updates_github_repo" to "GitHub Repository",
         "updates_dismiss" to "Später",
         "updates_update_now" to "Jetzt aktualisieren",
-        "updates_never_checked" to "Noch nie geprüft"
+        "updates_never_checked" to "Noch nie geprüft",
+        "updates_server_build" to "Server-Version",
+        "updates_reinstall_btn" to "Vom Server installieren",
+        "updates_last_checked" to "Letzte Prüfung",
+        "updates_published" to "Bereitgestellt am"
     )
 }

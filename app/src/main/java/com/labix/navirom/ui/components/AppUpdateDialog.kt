@@ -272,6 +272,7 @@ fun AppUpdateDialog(
         }
 
         is UpdateState.UpToDate -> {
+            val latest = updateState.latestInfo
             AlertDialog(
                 onDismissRequest = onDismiss,
                 icon = {
@@ -283,12 +284,54 @@ fun AppUpdateDialog(
                     )
                 },
                 title = { Text(str("updates_uptodate_title"), fontWeight = FontWeight.Bold) },
-                text = { Text(str("updates_uptodate_desc")) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(str("updates_uptodate_desc"))
+                        if (latest != null) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "${str("updates_current_version")}: v${com.labix.BuildConfig.VERSION_NAME} (Build ${com.labix.BuildConfig.VERSION_CODE})",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${str("updates_server_build")}: ${latest.title.ifBlank { latest.tagName }}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (latest.apkSize > 0) {
+                                        val mbSize = "%.1f MB".format(latest.apkSize / (1024f * 1024f))
+                                        Text(
+                                            text = "APK: ${latest.apkName} • $mbSize",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 confirmButton = {
                     Button(onClick = onDismiss) {
                         Text("OK")
                     }
-                }
+                },
+                dismissButton = if (latest != null) {
+                    {
+                        TextButton(onClick = {
+                            onDismiss()
+                            onDownloadAndInstall(latest)
+                        }) {
+                            Text(str("updates_reinstall_btn"), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                } else null
             )
         }
 

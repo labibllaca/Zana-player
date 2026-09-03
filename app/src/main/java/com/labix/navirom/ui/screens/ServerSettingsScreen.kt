@@ -1199,7 +1199,7 @@ fun ServerSettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Letzte Prüfung: $lastDateStr",
+                        text = "${str("updates_last_checked")}: $lastDateStr",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1312,7 +1312,7 @@ fun ServerSettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Navirom v1.3 • Android Auto Ready",
+                    text = "Zana v${com.labix.BuildConfig.VERSION_NAME} (Build ${com.labix.BuildConfig.VERSION_CODE}) • Android Auto Ready",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )

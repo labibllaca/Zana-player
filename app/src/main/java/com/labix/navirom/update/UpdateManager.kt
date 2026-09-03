@@ -5,8 +5,9 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
+import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.labix.BuildConfig
 import com.labix.navirom.diagnostics.AppDiagnostics
@@ -22,6 +23,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 data class AppUpdateInfo(
@@ -33,14 +37,17 @@ data class AppUpdateInfo(
     val apkDownloadUrl: String,
     val apkName: String,
     val apkSize: Long,
-    val isNewer: Boolean
+    val isNewer: Boolean,
+    val assetUpdatedAt: String = "",
+    val assetUpdatedAtMillis: Long = 0L,
+    val assetDigest: String = ""
 )
 
 sealed class UpdateState {
     object Idle : UpdateState()
     object Checking : UpdateState()
     data class Available(val updateInfo: AppUpdateInfo) : UpdateState()
-    object UpToDate : UpdateState()
+    data class UpToDate(val latestInfo: AppUpdateInfo? = null) : UpdateState()
     data class Downloading(val progress: Float, val downloadedBytes: Long, val totalBytes: Long) : UpdateState()
     data class ReadyToInstall(val apkFile: File, val updateInfo: AppUpdateInfo) : UpdateState()
     data class Error(val message: String) : UpdateState()
@@ -113,38 +120,67 @@ class UpdateManager(private val context: Context) {
             val jsonArray = JSONArray(bodyString)
             if (jsonArray.length() == 0) {
                 AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "No releases found on repo")
-                _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
+                _updateState.value = if (isManual) UpdateState.UpToDate() else UpdateState.Idle
                 return@withContext null
             }
 
-            // Find the most relevant release with an APK
-            var latestApkAsset: JSONObject? = null
-            var targetRelease: JSONObject? = null
+            // Gather candidate releases that contain at least one APK asset
+            data class ReleaseCandidate(
+                val release: JSONObject,
+                val asset: JSONObject,
+                val tagName: String,
+                val title: String,
+                val semver: String?,
+                val assetTimeMillis: Long
+            )
+
+            val candidates = mutableListOf<ReleaseCandidate>()
 
             for (i in 0 until jsonArray.length()) {
                 val rel = jsonArray.getJSONObject(i)
-                val isDraft = rel.optBoolean("draft", false)
-                if (isDraft) continue
+                if (rel.optBoolean("draft", false)) continue
 
                 val assets = rel.optJSONArray("assets") ?: JSONArray()
+                var bestAsset: JSONObject? = null
                 for (j in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(j)
-                    val name = asset.optString("name", "")
-                    if (name.endsWith(".apk", ignoreCase = true)) {
-                        latestApkAsset = asset
-                        targetRelease = rel
+                    val a = assets.getJSONObject(j)
+                    val n = a.optString("name", "")
+                    if (n.endsWith(".apk", ignoreCase = true)) {
+                        bestAsset = a
                         break
                     }
                 }
-                if (targetRelease != null) break
+
+                if (bestAsset != null) {
+                    val tag = rel.optString("tag_name", "")
+                    val t = rel.optString("name", tag).ifBlank { tag }
+                    val sem = extractVersionString(tag) ?: extractVersionString(t)
+                    val aTime = parseIso8601(bestAsset.optString("updated_at", rel.optString("published_at", "")))
+                    candidates.add(ReleaseCandidate(rel, bestAsset, tag, t, sem, aTime))
+                }
             }
 
-            if (targetRelease == null || latestApkAsset == null) {
-                Log.i(TAG, "No APK asset found in releases for $repo")
+            if (candidates.isEmpty()) {
+                Log.i(TAG, "No APK asset found in any release for $repo")
                 AppDiagnostics.logWarn(DiagnosticCodes.UPDATE_CHECK_WARN_703, TAG, "No APK asset found in releases")
-                _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
+                _updateState.value = if (isManual) UpdateState.UpToDate() else UpdateState.Idle
                 return@withContext null
             }
+
+            // Prioritize candidates with higher semver than current version, otherwise newest asset timestamp
+            val currentVersion = BuildConfig.VERSION_NAME
+            val higherSemverCandidates = candidates.filter { c ->
+                c.semver != null && compareSemver(c.semver, currentVersion) > 0
+            }.sortedWith { a, b -> compareSemver(b.semver!!, a.semver!!) }
+
+            val chosen = if (higherSemverCandidates.isNotEmpty()) {
+                higherSemverCandidates.first()
+            } else {
+                candidates.maxByOrNull { it.assetTimeMillis } ?: candidates.first()
+            }
+
+            val targetRelease = chosen.release
+            val latestApkAsset = chosen.asset
 
             val tagName = targetRelease.optString("tag_name", "")
             val title = targetRelease.optString("name", tagName).ifBlank { tagName }
@@ -154,9 +190,17 @@ class UpdateManager(private val context: Context) {
             val apkDownloadUrl = latestApkAsset.optString("browser_download_url", "")
             val apkName = latestApkAsset.optString("name", "navirom-update.apk")
             val apkSize = latestApkAsset.optLong("size", 0L)
+            val assetUpdatedAt = latestApkAsset.optString("updated_at", publishedAt)
+            val assetUpdatedAtMillis = chosen.assetTimeMillis
+            val assetDigest = latestApkAsset.optString("digest", "")
 
-            val currentVersion = BuildConfig.VERSION_NAME
-            val isNewer = isRemoteVersionNewer(tagName, title, currentVersion)
+            val isNewer = isRemoteVersionNewer(
+                tag = tagName,
+                title = title,
+                assetUpdatedAt = assetUpdatedAt,
+                assetDigest = assetDigest,
+                currentVersion = currentVersion
+            )
 
             val now = System.currentTimeMillis()
             prefs.edit().putLong(KEY_LAST_CHECKED, now).apply()
@@ -171,7 +215,10 @@ class UpdateManager(private val context: Context) {
                 apkDownloadUrl = apkDownloadUrl,
                 apkName = apkName,
                 apkSize = apkSize,
-                isNewer = isNewer
+                isNewer = isNewer,
+                assetUpdatedAt = assetUpdatedAt,
+                assetUpdatedAtMillis = assetUpdatedAtMillis,
+                assetDigest = assetDigest
             )
 
             if (isNewer) {
@@ -179,8 +226,8 @@ class UpdateManager(private val context: Context) {
                 _updateState.value = UpdateState.Available(updateInfo)
                 updateInfo
             } else {
-                AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "App is up-to-date (current: $currentVersion)")
-                _updateState.value = if (isManual) UpdateState.UpToDate else UpdateState.Idle
+                AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "App is up-to-date (current: $currentVersion, server: $tagName)")
+                _updateState.value = if (isManual) UpdateState.UpToDate(updateInfo) else UpdateState.Idle
                 null
             }
         } catch (e: Exception) {
@@ -197,11 +244,16 @@ class UpdateManager(private val context: Context) {
             _updateState.value = UpdateState.Downloading(0f, 0L, updateInfo.apkSize)
 
             val updateDir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val outputFile = File(updateDir, "navirom-update-${updateInfo.tagName.replace('/', '_')}.apk")
-
-            if (outputFile.exists()) {
-                outputFile.delete()
+            // Clean up old apk files
+            updateDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(".apk", ignoreCase = true)) {
+                    file.delete()
+                }
             }
+
+            val timestamp = System.currentTimeMillis()
+            val safeTag = updateInfo.tagName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+            val outputFile = File(updateDir, "zana-update-${safeTag}-${timestamp}.apk")
 
             val request = Request.Builder()
                 .url(updateInfo.apkDownloadUrl)
@@ -240,6 +292,13 @@ class UpdateManager(private val context: Context) {
                 }
             }
 
+            // Save last installed build metadata
+            prefs.edit()
+                .putString(KEY_LAST_INSTALLED_DIGEST, updateInfo.assetDigest)
+                .putString(KEY_LAST_INSTALLED_TAG, updateInfo.tagName)
+                .putLong(KEY_LAST_INSTALLED_TIME, System.currentTimeMillis())
+                .apply()
+
             _updateState.value = UpdateState.ReadyToInstall(outputFile, updateInfo)
             withContext(Dispatchers.Main) {
                 installApk(context, outputFile)
@@ -261,6 +320,18 @@ class UpdateManager(private val context: Context) {
                 return
             }
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(settingsIntent)
+                    Toast.makeText(context, "Please allow installing unknown apps for Zana", Toast.LENGTH_LONG).show()
+                    return
+                }
+            }
+
             val authority = "${context.packageName}.provider"
             val apkUri: Uri = FileProvider.getUriForFile(context, authority, apkFile)
 
@@ -278,35 +349,126 @@ class UpdateManager(private val context: Context) {
     }
 
     private fun extractVersionString(input: String): String? {
-        val regex = Regex("(\\d+\\.\\d+\\.\\d+)")
+        val regex = Regex("(\\d+(?:\\.\\d+)+)")
         return regex.find(input)?.value
     }
 
-    private fun isRemoteVersionNewer(tag: String, title: String, currentVersion: String): Boolean {
+    private fun compareSemver(v1: String, v2: String): Int {
+        val clean1 = extractVersionString(v1) ?: v1.removePrefix("v").trim()
+        val clean2 = extractVersionString(v2) ?: v2.removePrefix("v").trim()
+        val parts1 = clean1.split(".").map { Regex("^\\d+").find(it.trim())?.value?.toIntOrNull() ?: 0 }
+        val parts2 = clean2.split(".").map { Regex("^\\d+").find(it.trim())?.value?.toIntOrNull() ?: 0 }
+        val len = maxOf(parts1.size, parts2.size)
+        for (i in 0 until len) {
+            val p1 = parts1.getOrElse(i) { 0 }
+            val p2 = parts2.getOrElse(i) { 0 }
+            if (p1 > p2) return 1
+            if (p1 < p2) return -1
+        }
+        return 0
+    }
+
+    private fun parseIso8601(dateStr: String): Long {
+        if (dateStr.isBlank()) return 0L
+        return try {
+            val clean = dateStr.replace(Regex("\\.\\d+Z$"), "Z")
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            sdf.parse(clean)?.time ?: 0L
+        } catch (_: Exception) {
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }
+                sdf.parse(dateStr.take(19))?.time ?: 0L
+            } catch (_: Exception) {
+                0L
+            }
+        }
+    }
+
+    private fun isRemoteVersionNewer(
+        tag: String,
+        title: String,
+        assetUpdatedAt: String,
+        assetDigest: String,
+        currentVersion: String
+    ): Boolean {
+        AppDiagnostics.logInfo(
+            DiagnosticCodes.UPDATE_CHECK_START_701,
+            TAG,
+            "Comparing remote: tag='$tag', title='$title', assetUpdatedAt='$assetUpdatedAt', digest='$assetDigest' with local: version='$currentVersion', buildTime=${BuildConfig.BUILD_TIME}"
+        )
+
+        // 1. Semantic Versioning comparison
         val cleanCurrent = extractVersionString(currentVersion) ?: currentVersion.removePrefix("v").trim()
+        val remoteVersionFromTag = extractVersionString(tag)
+        val remoteVersionFromTitle = extractVersionString(title)
+        val cleanRemote = remoteVersionFromTag ?: remoteVersionFromTitle
 
-        // Try to get clean version from tag first, then title
-        val cleanRemote = extractVersionString(tag) 
-            ?: extractVersionString(title) 
-            ?: tag.removePrefix("v").trim()
+        if (cleanRemote != null) {
+            val semverComparison = compareSemver(cleanRemote, cleanCurrent)
+            if (semverComparison > 0) {
+                Log.i(TAG, "Remote semver $cleanRemote is newer than $cleanCurrent")
+                return true
+            } else if (semverComparison < 0) {
+                Log.i(TAG, "Remote semver $cleanRemote is older than $cleanCurrent")
+                return false
+            }
+        }
 
-        if (cleanRemote.equals("latest-build", ignoreCase = true) || cleanRemote.equals("latest", ignoreCase = true)) {
+        // 2. Check if identical build digest was already downloaded/installed
+        val lastInstalledDigest = prefs.getString(KEY_LAST_INSTALLED_DIGEST, "") ?: ""
+        if (assetDigest.isNotBlank() && lastInstalledDigest.isNotBlank() && assetDigest.equals(lastInstalledDigest, ignoreCase = true)) {
+            Log.i(TAG, "Identical asset digest already installed: $assetDigest")
             return false
         }
 
-        val tagParts = cleanRemote.split(".").map { part ->
-            Regex("^\\d+").find(part.trim())?.value?.toIntOrNull() ?: 0
-        }
-        val currentParts = cleanCurrent.split(".").map { part ->
-            Regex("^\\d+").find(part.trim())?.value?.toIntOrNull() ?: 0
+        // 3. Compare asset upload timestamp against local build / install time
+        val assetTimeMillis = parseIso8601(assetUpdatedAt)
+        val packageInstalledTime = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0)).lastUpdateTime
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
+            }
+        } catch (_: Exception) {
+            0L
         }
 
-        val length = maxOf(tagParts.size, currentParts.size)
-        for (i in 0 until length) {
-            val t = tagParts.getOrElse(i) { 0 }
-            val c = currentParts.getOrElse(i) { 0 }
-            if (t > c) return true
-            if (t < c) return false
+        val lastInstalledTime = prefs.getLong(KEY_LAST_INSTALLED_TIME, 0L)
+        val localBaselineTime = maxOf(
+            BuildConfig.BUILD_TIME,
+            packageInstalledTime,
+            lastInstalledTime
+        )
+
+        if (assetTimeMillis > 0L && localBaselineTime > 0L) {
+            val isAssetNewer = assetTimeMillis > (localBaselineTime + 60_000L)
+            Log.i(TAG, "Timestamp check: assetTime=$assetTimeMillis ($assetUpdatedAt) vs localBaseline=$localBaselineTime -> isAssetNewer=$isAssetNewer")
+            if (isAssetNewer) {
+                return true
+            }
+        }
+
+        // 4. For rolling releases (latest-build / latest / nightly)
+        val isRollingRelease = tag.contains("latest", ignoreCase = true) ||
+                tag.contains("nightly", ignoreCase = true) ||
+                tag.contains("build", ignoreCase = true) ||
+                title.contains("latest", ignoreCase = true) ||
+                title.contains("build", ignoreCase = true)
+
+        if (isRollingRelease) {
+            if (assetDigest.isNotBlank() && lastInstalledDigest.isNotBlank()) {
+                val isDifferent = !assetDigest.equals(lastInstalledDigest, ignoreCase = true)
+                Log.i(TAG, "Rolling release digest diff: isDifferent=$isDifferent")
+                if (isDifferent) return true
+            } else if (assetTimeMillis > BuildConfig.BUILD_TIME) {
+                Log.i(TAG, "Rolling release assetTime > BuildConfig.BUILD_TIME")
+                return true
+            }
         }
 
         return false
@@ -318,5 +480,8 @@ class UpdateManager(private val context: Context) {
         private const val KEY_AUTO_CHECK = "auto_check_updates"
         private const val KEY_GITHUB_REPO = "github_repo_slug"
         private const val KEY_LAST_CHECKED = "last_checked_timestamp"
+        private const val KEY_LAST_INSTALLED_DIGEST = "last_installed_asset_digest"
+        private const val KEY_LAST_INSTALLED_TAG = "last_installed_tag"
+        private const val KEY_LAST_INSTALLED_TIME = "last_installed_timestamp"
     }
 }
