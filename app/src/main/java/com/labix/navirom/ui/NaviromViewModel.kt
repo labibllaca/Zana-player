@@ -523,7 +523,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
         // Auto-record playback history for listening statistics
         viewModelScope.launch {
-            var lastTrackId: String? = null
+            var activeTrack: NaviromTrack? = null
             var lastPositionMs: Long = 0L
             var accumulatedPlaySeconds: Long = 0L
 
@@ -533,26 +533,28 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val track = state.currentTrack
 
                 if (track != null && state.isPlaying) {
-                    if (track.id != lastTrackId) {
-                        // Flushed previous track if any
-                        if (accumulatedPlaySeconds >= 3) {
-                            val prevTrack = playerController.queue.value.find { it.id == lastTrackId }
-                            if (prevTrack != null) {
-                                statsManager.recordPlaybackSession(prevTrack, accumulatedPlaySeconds)
-                            }
+                    if (track.id != activeTrack?.id) {
+                        // Track changed: flush accumulated session for previous track
+                        if (activeTrack != null && accumulatedPlaySeconds >= 10) {
+                            statsManager.recordPlaybackSession(activeTrack, accumulatedPlaySeconds)
                         }
-                        lastTrackId = track.id
+                        activeTrack = track
                         lastPositionMs = state.currentPositionMs
                         accumulatedPlaySeconds = 0L
                     } else {
                         val delta = (state.currentPositionMs - lastPositionMs).coerceAtLeast(0)
                         if (delta in 500..4000) {
                             accumulatedPlaySeconds += (delta / 1000).coerceAtLeast(1)
-                            if (accumulatedPlaySeconds >= 10) {
-                                statsManager.recordPlaybackSession(track, accumulatedPlaySeconds)
-                                accumulatedPlaySeconds = 0L
-                            }
                         }
+                        lastPositionMs = state.currentPositionMs
+                    }
+                } else {
+                    // Playback paused or stopped: flush accumulated session
+                    if (activeTrack != null && accumulatedPlaySeconds >= 10) {
+                        statsManager.recordPlaybackSession(activeTrack, accumulatedPlaySeconds)
+                        accumulatedPlaySeconds = 0L
+                    }
+                    if (!state.isPlaying) {
                         lastPositionMs = state.currentPositionMs
                     }
                 }

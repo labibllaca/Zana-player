@@ -46,6 +46,26 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppDiagnostics.init(applicationContext)
+
+        // Configure Coil image caching to prevent memory leaks from album arts
+        try {
+            val imageLoader = coil.ImageLoader.Builder(applicationContext)
+                .memoryCache {
+                    coil.memory.MemoryCache.Builder(applicationContext)
+                        .maxSizePercent(0.15)
+                        .build()
+                }
+                .diskCache {
+                    coil.disk.DiskCache.Builder()
+                        .directory(cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(64L * 1024 * 1024)
+                        .build()
+                }
+                .crossfade(true)
+                .build()
+            coil.Coil.setImageLoader(imageLoader)
+        } catch (_: Exception) {}
+
         enableEdgeToEdge()
 
         if (intent?.action == "ACTION_CLOSE_APP") {

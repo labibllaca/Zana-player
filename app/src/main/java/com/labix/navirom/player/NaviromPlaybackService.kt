@@ -41,7 +41,14 @@ class NaviromPlaybackService : MediaBrowserService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var lastCoverUrl: String? = null
     private var cachedBitmap: Bitmap? = null
+    private var lastNotifiedTrackId: String? = null
+    private var lastNotifiedIsPlaying: Boolean? = null
+    private var lastNotifiedBitmap: Bitmap? = null
     private var isForegroundService = false
+        set(value) {
+            field = value
+            isServiceRunningInForeground = value
+        }
     private val httpClient = HttpClientProvider.client
     private val subsonicClient = NaviromSubsonicClient()
 
@@ -73,13 +80,28 @@ class NaviromPlaybackService : MediaBrowserService() {
 
         var activePlayerController: WeakReference<AudioPlayerController>? = null
 
+        @Volatile
+        var isServiceRunningInForeground: Boolean = false
+
+        fun notifySeek(context: Context, positionMs: Long) {
+            try {
+                val intent = Intent(context, NaviromPlaybackService::class.java).apply {
+                    action = ACTION_SEEK
+                    putExtra(EXTRA_SEEK_POSITION, positionMs)
+                }
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.w("PlaybackService", "Failed to send seek to service", e)
+            }
+        }
+
         fun updateService(context: Context, state: PlaybackState) {
             try {
                 val intent = Intent(context, NaviromPlaybackService::class.java).apply {
                     action = ACTION_UPDATE_STATE
                 }
                 if (state.isPlaying) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (!isServiceRunningInForeground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         try {
                             context.startForegroundService(intent)
                         } catch (e: Exception) {
@@ -730,8 +752,10 @@ class NaviromPlaybackService : MediaBrowserService() {
             ACTION_PREVIOUS -> player.previous()
             ACTION_NEXT -> player.next()
             ACTION_SEEK -> {
-                val pos = intent.getLongExtra(EXTRA_SEEK_POSITION, 0L)
-                player.seekTo(pos)
+                val pos = intent.getLongExtra(EXTRA_SEEK_POSITION, -1L)
+                if (pos >= 0 && player.playbackState.value.currentPositionMs != pos) {
+                    player.seekTo(pos)
+                }
             }
             ACTION_STOP -> {
                 player.pause()
@@ -765,7 +789,7 @@ class NaviromPlaybackService : MediaBrowserService() {
                 return START_NOT_STICKY
             }
             ACTION_UPDATE_STATE -> {
-                updatePlaybackAndNotification()
+                // Handled once below
             }
         }
 
@@ -812,6 +836,9 @@ class NaviromPlaybackService : MediaBrowserService() {
         // Update Metadata & Notification
         if (lastCoverUrl != track.coverArtUrl) {
             lastCoverUrl = track.coverArtUrl
+            try {
+                cachedBitmap?.let { if (!it.isRecycled) it.recycle() }
+            } catch (_: Exception) {}
             cachedBitmap = null
             updateMediaSessionMetadata(track, state.durationMs, null)
             showNotification(track, state.isPlaying, null)
@@ -878,18 +905,8 @@ class NaviromPlaybackService : MediaBrowserService() {
             .putString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI, track.coverArtUrl)
 
         if (bitmap != null && !bitmap.isRecycled) {
-            try {
-                val copiedBitmap = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
-                if (copiedBitmap != null && !copiedBitmap.isRecycled) {
-                    metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, copiedBitmap)
-                    metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, copiedBitmap)
-                }
-            } catch (e: Exception) {
-                if (!bitmap.isRecycled) {
-                    metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, bitmap)
-                    metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap)
-                }
-            }
+            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, bitmap)
+            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, bitmap)
         }
 
         session.setMetadata(metadataBuilder.build())
@@ -897,6 +914,19 @@ class NaviromPlaybackService : MediaBrowserService() {
 
     private fun showNotification(track: NaviromTrack, isPlaying: Boolean, coverBitmap: Bitmap?) {
         val session = mediaSession ?: return
+
+        // Skip rebuilding and reposting notification if identical to already visible state
+        if (isForegroundService &&
+            lastNotifiedTrackId == track.id &&
+            lastNotifiedIsPlaying == isPlaying &&
+            lastNotifiedBitmap == coverBitmap
+        ) {
+            return
+        }
+
+        lastNotifiedTrackId = track.id
+        lastNotifiedIsPlaying = isPlaying
+        lastNotifiedBitmap = coverBitmap
 
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -946,9 +976,6 @@ class NaviromPlaybackService : MediaBrowserService() {
             Intent(this, NaviromPlaybackService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-
-        val player = getOrInitPlayerController()
-        val state = player.playbackState.value
 
         val notifBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -1001,16 +1028,7 @@ class NaviromPlaybackService : MediaBrowserService() {
             )
 
         if (coverBitmap != null && !coverBitmap.isRecycled) {
-            try {
-                val copiedBitmap = coverBitmap.copy(coverBitmap.config ?: Bitmap.Config.ARGB_8888, false)
-                if (copiedBitmap != null && !copiedBitmap.isRecycled) {
-                    notifBuilder.setLargeIcon(copiedBitmap)
-                }
-            } catch (e: Exception) {
-                if (!coverBitmap.isRecycled) {
-                    notifBuilder.setLargeIcon(coverBitmap)
-                }
-            }
+            notifBuilder.setLargeIcon(coverBitmap)
         }
 
         val notification = notifBuilder.build()
@@ -1047,7 +1065,7 @@ class NaviromPlaybackService : MediaBrowserService() {
                     resp.body?.byteStream()?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         if (bitmap != null) {
-                            val maxDim = 512
+                            val maxDim = 384
                             val width = bitmap.width
                             val height = bitmap.height
                             if (width > maxDim || height > maxDim) {
@@ -1068,12 +1086,15 @@ class NaviromPlaybackService : MediaBrowserService() {
     }
 
     override fun onDestroy() {
+        isForegroundService = false
         try {
             unregisterReceiver(screenOffReceiver)
         } catch (_: Exception) {}
         super.onDestroy()
         serviceScope.cancel()
-        cachedBitmap?.recycle()
+        try {
+            cachedBitmap?.let { if (!it.isRecycled) it.recycle() }
+        } catch (_: Exception) {}
         cachedBitmap = null
         mediaSession?.isActive = false
         mediaSession?.release()

@@ -26,6 +26,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import java.io.File
 
@@ -161,8 +162,8 @@ class AudioPlayerController(
         } catch (_: Exception) {}
         try {
             if (wakeLock?.isHeld == false) {
-                // Keep the CPU awake for up to 10 minutes at a time per track
-                wakeLock?.acquire(10 * 60 * 1000L)
+                // Keep the CPU awake throughout active playback (no arbitrary 10min cutoff)
+                wakeLock?.acquire()
             }
         } catch (_: Exception) {}
     }
@@ -328,9 +329,18 @@ class AudioPlayerController(
         initMediaPlayer()
         restoreQueueFromRoom()
         scope.launch {
-            _playbackState.collect { state ->
-                NaviromPlaybackService.updateService(context, state)
-            }
+            _playbackState
+                .distinctUntilChanged { old, new ->
+                    old.currentTrack?.id == new.currentTrack?.id &&
+                    old.isPlaying == new.isPlaying &&
+                    old.isBuffering == new.isBuffering &&
+                    old.repeatMode == new.repeatMode &&
+                    old.isShuffle == new.isShuffle &&
+                    old.playbackSpeed == new.playbackSpeed
+                }
+                .collect { state ->
+                    NaviromPlaybackService.updateService(context, state)
+                }
         }
     }
 
@@ -700,6 +710,7 @@ class AudioPlayerController(
             val safePos = positionMs.coerceIn(0L, _playbackState.value.durationMs.coerceAtLeast(0L))
             mp.seekTo(safePos.toInt())
             _playbackState.update { it.copy(currentPositionMs = safePos) }
+            NaviromPlaybackService.notifySeek(context, safePos)
             
             // If user seeks during crossfade or away from fade zone, cancel crossfade and restore full volume
             if (fadingOutPlayer != null) {
