@@ -1,6 +1,8 @@
 package com.labix.navirom.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -61,104 +63,117 @@ fun PlaylistsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
 
-    if (selectedPlaylistId != null) {
-        val selectedPlaylist = playlists.find { it.id == selectedPlaylistId }
-        PlaylistDetailView(
-            playlist = selectedPlaylist,
-            tracks = selectedPlaylistTracks,
-            currentTrack = currentTrack,
-            isPlaying = isPlaying,
-            downloadStatuses = downloadStatuses,
-            downloadProgresses = downloadProgresses,
-            favoriteIds = favoriteIds,
-            appLanguage = appLanguage,
-            onBack = { onSelectPlaylist(null) },
-            onDelete = { onDeletePlaylist(selectedPlaylistId) },
-            onTrackClick = { track -> onTrackClick(track, selectedPlaylistTracks) },
-            onPlayAll = { onPlayAll(selectedPlaylistTracks) },
-            onShuffleAll = { onShuffleAll(selectedPlaylistTracks) },
-            onDownloadPlaylist = { onDownloadPlaylist(selectedPlaylistTracks) },
-            onToggleFavorite = onToggleFavorite,
-            onDownloadTrack = onDownloadTrack,
-            onPlayNext = onPlayNext,
-            onAddToQueue = onAddToQueue,
-            modifier = modifier
-        )
-        return
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("playlists_screen")
-    ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "${str("playlists_title")} (${playlists.size})",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Button(
-                onClick = { showCreateDialog = true },
-                shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                modifier = Modifier.testTag("create_playlist_btn")
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(str("btn_create_playlist"))
+    AnimatedContent(
+        targetState = selectedPlaylistId,
+        transitionSpec = {
+            if (targetState != null) {
+                (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 4 })
+                    .togetherWith(fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { -it / 4 })
+            } else {
+                (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 4 })
+                    .togetherWith(fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 4 })
             }
-        }
-
-        if (playlists.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        },
+        label = "PlaylistScreenDetailTransition",
+        modifier = modifier.fillMaxSize()
+    ) { targetPlaylistId ->
+        if (targetPlaylistId != null) {
+            val selectedPlaylist = playlists.find { it.id == targetPlaylistId }
+            PlaylistDetailView(
+                playlist = selectedPlaylist,
+                tracks = selectedPlaylistTracks,
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                downloadStatuses = downloadStatuses,
+                downloadProgresses = downloadProgresses,
+                favoriteIds = favoriteIds,
+                appLanguage = appLanguage,
+                onBack = { onSelectPlaylist(null) },
+                onDelete = { onDeletePlaylist(targetPlaylistId) },
+                onTrackClick = { track -> onTrackClick(track, selectedPlaylistTracks) },
+                onPlayAll = { onPlayAll(selectedPlaylistTracks) },
+                onShuffleAll = { onShuffleAll(selectedPlaylistTracks) },
+                onDownloadPlaylist = { onDownloadPlaylist(selectedPlaylistTracks) },
+                onToggleFavorite = onToggleFavorite,
+                onDownloadTrack = onDownloadTrack,
+                onPlayNext = onPlayNext,
+                onAddToQueue = onAddToQueue
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("playlists_screen")
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = str("empty_playlists"),
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "${str("playlists_title")} (${playlists.size})",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = str("empty_playlists_desc"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FilledTonalButton(onClick = { showCreateDialog = true }) {
+
+                    Button(
+                        onClick = { showCreateDialog = true },
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.testTag("create_playlist_btn")
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(str("btn_create_playlist"))
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(playlists, key = { it.id }) { playlist ->
-                    PlaylistCard(
-                        playlist = playlist,
-                        onClick = { onSelectPlaylist(playlist.id) }
-                    )
+
+                if (playlists.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = str("empty_playlists"),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = str("empty_playlists_desc"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            FilledTonalButton(onClick = { showCreateDialog = true }) {
+                                Text(str("btn_create_playlist"))
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(playlists, key = { it.id }) { playlist ->
+                            PlaylistCard(
+                                playlist = playlist,
+                                onClick = { onSelectPlaylist(playlist.id) }
+                            )
+                        }
+                    }
                 }
             }
         }

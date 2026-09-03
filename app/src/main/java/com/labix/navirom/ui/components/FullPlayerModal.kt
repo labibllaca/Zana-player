@@ -15,6 +15,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -392,11 +394,25 @@ fun FullPlayerModal(
 
                             Spacer(modifier = Modifier.height(24.dp))
 
+                            // Artwork breathing scale based on playback state
+                            val artworkScale by animateFloatAsState(
+                                targetValue = if (playbackState.isPlaying) 1.0f else 0.92f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                label = "artworkScale"
+                            )
+
                             // Artwork with lyric overlay at bottom
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f)
+                                    .graphicsLayer {
+                                        scaleX = artworkScale
+                                        scaleY = artworkScale
+                                    }
                                     .clip(RoundedCornerShape(32.dp))
                             ) {
                                 SongAlbumCover(
@@ -513,30 +529,54 @@ fun FullPlayerModal(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                                    Text(
-                                        text = track.title,
-                                        color = textOnCard,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 24.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = track.artist,
-                                        color = textMutedOnCard,
-                                        fontSize = 16.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.clickable { onArtistClick?.invoke(track.artistId) }
-                                    )
+                                AnimatedContent(
+                                    targetState = track.id,
+                                    transitionSpec = {
+                                        (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 3 })
+                                            .togetherWith(fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 })
+                                    },
+                                    label = "fullPlayerTrackTitleAnim",
+                                    modifier = Modifier.weight(1f).padding(end = 16.dp)
+                                ) { _ ->
+                                    Column {
+                                        Text(
+                                            text = track.title,
+                                            color = textOnCard,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 24.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = track.artist,
+                                            color = textMutedOnCard,
+                                            fontSize = 16.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.clickable { onArtistClick?.invoke(track.artistId) }
+                                        )
+                                    }
                                 }
                                 
-                                // Saved Button
+                                // Saved Button with bounce
+                                val savedFavScale by animateFloatAsState(
+                                    targetValue = if (isFavorite) 1.2f else 1.0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "savedFavScale"
+                                )
+
                                 Surface(
                                     color = if (isFavorite) Color(0xFF1DB954) else Color(0xFFE0E0E0),
                                     shape = CircleShape,
-                                    modifier = Modifier.clickable { onToggleFavorite() }
+                                    modifier = Modifier
+                                        .graphicsLayer {
+                                            scaleX = savedFavScale
+                                            scaleY = savedFavScale
+                                        }
+                                        .clickable { onToggleFavorite() }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -615,12 +655,21 @@ fun FullPlayerModal(
                                     modifier = Modifier.size(64.dp).clickable { onTogglePlayPause() }
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                            contentDescription = "Play/Pause",
-                                            tint = textOnCard,
-                                            modifier = Modifier.size(32.dp)
-                                        )
+                                        AnimatedContent(
+                                            targetState = playbackState.isPlaying,
+                                            transitionSpec = {
+                                                (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(tween(160)))
+                                                    .togetherWith(scaleOut() + fadeOut(tween(100)))
+                                            },
+                                            label = "fullPlayPauseAnim"
+                                        ) { isPlaying ->
+                                            Icon(
+                                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                contentDescription = "Play/Pause",
+                                                tint = textOnCard,
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
                                     }
                                 }
 

@@ -1,6 +1,7 @@
 package com.labix.navirom.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -925,8 +926,21 @@ private fun TabContent(
     onSetGithubRepo: (String) -> Unit = {},
     onDismissUpdate: () -> Unit = {}
 ) {
-    when (currentTab) {
-        NaviromTab.LIBRARY -> {
+    AnimatedContent(
+        targetState = currentTab,
+        transitionSpec = {
+            val forward = targetState.ordinal > initialState.ordinal
+            (fadeIn(animationSpec = tween(220)) +
+                slideInHorizontally(animationSpec = tween(220)) { width -> if (forward) width / 5 else -width / 5 })
+                .togetherWith(
+                    fadeOut(animationSpec = tween(160)) +
+                    slideOutHorizontally(animationSpec = tween(160)) { width -> if (forward) -width / 5 else width / 5 }
+                )
+        },
+        label = "MainTabTransition"
+    ) { activeTab ->
+        when (activeTab) {
+            NaviromTab.LIBRARY -> {
             LibraryScreen(
                 subTab = librarySubTab,
                 onSubTabSelected = onSubTabSelected,
@@ -1081,4 +1095,5 @@ private fun TabContent(
             )
         }
     }
+}
 }

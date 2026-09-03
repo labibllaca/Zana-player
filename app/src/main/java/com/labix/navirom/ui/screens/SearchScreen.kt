@@ -1,5 +1,7 @@
 package com.labix.navirom.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -194,131 +196,152 @@ fun SearchScreen(
             }
         }
 
-        if (isSearching) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else if (query.isBlank()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = str("search_recent"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        val searchState = when {
+            isSearching -> 0
+            query.isBlank() -> 1
+            artists.isEmpty() && albums.isEmpty() && tracks.isEmpty() -> 2
+            else -> 3
+        }
+
+        AnimatedContent(
+            targetState = searchState,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(150))
+            },
+            label = "SearchStateTransition",
+            modifier = Modifier.fillMaxSize()
+        ) { state ->
+            when (state) {
+                0 -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
                 }
-            }
-        } else if (artists.isEmpty() && albums.isEmpty() && tracks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = String.format(str("search_no_results"), query),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(bottom = 80.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Artists Section
-                if (artists.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = str("search_artists"),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(artists, key = { it.id }) { artist ->
-                                ArtistCard(
-                                    artist = artist,
-                                    onClick = { onQueryChange(artist.name) },
-                                    modifier = Modifier.width(130.dp)
-                                )
-                            }
+                1 -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = str("search_recent"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
-
-                // Albums Section
-                if (albums.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
+                2 -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = str("search_albums"),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            text = String.format(str("search_no_results"), query),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(albums, key = { it.id }) { album ->
-                                AlbumCard(
-                                    album = album,
-                                    onClick = { onSelectAlbum(album.id) },
-                                    modifier = Modifier.width(150.dp)
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Artists Section
+                        if (artists.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = str("search_artists"),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(artists, key = { it.id }) { artist ->
+                                        ArtistCard(
+                                            artist = artist,
+                                            onClick = { onQueryChange(artist.name) },
+                                            modifier = Modifier.width(130.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Albums Section
+                        if (albums.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = str("search_albums"),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(albums, key = { it.id }) { album ->
+                                        AlbumCard(
+                                            album = album,
+                                            onClick = { onSelectAlbum(album.id) },
+                                            modifier = Modifier.width(150.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tracks Section
+                        if (tracks.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "${str("search_tracks")} (${tracks.size})",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+
+                            items(tracks, key = { it.id }) { track ->
+                                TrackListItem(
+                                    track = track,
+                                    isPlaying = isPlaying,
+                                    isCurrentTrack = currentTrack?.id == track.id,
+                                    downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
+                                    downloadProgress = downloadProgresses[track.id],
+                                    isFavorite = favoriteIds.contains(track.id),
+                                    onTrackClick = { onTrackClick(track, tracks) },
+                                    onToggleFavorite = { onToggleFavorite(track.id) },
+                                    onDownloadClick = { onDownloadTrack(track) },
+                                    onPlayNext = { onPlayNext(track) },
+                                    onAddToQueue = { onAddToQueue(track) },
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                    }
-                }
-
-                // Tracks Section
-                if (tracks.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "${str("search_tracks")} (${tracks.size})",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                    }
-
-                    items(tracks, key = { it.id }) { track ->
-                        TrackListItem(
-                            track = track,
-                            isPlaying = isPlaying,
-                            isCurrentTrack = currentTrack?.id == track.id,
-                            downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
-                            downloadProgress = downloadProgresses[track.id],
-                            isFavorite = favoriteIds.contains(track.id),
-                            onTrackClick = { onTrackClick(track, tracks) },
-                            onToggleFavorite = { onToggleFavorite(track.id) },
-                            onDownloadClick = { onDownloadTrack(track) },
-                            onPlayNext = { onPlayNext(track) },
-                            onAddToQueue = { onAddToQueue(track) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-                        )
                     }
                 }
             }

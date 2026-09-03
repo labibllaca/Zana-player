@@ -1,5 +1,7 @@
 package com.labix.navirom.ui.components
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,11 @@ fun MiniPlayerBar(
 ) {
     val track = playbackState.currentTrack ?: return
     val haptics = rememberNaviromHaptics()
+    val animatedProgress by animateFloatAsState(
+        targetValue = playbackState.progressFraction,
+        animationSpec = tween(200, easing = LinearEasing),
+        label = "miniProgress"
+    )
 
     Surface(
         modifier = modifier
@@ -51,7 +59,7 @@ fun MiniPlayerBar(
         Column {
             // Linear progress indicator
             LinearProgressIndicator(
-                progress = { playbackState.progressFraction },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.5.dp),
@@ -130,24 +138,32 @@ fun MiniPlayerBar(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Title & Artist
-                    Column(
+                    // Title & Artist with smooth transition
+                    AnimatedContent(
+                        targetState = track.id,
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 })
+                                .togetherWith(fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 })
+                        },
+                        label = "miniTrackAnim",
                         modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = track.title,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = track.artist,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    ) { _ ->
+                        Column {
+                            Text(
+                                text = track.title,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
@@ -169,12 +185,21 @@ fun MiniPlayerBar(
                             .size(40.dp)
                             .testTag("mini_player_play_pause")
                     ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        AnimatedContent(
+                            targetState = playbackState.isPlaying,
+                            transitionSpec = {
+                                (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(tween(150)))
+                                    .togetherWith(scaleOut() + fadeOut(tween(100)))
+                            },
+                            label = "miniPlayPauseAnim"
+                        ) { isPlaying ->
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
                     }
                 }
 

@@ -25,6 +25,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.NaviromAlbum
 import com.labix.navirom.data.model.NaviromArtist
@@ -32,6 +39,75 @@ import com.labix.navirom.data.model.NaviromPlaylist
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.ui.util.rememberNaviromHaptics
 import com.labix.ui.theme.*
+
+@Composable
+fun AnimatedEqualizerBars(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    barColor: Color = Color.White
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "equalizer")
+
+    val animHeight1 by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(380, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "eq1"
+    )
+    val animHeight2 by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(490, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "eq2"
+    )
+    val animHeight3 by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(340, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "eq3"
+    )
+
+    Row(
+        modifier = modifier.height(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        val h1 = if (isPlaying) animHeight1 else 0.4f
+        val h2 = if (isPlaying) animHeight2 else 0.7f
+        val h3 = if (isPlaying) animHeight3 else 0.3f
+
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight(h1)
+                .clip(RoundedCornerShape(2.dp))
+                .background(barColor)
+        )
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight(h2)
+                .clip(RoundedCornerShape(2.dp))
+                .background(barColor)
+        )
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight(h3)
+                .clip(RoundedCornerShape(2.dp))
+                .background(barColor)
+        )
+    }
+}
 
 @Composable
 fun TrackListItem(
@@ -167,11 +243,24 @@ private fun TrackListItemContent(
     onShowMenuChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val itemScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "trackItemScale"
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = itemScale
+                scaleY = itemScale
+            }
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onTrackClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onTrackClick() }
+            .animateContentSize()
             .testTag("track_item_${track.id}"),
         color = if (isCurrentTrack) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent
     ) {
@@ -188,11 +277,10 @@ private fun TrackListItemContent(
                     contentAlignment = Alignment.Center
                 ) {
                     if (isCurrentTrack && isPlaying) {
-                        Icon(
-                            imageVector = Icons.Filled.GraphicEq,
-                            contentDescription = "Playing",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                        AnimatedEqualizerBars(
+                            isPlaying = true,
+                            modifier = Modifier.size(16.dp),
+                            barColor = MaterialTheme.colorScheme.primary
                         )
                     } else {
                         Text(
@@ -225,14 +313,13 @@ private fun TrackListItemContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f)),
+                                .background(Color.Black.copy(alpha = 0.55f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.GraphicEq,
-                                contentDescription = "Playing",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                            AnimatedEqualizerBars(
+                                isPlaying = true,
+                                modifier = Modifier.size(18.dp),
+                                barColor = Color.White
                             )
                         }
                     }
@@ -309,6 +396,15 @@ private fun TrackListItemContent(
             }
 
             // Favorite Button
+            val favScale by animateFloatAsState(
+                targetValue = if (isFavorite) 1.25f else 1.0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "favScale"
+            )
+
             IconButton(
                 onClick = onToggleFavorite,
                 modifier = Modifier.size(36.dp)
@@ -317,7 +413,12 @@ private fun TrackListItemContent(
                     imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "Favorited" else "Favorite",
                     tint = if (isFavorite) AccentRose else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer {
+                            scaleX = favScale
+                            scaleY = favScale
+                        }
                 )
             }
 
@@ -377,11 +478,23 @@ fun AlbumCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.965f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "albumCardScale"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("album_card_${album.id}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -452,11 +565,23 @@ fun ArtistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.965f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "artistCardScale"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("artist_card_${artist.id}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -516,11 +641,23 @@ fun PlaylistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.965f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "playlistCardScale"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("playlist_card_${playlist.id}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -628,12 +765,24 @@ fun SleekFeatureCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.965f else 1.0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "sleekFeatureCardScale"
+    )
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .height(130.dp)
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() },
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {

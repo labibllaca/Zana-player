@@ -510,8 +510,22 @@ fun LibraryScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            when (subTab) {
-                LibrarySubTab.OVERVIEW -> {
+            AnimatedContent(
+                targetState = subTab,
+                transitionSpec = {
+                    val forward = targetState.ordinal > initialState.ordinal
+                    (fadeIn(animationSpec = tween(200)) +
+                        slideInHorizontally(animationSpec = tween(200)) { width -> if (forward) width / 6 else -width / 6 })
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(150)) +
+                            slideOutHorizontally(animationSpec = tween(150)) { width -> if (forward) -width / 6 else width / 6 }
+                        )
+                },
+                label = "LibrarySubTabAnimatedTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { activeSubTab ->
+                when (activeSubTab) {
+                    LibrarySubTab.OVERVIEW -> {
                     // Overview Dashboard with the 4 requested groups:
                     // 1. Recent Played Songs
                     // 2. Recent Added (Albums & Tracks)
@@ -1473,6 +1487,7 @@ fun LibraryScreen(
                 }
             }
         }
+    }
     }
 
     // Folder Switcher Dialog
