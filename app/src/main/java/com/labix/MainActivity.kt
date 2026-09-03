@@ -11,16 +11,25 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labix.navirom.ui.AppThemeMode
 import com.labix.navirom.ui.NaviromApp
 import com.labix.navirom.ui.NaviromViewModel
+import com.labix.navirom.ui.components.AppSplashScreen
 import com.labix.ui.theme.MyApplicationTheme
 
 import com.labix.navirom.diagnostics.AppDiagnostics
@@ -61,16 +70,30 @@ class MainActivity : ComponentActivity() {
                 AppThemeMode.SYSTEM -> isSystemDark
             }
 
+            var showSplash by rememberSaveable { mutableStateOf(true) }
+
             MyApplicationTheme(darkTheme = isDark) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    NaviromApp(
-                        viewModel = viewModel,
-                        onCloseApp = {
-                            NaviromPlaybackService.stopService(this)
-                            finishAndRemoveTask()
-                            finishAffinity()
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        NaviromApp(
+                            viewModel = viewModel,
+                            onCloseApp = {
+                                NaviromPlaybackService.stopService(this@MainActivity)
+                                finishAndRemoveTask()
+                                finishAffinity()
+                            }
+                        )
+
+                        AnimatedVisibility(
+                            visible = showSplash,
+                            enter = fadeIn(),
+                            exit = fadeOut(animationSpec = tween(durationMillis = 400))
+                        ) {
+                            AppSplashScreen(
+                                onFinished = { showSplash = false }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }

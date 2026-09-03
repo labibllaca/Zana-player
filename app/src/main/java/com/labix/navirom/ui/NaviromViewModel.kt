@@ -112,9 +112,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     // Language & Theme states
     private val _appLanguage = MutableStateFlow(
         try {
-            AppLanguage.valueOf(prefs.getString("app_language", AppLanguage.ENGLISH.name) ?: AppLanguage.ENGLISH.name)
+            AppLanguage.valueOf(prefs.getString("app_language", AppLanguage.ALBANIAN.name) ?: AppLanguage.ALBANIAN.name)
         } catch (e: Exception) {
-            AppLanguage.ENGLISH
+            AppLanguage.ALBANIAN
         }
     )
     val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()

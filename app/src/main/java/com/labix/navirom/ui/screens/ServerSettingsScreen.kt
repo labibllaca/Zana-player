@@ -1,6 +1,8 @@
 package com.labix.navirom.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,9 +23,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,6 +36,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.labix.R
 import com.labix.navirom.data.stats.ListeningStatsSummary
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.AppThemeMode
@@ -469,38 +474,47 @@ fun ServerSettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     AppLanguage.entries.forEach { lang ->
                         val isSelected = appLanguage == lang
-                        val label = when (lang) {
-                            AppLanguage.ENGLISH -> str("lang_english")
-                            AppLanguage.ALBANIAN -> str("lang_albanian")
-                            AppLanguage.GERMAN -> str("lang_german")
+                        val flagRes = when (lang) {
+                            AppLanguage.ALBANIAN -> R.drawable.ic_flag_albania
+                            AppLanguage.ENGLISH -> R.drawable.ic_flag_uk
+                            AppLanguage.GERMAN -> R.drawable.ic_flag_germany
+                        }
+                        val flagDesc = when (lang) {
+                            AppLanguage.ALBANIAN -> "Shqip (Albanian)"
+                            AppLanguage.ENGLISH -> "English"
+                            AppLanguage.GERMAN -> "Deutsch (German)"
                         }
 
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp),
+                                .height(50.dp)
+                                .testTag("lang_flag_${lang.code}"),
                             onClick = {
                                 haptics.tick()
                                 onSetLanguage(lang)
                             }
                         ) {
-                            Row(
+                            Box(
                                 modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                Image(
+                                    painter = painterResource(flagRes),
+                                    contentDescription = flagDesc,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier
+                                        .width(36.dp)
+                                        .height(24.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .border(0.75.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
                                 )
                             }
                         }

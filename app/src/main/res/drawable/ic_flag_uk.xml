@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="32dp"
+    android:viewportWidth="60"
+    android:viewportHeight="40">
+    <!-- Blue Field -->
+    <path
+        android:fillColor="#012169"
+        android:pathData="M0,0h60v40h-60z" />
+    <!-- White Diagonals (St. Andrew) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:pathData="M0,0L60,40M60,0L0,40" />
+    <!-- Red Diagonals (St. Patrick) -->
+    <path
+        android:strokeColor="#C8102E"
+        android:strokeWidth="2.5"
+        android:pathData="M0,0L60,40M60,0L0,40" />
+    <!-- White Cross (St. George border) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,15h60v10h-60zM25,0h10v40h-10z" />
+    <!-- Red Cross (St. George) -->
+    <path
+        android:fillColor="#C8102E"
+        android:pathData="M0,17h60v6h-60zM27,0h6v40h-6z" />
+</vector>

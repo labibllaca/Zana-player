@@ -19,10 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.labix.R
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.ui.components.*
 import com.labix.navirom.update.AppUpdateInfo
@@ -791,9 +793,9 @@ private fun AppTopBar(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = "Navirom Logo",
-                    tint = if (serverConnected) Color.Green else Color.Red,
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = "Zana Logo",
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
             }

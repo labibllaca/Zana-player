@@ -1,9 +1,9 @@
 package com.labix.navirom.ui
 
 enum class AppLanguage(val code: String, val displayName: String, val nativeName: String) {
+    ALBANIAN("sq", "Albanian", "Shqip"),
     ENGLISH("en", "English", "English"),
-    GERMAN("de", "German", "Deutsch"),
-    ALBANIAN("sq", "Albanian", "Shqip")
+    GERMAN("de", "German", "Deutsch")
 }
 
 enum class AppThemeMode(val titleEn: String, val titleSq: String, val titleDe: String = "Systemstandard") {
@@ -14,7 +14,7 @@ enum class AppThemeMode(val titleEn: String, val titleSq: String, val titleDe: S
 
 object NaviromStrings {
 
-    fun get(key: String, language: AppLanguage = AppLanguage.ENGLISH): String {
+    fun get(key: String, language: AppLanguage = AppLanguage.ALBANIAN): String {
         val map = when (language) {
             AppLanguage.GERMAN -> germanStrings
             AppLanguage.ALBANIAN -> albanianStrings
