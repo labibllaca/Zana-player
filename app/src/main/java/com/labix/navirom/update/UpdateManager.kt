@@ -80,7 +80,14 @@ class UpdateManager(private val context: Context) {
     }
 
     fun setGithubRepo(repo: String) {
-        val sanitized = repo.trim().removePrefix("https://github.com/").removeSuffix("/")
+        val sanitized = repo.trim()
+            .removePrefix("https://github.com/")
+            .removePrefix("http://github.com/")
+            .removePrefix("github.com/")
+            .removeSuffix("/releases")
+            .removeSuffix("/releases/")
+            .removeSuffix("/")
+            .trim()
         _githubRepo.value = sanitized
         prefs.edit().putString(KEY_GITHUB_REPO, sanitized).apply()
     }

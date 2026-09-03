@@ -312,6 +312,23 @@ fun AppUpdateDialog(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    if (latest.htmlUrl.isNotBlank()) {
+                                        TextButton(
+                                            onClick = {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(latest.htmlUrl)).apply {
+                                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {}
+                                            },
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        ) {
+                                            Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(str("updates_view_on_github"), style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
                                 }
                             }
                         }

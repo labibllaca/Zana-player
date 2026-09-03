@@ -24,6 +24,9 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -91,6 +94,7 @@ fun ServerSettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberNaviromHaptics()
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val usernameFocusRequester = remember { FocusRequester() }
@@ -1178,11 +1182,33 @@ fun ServerSettingsScreen(
                                 }
                             )
                         } else {
-                            Text(
-                                text = githubRepo,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier
+                                    .clickable {
+                                        try {
+                                            val releasesUrl = "https://github.com/$githubRepo/releases"
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl)).apply {
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {}
+                                    }
+                                    .padding(vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "https://github.com/$githubRepo/releases",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Icon(
+                                    imageVector = Icons.Outlined.OpenInBrowser,
+                                    contentDescription = "Open Releases",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                     if (!isEditingRepo) {
