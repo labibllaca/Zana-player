@@ -918,6 +918,52 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_SUSPENDED)
     }
 
+    private fun getDeviceLocalIpAddresses(): List<String> {
+        val localIps = LinkedHashSet<String>()
+        try {
+            val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val activeNetwork = cm?.activeNetwork
+            if (activeNetwork != null) {
+                val linkProps = cm.getLinkProperties(activeNetwork)
+                if (linkProps != null) {
+                    for (linkAddress in linkProps.linkAddresses) {
+                        val inetAddr = linkAddress.address
+                        if (inetAddr is Inet4Address && !inetAddr.isLoopbackAddress) {
+                            val host = inetAddr.hostAddress ?: ""
+                            if (host.isNotBlank() && !host.startsWith("127.") && !host.startsWith("169.254.")) {
+                                localIps.add(host)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NaviromViewModel", "Error reading IP from LinkProperties", e)
+        }
+
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                val ni = interfaces.nextElement()
+                if (!ni.isUp || ni.isLoopback) continue
+                val addresses = ni.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                        val hostAddr = addr.hostAddress ?: ""
+                        if (hostAddr.isNotBlank() && !hostAddr.startsWith("127.") && !hostAddr.startsWith("169.254.")) {
+                            localIps.add(hostAddr)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NaviromViewModel", "Error reading IP from NetworkInterface", e)
+        }
+
+        return localIps.toList()
+    }
+
     fun scanLocalNetwork() {
         if (networkScanJob?.isActive == true) {
             networkScanJob?.cancel()
@@ -951,35 +997,47 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             val portsToScan = if (enteredPort != 4533) listOf(enteredPort, 4533) else listOf(4533)
             val primaryPort = portsToScan.first()
 
-            val msgScanning = if (isSq) "Duke skanuar rrjetin lokal për Navidrome (Porta $primaryPort)..." else "Scanning local network for Navidrome (Port $primaryPort)..."
-            _serverState.update { it.copy(isConnecting = true, connectionStatusMessage = msgScanning) }
-
-             try {
-                val candidateHosts = LinkedHashSet<String>()
-                val discoveredSubnets = LinkedHashSet<String>()
-
-                // Discover all active IPv4 interfaces and local subnets first
-                try {
-                    val interfaces = NetworkInterface.getNetworkInterfaces()
-                    while (interfaces != null && interfaces.hasMoreElements()) {
-                        val ni = interfaces.nextElement()
-                        val addresses = ni.inetAddresses
-                        while (addresses.hasMoreElements()) {
-                            val addr = addresses.nextElement()
-                            if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                                val hostAddr = addr.hostAddress ?: ""
-                                if (hostAddr.isNotBlank()) {
-                                    val parts = hostAddr.split(".")
-                                    if (parts.size == 4) {
-                                        discoveredSubnets.add("${parts[0]}.${parts[1]}.${parts[2]}")
-                                    }
-                                }
-                            }
-                        }
+            // Step 1: Read active device IP address from OS
+            val deviceIps = getDeviceLocalIpAddresses()
+            if (deviceIps.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    _serverState.update {
+                        it.copy(
+                            isConnecting = false,
+                            connectionStatusMessage = if (isSq)
+                                "⚠️ Nuk u gjet asnjë adresë IP lokale nga sistemi! Ju lutem lidhni telefonin me Wi-Fi ose LAN."
+                            else
+                                "⚠️ Could not read local device IP from OS! Please connect phone to Wi-Fi or local LAN."
+                        )
                     }
-                } catch (e: Exception) {
-                    android.util.Log.w("NaviromViewModel", "Error scanning network interfaces", e)
                 }
+                return@launch
+            }
+
+            // Step 2: Identify local subnet directly from device IP address(es)
+            val primaryDeviceIp = deviceIps.first()
+            val deviceSubnets = LinkedHashSet<String>()
+            for (ip in deviceIps) {
+                val parts = ip.split(".")
+                if (parts.size == 4) {
+                    deviceSubnets.add("${parts[0]}.${parts[1]}.${parts[2]}")
+                }
+            }
+
+            val primarySubnet = deviceSubnets.firstOrNull() ?: ""
+
+            val msgScanning = if (isSq)
+                "IP e pajisjes: $primaryDeviceIp | Subneti: $primarySubnet.x\nDuke kërkuar serverin Navidrome (Porta $primaryPort)..."
+            else
+                "Device IP: $primaryDeviceIp | Subnet: $primarySubnet.x\nSearching for Navidrome server (Port $primaryPort)..."
+
+            withContext(Dispatchers.Main) {
+                _serverState.update { it.copy(isConnecting = true, connectionStatusMessage = msgScanning) }
+            }
+
+            try {
+                // Step 3: Prioritize scanning within the identified device subnet
+                val candidateHosts = LinkedHashSet<String>()
 
                 val currentEnteredHost = _serverState.value.host.trim()
                     .removePrefix("http://").removePrefix("https://").removePrefix("HTTP://").removePrefix("HTTPS://")
@@ -989,81 +1047,28 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     .removePrefix("http://").removePrefix("https://").removePrefix("HTTP://").removePrefix("HTTPS://")
                     .substringBefore(":").substringBefore("/")
 
-                val enteredParts = currentEnteredHost.split(".")
-                val enteredSubnet = if (enteredParts.size == 4) "${enteredParts[0]}.${enteredParts[1]}.${enteredParts[2]}" else ""
-                val enteredNotInLocal = enteredSubnet.isNotBlank() && discoveredSubnets.isNotEmpty() && !discoveredSubnets.contains(enteredSubnet)
+                if (currentEnteredHost.isNotBlank()) candidateHosts.add(currentEnteredHost)
+                if (currentAltHost.isNotBlank()) candidateHosts.add(currentAltHost)
 
-                // If primary host is clearly not in the same network, jump to / prioritize alternative IP address
-                if (enteredNotInLocal && currentAltHost.isNotBlank()) {
-                    android.util.Log.i("NaviromViewModel", "Primary host $currentEnteredHost is not in local network subnets $discoveredSubnets. Jumping to alternative host $currentAltHost.")
-                    candidateHosts.add(currentAltHost)
-                    val altParts = currentAltHost.split(".")
-                    if (altParts.size == 4) discoveredSubnets.add("${altParts[0]}.${altParts[1]}.${altParts[2]}")
-                    if (currentEnteredHost.isNotBlank()) candidateHosts.add(currentEnteredHost)
-                } else {
-                    if (currentEnteredHost.isNotBlank()) {
-                        candidateHosts.add(currentEnteredHost)
-                        if (enteredSubnet.isNotBlank()) discoveredSubnets.add(enteredSubnet)
-                    }
-                    if (currentAltHost.isNotBlank()) {
-                        candidateHosts.add(currentAltHost)
-                        val altParts = currentAltHost.split(".")
-                        if (altParts.size == 4) discoveredSubnets.add("${altParts[0]}.${altParts[1]}.${altParts[2]}")
-                    }
-                }
-
-                // Add discovered local interface IPs and gateway/common addresses
-                try {
-                    val interfaces = NetworkInterface.getNetworkInterfaces()
-                    while (interfaces != null && interfaces.hasMoreElements()) {
-                        val ni = interfaces.nextElement()
-                        val addresses = ni.inetAddresses
-                        while (addresses.hasMoreElements()) {
-                            val addr = addresses.nextElement()
-                            if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                                val hostAddr = addr.hostAddress ?: ""
-                                if (hostAddr.isNotBlank()) {
-                                    candidateHosts.add(hostAddr)
-                                    val parts = hostAddr.split(".")
-                                    if (parts.size == 4) {
-                                        val prefix = "${parts[0]}.${parts[1]}.${parts[2]}"
-                                        discoveredSubnets.add(prefix)
-                                        candidateHosts.add("$prefix.1")
-                                        candidateHosts.add("$prefix.2")
-                                        candidateHosts.add("$prefix.100")
-                                        candidateHosts.add("$prefix.200")
-                                        candidateHosts.add("$prefix.254")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (_: Exception) {}
-
-                // 3. Fallback common local subnets
-                val fallbackSubnets = listOf(
-                    "192.168.1", "192.168.0", "192.168.8", "192.168.2", "192.168.178",
-                    "192.168.86", "192.168.43", "192.168.10", "10.0.0", "10.0.1", "172.20.10"
-                )
-                discoveredSubnets.addAll(fallbackSubnets)
-
-                for (subnet in discoveredSubnets) {
+                // High-probability router / gateway / static server addresses in identified device subnet(s)
+                for (subnet in deviceSubnets) {
                     candidateHosts.add("$subnet.1")
                     candidateHosts.add("$subnet.2")
                     candidateHosts.add("$subnet.100")
+                    candidateHosts.add("$subnet.200")
                     candidateHosts.add("$subnet.254")
                 }
 
                 var foundHost: String? = null
                 var foundPort: Int = primaryPort
 
-                // PHASE 1: Priority direct probe for candidate hosts on configured ports
+                // Phase 1: Direct priority probe on candidate hosts
                 for (targetPort in portsToScan) {
                     if (foundHost != null) break
                     for (host in candidateHosts) {
                         try {
                             Socket().use { socket ->
-                                socket.connect(InetSocketAddress(host, targetPort), 350)
+                                socket.connect(InetSocketAddress(host, targetPort), 300)
                                 foundHost = host
                                 foundPort = targetPort
                                 break
@@ -1072,9 +1077,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
 
-                // PHASE 2: Parallel high-speed sweep on port 4533 (and configured port) across discovered subnets
+                // Phase 2: High-speed parallel sweep across all octets (1..254) in device subnet(s)
                 if (foundHost == null) {
-                    for (subnetPrefix in discoveredSubnets) {
+                    for (subnetPrefix in deviceSubnets) {
                         if (foundHost != null) break
                         for (targetPort in portsToScan) {
                             if (foundHost != null) break
@@ -1084,9 +1089,10 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                                     val jobs = chunk.map { lastOctet ->
                                         async(Dispatchers.IO) {
                                             val targetIp = "$subnetPrefix.$lastOctet"
+                                            if (deviceIps.contains(targetIp)) return@async null
                                             try {
                                                 Socket().use { socket ->
-                                                    socket.connect(InetSocketAddress(targetIp, targetPort), 350)
+                                                    socket.connect(InetSocketAddress(targetIp, targetPort), 300)
                                                     return@async targetIp
                                                 }
                                             } catch (_: Exception) { }
@@ -1104,6 +1110,30 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
 
+                // Phase 3: Secondary backup check on other standard local subnets if not found in primary device subnet
+                if (foundHost == null) {
+                    val fallbackSubnets = listOf("192.168.1", "192.168.0", "192.168.178", "192.168.2", "192.168.86", "10.0.0")
+                        .filter { !deviceSubnets.contains(it) }
+
+                    for (fallbackPrefix in fallbackSubnets) {
+                        if (foundHost != null) break
+                        for (targetPort in portsToScan) {
+                            if (foundHost != null) break
+                            for (lastOctet in listOf(1, 2, 100, 200, 254)) {
+                                val targetIp = "$fallbackPrefix.$lastOctet"
+                                try {
+                                    Socket().use { socket ->
+                                        socket.connect(InetSocketAddress(targetIp, targetPort), 250)
+                                        foundHost = targetIp
+                                        foundPort = targetPort
+                                        break
+                                    }
+                                } catch (_: Exception) { }
+                            }
+                        }
+                    }
+                }
+
                 withContext(Dispatchers.Main) {
                     if (foundHost != null) {
                         _serverState.update {
@@ -1111,7 +1141,10 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                                 host = foundHost!!,
                                 port = foundPort.toString(),
                                 isConnecting = false,
-                                connectionStatusMessage = if (isSq) "U gjet serveri Navidrome në $foundHost:$foundPort!" else "Found Navidrome server at $foundHost:$foundPort!"
+                                connectionStatusMessage = if (isSq) 
+                                    "U gjet serveri Navidrome në $foundHost:$foundPort!" 
+                                else 
+                                    "Found Navidrome server at $foundHost:$foundPort!"
                             )
                         }
                         connectServer()
@@ -1119,7 +1152,10 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                         _serverState.update {
                             it.copy(
                                 isConnecting = false,
-                                connectionStatusMessage = if (isSq) "Nuk u gjet asnjë server Navidrome në portën $primaryPort." else "No Navidrome server found on port $primaryPort."
+                                connectionStatusMessage = if (isSq) 
+                                    "Nuk u gjet asnjë server Navidrome në subnetin $primarySubnet.x (Porta $primaryPort)." 
+                                else 
+                                    "No Navidrome server found on subnet $primarySubnet.x (Port $primaryPort)."
                             )
                         }
                     }
