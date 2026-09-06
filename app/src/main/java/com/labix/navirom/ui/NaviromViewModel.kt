@@ -98,7 +98,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     val subsonicClient = NaviromSubsonicClient()
     val downloadManager = OfflineDownloadManager(application, cachedTrackDao)
-    val playerController = AudioPlayerController(application, downloadManager, cachedTrackDao, playbackQueueDao)
+    val playerController = AudioPlayerController.getInstance(application)
     val statsManager = ListeningStatsManager(playbackHistoryDao)
     val lyricsRepository = LyricsRepository(application, lyricsDao, subsonicClient)
     val recentSongsRepository = RecentSongsRepository(recentSongsDao)
@@ -507,18 +507,20 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private fun observePlaybackForLyricsAndStats() {
         // Instant logging & Auto-fetch lyrics on track change
         viewModelScope.launch {
-            playbackState.collect { state ->
-                val track = state.currentTrack
-                if (track != null) {
-                    if (track.id != lastLoggedTrackId) {
-                        lastLoggedTrackId = track.id
-                        recordTrackToHistory(track)
-                    }
-                    if (!state.isBuffering && (state.durationMs > 0 || track.durationSeconds > 0) && track.id != _currentLyrics.value.trackId) {
-                        fetchLyricsForTrack(track)
+            playbackState
+                .map { Pair(it.currentTrack, it.isBuffering) }
+                .distinctUntilChanged()
+                .collect { (track, isBuffering) ->
+                    if (track != null) {
+                        if (track.id != lastLoggedTrackId) {
+                            lastLoggedTrackId = track.id
+                            recordTrackToHistory(track)
+                        }
+                        if (!isBuffering && (track.durationSeconds > 0) && track.id != _currentLyrics.value.trackId) {
+                            fetchLyricsForTrack(track)
+                        }
                     }
                 }
-            }
         }
 
         // Auto-record playback history for listening statistics

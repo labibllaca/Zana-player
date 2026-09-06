@@ -17,6 +17,7 @@ import android.os.Looper
 import android.util.Log
 import com.labix.navirom.data.cache.OfflineDownloadManager
 import com.labix.navirom.data.local.CachedTrackDao
+import com.labix.navirom.data.local.NaviromDatabase
 import com.labix.navirom.data.local.PlaybackQueueDao
 import com.labix.navirom.data.local.PlaybackQueueEntity
 import com.labix.navirom.data.model.NaviromTrack
@@ -87,9 +88,19 @@ class AudioPlayerController(
     }
 
     private val wifiLock: WifiManager.WifiLock? by lazy {
-        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-        wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Navirom:WifiLock")?.apply {
-            setReferenceCounted(false)
+        try {
+            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                @Suppress("DEPRECATION")
+                WifiManager.WIFI_MODE_FULL
+            }
+            wm?.createWifiLock(mode, "Navirom:WifiLock")?.apply {
+                setReferenceCounted(false)
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -162,8 +173,8 @@ class AudioPlayerController(
         } catch (_: Exception) {}
         try {
             if (wakeLock?.isHeld == false) {
-                // Keep the CPU awake throughout active playback (no arbitrary 10min cutoff)
-                wakeLock?.acquire()
+                // Safety timeout on wakeLock (max 45 min) to prevent battery watchdog SIGKILL
+                wakeLock?.acquire(45 * 60 * 1000L)
             }
         } catch (_: Exception) {}
     }
@@ -252,17 +263,17 @@ class AudioPlayerController(
             val currentIdx = _currentIndex.value
             val currentQueue = _queue.value
             if (currentIdx + 1 in currentQueue.indices) {
-                checkQueueRecursively(currentQueue, currentIdx + 1)
+                checkQueueRecursively(currentQueue, currentIdx + 1, maxChecks = 2)
             }
         }
     }
 
-    private suspend fun checkQueueRecursively(queueList: List<NaviromTrack>, index: Int) {
-        if (index !in queueList.indices) return
+    private suspend fun checkQueueRecursively(queueList: List<NaviromTrack>, index: Int, maxChecks: Int = 2) {
+        if (index !in queueList.indices || maxChecks <= 0) return
 
         val track = queueList[index]
         if (_playbackState.value.unplayableTrackIds.contains(track.id)) {
-            checkQueueRecursively(queueList, index + 1)
+            checkQueueRecursively(queueList, index + 1, maxChecks - 1)
             return
         }
 
@@ -270,7 +281,7 @@ class AudioPlayerController(
         if (!playable) {
             Log.w("AudioPlayerController", "Mid-song check: track '${track.title}' (${track.id}) is unplayable. Highlighting red.")
             markTrackUnplayable(track.id)
-            checkQueueRecursively(queueList, index + 1)
+            checkQueueRecursively(queueList, index + 1, maxChecks - 1)
         } else {
             Log.d("AudioPlayerController", "Mid-song check: track '${track.title}' (${track.id}) is verified playable.")
         }
@@ -306,16 +317,18 @@ class AudioPlayerController(
             return File(path).exists()
         }
 
-        // 3. Network URL probe
+        // 3. Network URL probe (safely closing all streams)
         return try {
             val connection = (java.net.URL(resolvedUrl).openConnection() as java.net.HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Range", "bytes=0-100")
-                connectTimeout = 3500
-                readTimeout = 3500
+                connectTimeout = 3000
+                readTimeout = 3000
                 instanceFollowRedirects = true
             }
             val responseCode = connection.responseCode
+            try { connection.inputStream?.close() } catch (_: Exception) {}
+            try { connection.errorStream?.close() } catch (_: Exception) {}
             connection.disconnect()
             responseCode in 200..299 || responseCode == 206
         } catch (e: Exception) {
@@ -324,8 +337,28 @@ class AudioPlayerController(
         }
     }
 
+    companion object {
+        @Volatile
+        private var INSTANCE: AudioPlayerController? = null
+
+        fun getInstance(context: Context): AudioPlayerController {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: run {
+                    val appContext = context.applicationContext
+                    val db = NaviromDatabase.getDatabase(appContext)
+                    val downloadManager = OfflineDownloadManager(appContext, db.cachedTrackDao())
+                    AudioPlayerController(
+                        context = appContext,
+                        downloadManager = downloadManager,
+                        cachedTrackDao = db.cachedTrackDao(),
+                        playbackQueueDao = db.playbackQueueDao()
+                    ).also { INSTANCE = it }
+                }
+            }
+        }
+    }
+
     init {
-        NaviromPlaybackService.activePlayerController = java.lang.ref.WeakReference(this)
         initMediaPlayer()
         restoreQueueFromRoom()
         scope.launch {
@@ -968,7 +1001,7 @@ class AudioPlayerController(
                         // ignore state changes
                     }
                 }
-                delay(250)
+                delay(400)
             }
         }
     }

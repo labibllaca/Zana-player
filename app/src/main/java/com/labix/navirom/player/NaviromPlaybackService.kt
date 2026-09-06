@@ -131,37 +131,11 @@ class NaviromPlaybackService : MediaBrowserService() {
         }
     }
 
-    private val screenOffReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                try {
-                    val controller = activePlayerController?.get()
-                    if (controller != null && controller.playbackState.value.isShuffle) {
-                        controller.toggleShuffle()
-                        Log.i("NaviromPlaybackService", "Screen turned off: automatically disabled shuffle to prevent accidental pocket playback/random songs.")
-                    }
-                } catch (e: Exception) {
-                    Log.w("NaviromPlaybackService", "Error handling screen off shuffle disable", e)
-                }
-            }
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         initMediaSession()
         sessionToken = mediaSession?.sessionToken
-        try {
-            val filter = android.content.IntentFilter(Intent.ACTION_SCREEN_OFF)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(screenOffReceiver, filter)
-            }
-        } catch (e: Exception) {
-            Log.w("NaviromPlaybackService", "Failed to register screen off receiver", e)
-        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -169,16 +143,10 @@ class NaviromPlaybackService : MediaBrowserService() {
     }
 
     private fun getOrInitPlayerController(): AudioPlayerController {
-        activePlayerController?.get()?.let { return it }
-        val db = NaviromDatabase.getDatabase(this)
-        val downloadManager = OfflineDownloadManager(this, db.cachedTrackDao())
-        val controller = AudioPlayerController(
-            context = this,
-            downloadManager = downloadManager,
-            cachedTrackDao = db.cachedTrackDao(),
-            playbackQueueDao = db.playbackQueueDao()
-        )
-        controller.urlResolver = { url -> subsonicClient.resolveUrl(url) }
+        val controller = AudioPlayerController.getInstance(this)
+        if (controller.urlResolver == null) {
+            controller.urlResolver = { url -> subsonicClient.resolveUrl(url) }
+        }
         activePlayerController = WeakReference(controller)
         return controller
     }
@@ -1034,24 +1002,44 @@ class NaviromPlaybackService : MediaBrowserService() {
         val notification = notifBuilder.build()
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+        if (isPlaying) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+                isForegroundService = true
+            } catch (e: Exception) {
+                Log.w("PlaybackService", "Foreground service start disallowed: ${e.message}")
+                isForegroundService = false
+                try {
+                    notificationManager.notify(NOTIFICATION_ID, notification)
+                } catch (ne: Exception) {
+                    Log.e("PlaybackService", "Error posting fallback notification", ne)
+                }
             }
-            isForegroundService = true
-        } catch (e: Exception) {
-            Log.w("PlaybackService", "Foreground service start disallowed: ${e.message}")
-            isForegroundService = false
+        } else {
+            // When paused, detach from foreground to avoid Android 14 FGS restrictions and reduce system pressure
+            if (isForegroundService) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_DETACH)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(false)
+                    }
+                } catch (_: Exception) {}
+                isForegroundService = false
+            }
             try {
                 notificationManager.notify(NOTIFICATION_ID, notification)
             } catch (ne: Exception) {
-                Log.e("PlaybackService", "Error posting fallback notification", ne)
+                Log.e("PlaybackService", "Error posting paused notification", ne)
             }
         }
     }
@@ -1063,9 +1051,12 @@ class NaviromPlaybackService : MediaBrowserService() {
             httpClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     resp.body?.byteStream()?.use { stream ->
-                        val bitmap = BitmapFactory.decodeStream(stream)
+                        val options = BitmapFactory.Options().apply {
+                            inPreferredConfig = Bitmap.Config.RGB_565
+                        }
+                        val bitmap = BitmapFactory.decodeStream(stream, null, options)
                         if (bitmap != null) {
-                            val maxDim = 384
+                            val maxDim = 256
                             val width = bitmap.width
                             val height = bitmap.height
                             if (width > maxDim || height > maxDim) {
@@ -1087,9 +1078,6 @@ class NaviromPlaybackService : MediaBrowserService() {
 
     override fun onDestroy() {
         isForegroundService = false
-        try {
-            unregisterReceiver(screenOffReceiver)
-        } catch (_: Exception) {}
         super.onDestroy()
         serviceScope.cancel()
         try {

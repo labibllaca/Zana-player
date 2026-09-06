@@ -934,6 +934,14 @@ fun FullPlayerModal(
                                             onDismissRequest = { showMenu = false }
                                         ) {
                                             DropdownMenuItem(
+                                                text = { Text("Reload Lyrics") },
+                                                onClick = {
+                                                    showMenu = false
+                                                    onRefetchLyrics()
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Refresh, contentDescription = null) }
+                                            )
+                                            DropdownMenuItem(
                                                 text = { Text("Go to Artist") },
                                                 onClick = {
                                                     showMenu = false
@@ -1006,11 +1014,36 @@ fun FullPlayerModal(
                                 color = Color.White
                             )
                         } else if (lyricsData.error != null || (lyricsData.plainLyrics.isEmpty() && lyricsData.syncedLines.isEmpty())) {
-                            Text(
-                                text = "Lyrics not available",
-                                color = Color.Gray,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(horizontal = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MusicOff,
+                                    contentDescription = null,
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Lyrics not available",
+                                    color = Color.LightGray,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                OutlinedButton(
+                                    onClick = onRefetchLyrics,
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f))
+                                ) {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Retry", fontSize = 13.sp)
+                                }
+                            }
                         } else {
                             // Dots indicator
                             Row(
