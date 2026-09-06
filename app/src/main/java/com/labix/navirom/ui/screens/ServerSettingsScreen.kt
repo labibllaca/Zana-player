@@ -1172,10 +1172,14 @@ fun ServerSettingsScreen(
                                 onValueChange = { repoInput = it },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                placeholder = { Text("labibllaca/Zana-player or GitHub URL", style = MaterialTheme.typography.bodySmall) },
                                 trailingIcon = {
                                     IconButton(onClick = {
-                                        onSetGithubRepo(repoInput)
+                                        val sanitized = com.labix.navirom.update.UpdateManager.sanitizeGithubRepo(repoInput)
+                                        repoInput = sanitized
+                                        onSetGithubRepo(sanitized)
                                         isEditingRepo = false
+                                        onCheckForUpdates()
                                     }) {
                                         Icon(Icons.Filled.Check, contentDescription = "Save")
                                     }
@@ -1308,6 +1312,90 @@ fun ServerSettingsScreen(
                                 progress = { updateState.progress },
                                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
                             )
+                        }
+                    }
+                    is UpdateState.ReadyToInstall -> {
+                        val apkFile = updateState.apkFile
+                        val info = updateState.updateInfo
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        text = "${str("updates_ready_to_install_title")} (${info.tagName})",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${info.apkName} • ${str("updates_ready_install")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        val updateManager = com.labix.navirom.update.UpdateManager.getInstance(context)
+                                        updateManager.installApk(context, apkFile)
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth().height(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(str("updates_install_now_btn"), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                    is UpdateState.Error -> {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Text(
+                                        text = str("updates_error_title"),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = updateState.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        haptics.click()
+                                        onCheckForUpdates()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp)
+                                ) {
+                                    Text(str("updates_retry_btn"), fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
                     }
                     else -> {

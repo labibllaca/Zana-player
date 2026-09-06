@@ -352,6 +352,51 @@ fun AppUpdateDialog(
             )
         }
 
+        is UpdateState.ReadyToInstall -> {
+            val apkFile = updateState.apkFile
+            val info = updateState.updateInfo
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp)
+                    )
+                },
+                title = { Text(str("updates_ready_to_install_title"), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "${info.title.ifBlank { info.tagName }} (${info.apkName})",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                        Text(
+                            text = str("updates_ready_install"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val updateManager = com.labix.navirom.update.UpdateManager.getInstance(context)
+                            updateManager.installApk(context, apkFile)
+                        }
+                    ) {
+                        Text(str("updates_install_now_btn"), fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text(str("updates_dismiss"))
+                    }
+                }
+            )
+        }
+
         is UpdateState.Error -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
@@ -363,7 +408,7 @@ fun AppUpdateDialog(
                         modifier = Modifier.size(36.dp)
                     )
                 },
-                title = { Text("Update Check Error", fontWeight = FontWeight.Bold) },
+                title = { Text(str("updates_error_title"), fontWeight = FontWeight.Bold) },
                 text = { Text(updateState.message) },
                 confirmButton = {
                     Button(onClick = onDismiss) {

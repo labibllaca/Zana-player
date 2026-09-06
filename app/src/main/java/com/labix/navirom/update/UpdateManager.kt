@@ -68,7 +68,7 @@ class UpdateManager(private val context: Context) {
     private val _autoCheckEnabled = MutableStateFlow(prefs.getBoolean(KEY_AUTO_CHECK, true))
     val autoCheckEnabled: StateFlow<Boolean> = _autoCheckEnabled.asStateFlow()
 
-    private val _githubRepo = MutableStateFlow(prefs.getString(KEY_GITHUB_REPO, DEFAULT_REPO) ?: DEFAULT_REPO)
+    private val _githubRepo = MutableStateFlow(sanitizeGithubRepo(prefs.getString(KEY_GITHUB_REPO, DEFAULT_REPO) ?: DEFAULT_REPO))
     val githubRepo: StateFlow<String> = _githubRepo.asStateFlow()
 
     private val _lastCheckedTime = MutableStateFlow(prefs.getLong(KEY_LAST_CHECKED, 0L))
@@ -80,20 +80,20 @@ class UpdateManager(private val context: Context) {
     }
 
     fun setGithubRepo(repo: String) {
-        val sanitized = repo.trim()
-            .removePrefix("https://github.com/")
-            .removePrefix("http://github.com/")
-            .removePrefix("github.com/")
-            .removeSuffix("/releases")
-            .removeSuffix("/releases/")
-            .removeSuffix("/")
-            .trim()
+        val sanitized = sanitizeGithubRepo(repo)
         _githubRepo.value = sanitized
         prefs.edit().putString(KEY_GITHUB_REPO, sanitized).apply()
     }
 
     fun dismissUpdate() {
         _updateState.value = UpdateState.Idle
+    }
+
+    fun installReadyApk() {
+        val state = _updateState.value
+        if (state is UpdateState.ReadyToInstall) {
+            installApk(context, state.apkFile)
+        }
     }
 
     suspend fun checkForUpdates(isManual: Boolean = false): AppUpdateInfo? = withContext(Dispatchers.IO) {
@@ -103,7 +103,7 @@ class UpdateManager(private val context: Context) {
 
         _updateState.value = UpdateState.Checking
         try {
-            val repo = _githubRepo.value.ifBlank { DEFAULT_REPO }
+            val repo = sanitizeGithubRepo(_githubRepo.value)
             val apiUrl = "https://api.github.com/repos/$repo/releases"
 
             AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_START_701, TAG, "Checking for updates on repo: $repo (isManual: $isManual)")
@@ -114,18 +114,49 @@ class UpdateManager(private val context: Context) {
                 .header("User-Agent", "Navirom-Android-App")
                 .build()
 
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                val errMsg = "GitHub API error: ${response.code} ${response.message}"
-                Log.w(TAG, errMsg)
-                AppDiagnostics.logWarn(DiagnosticCodes.UPDATE_CHECK_WARN_703, TAG, errMsg)
-                _updateState.value = if (isManual) UpdateState.Error(errMsg) else UpdateState.Idle
-                return@withContext null
+            var response = httpClient.newCall(request).execute()
+            var bodyString = response.body?.string() ?: ""
+
+            // If /releases 404 or empty, try /releases/latest as fallback
+            var jsonArray: JSONArray? = null
+            if (response.isSuccessful && bodyString.isNotBlank()) {
+                try {
+                    jsonArray = JSONArray(bodyString)
+                } catch (_: Exception) {
+                    try {
+                        val singleObj = JSONObject(bodyString)
+                        jsonArray = JSONArray().apply { put(singleObj) }
+                    } catch (_: Exception) {}
+                }
             }
 
-            val bodyString = response.body?.string() ?: ""
-            val jsonArray = JSONArray(bodyString)
-            if (jsonArray.length() == 0) {
+            if (jsonArray == null || jsonArray.length() == 0) {
+                val latestUrl = "https://api.github.com/repos/$repo/releases/latest"
+                val latestReq = Request.Builder()
+                    .url(latestUrl)
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "Navirom-Android-App")
+                    .build()
+                val latestResp = httpClient.newCall(latestReq).execute()
+                if (latestResp.isSuccessful) {
+                    val latestBody = latestResp.body?.string() ?: ""
+                    if (latestBody.isNotBlank()) {
+                        try {
+                            val singleObj = JSONObject(latestBody)
+                            jsonArray = JSONArray().apply { put(singleObj) }
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+
+            if (jsonArray == null || jsonArray.length() == 0) {
+                if (!response.isSuccessful) {
+                    val errMsg = "GitHub error (${response.code}): repo '$repo' not found or has no releases."
+                    Log.w(TAG, errMsg)
+                    AppDiagnostics.logWarn(DiagnosticCodes.UPDATE_CHECK_WARN_703, TAG, errMsg)
+                    _updateState.value = if (isManual) UpdateState.Error(errMsg) else UpdateState.Idle
+                    return@withContext null
+                }
                 AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "No releases found on repo")
                 _updateState.value = if (isManual) UpdateState.UpToDate() else UpdateState.Idle
                 return@withContext null
@@ -195,7 +226,7 @@ class UpdateManager(private val context: Context) {
             val publishedAt = targetRelease.optString("published_at", "")
             val htmlUrl = targetRelease.optString("html_url", "https://github.com/$repo")
             val apkDownloadUrl = latestApkAsset.optString("browser_download_url", "")
-            val apkName = latestApkAsset.optString("name", "navirom-update.apk")
+            val apkName = latestApkAsset.optString("name", "zana-update.apk")
             val apkSize = latestApkAsset.optLong("size", 0L)
             val assetUpdatedAt = latestApkAsset.optString("updated_at", publishedAt)
             val assetUpdatedAtMillis = chosen.assetTimeMillis
@@ -206,7 +237,8 @@ class UpdateManager(private val context: Context) {
                 title = title,
                 assetUpdatedAt = assetUpdatedAt,
                 assetDigest = assetDigest,
-                currentVersion = currentVersion
+                currentVersion = currentVersion,
+                isManual = isManual
             )
 
             val now = System.currentTimeMillis()
@@ -321,11 +353,14 @@ class UpdateManager(private val context: Context) {
         try {
             AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_INSTALL_START_707, TAG, "Initiating package installer for ${apkFile.name}")
             if (!apkFile.exists() || apkFile.length() == 0L) {
-                val errMsg = "APK file does not exist or is empty"
+                val errMsg = "APK file does not exist or is empty: ${apkFile.absolutePath}"
                 Log.e(TAG, errMsg)
                 AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, errMsg)
+                _updateState.value = UpdateState.Error(errMsg)
                 return
             }
+
+            apkFile.setReadable(true, false)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!context.packageManager.canRequestPackageInstalls()) {
@@ -334,7 +369,7 @@ class UpdateManager(private val context: Context) {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     context.startActivity(settingsIntent)
-                    Toast.makeText(context, "Please allow installing unknown apps for Zana", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Please allow installing unknown apps for Zana, then return to install.", Toast.LENGTH_LONG).show()
                     return
                 }
             }
@@ -347,17 +382,43 @@ class UpdateManager(private val context: Context) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+
+            // Explicitly grant URI read permissions to any resolver (package installer)
+            val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.queryIntentActivities(intent, android.content.pm.PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.queryIntentActivities(intent, 0)
+            }
+            for (resolveInfo in resInfoList) {
+                val pkg = resolveInfo.activityInfo.packageName
+                try {
+                    context.grantUriPermission(pkg, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {}
+            }
+
             context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Error launching package installer", e)
             AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, "Install failed: ${e.message}", e)
-            _updateState.value = UpdateState.Error("Installation konnte nicht gestartet werden: ${e.localizedMessage}")
+            _updateState.value = UpdateState.Error("Installation could not be started: ${e.localizedMessage}")
         }
     }
 
     private fun extractVersionString(input: String): String? {
-        val regex = Regex("(\\d+(?:\\.\\d+)+)")
-        return regex.find(input)?.value
+        // 1. Standard SemVer (e.g. 1.6.0, 1.5.1)
+        val semverRegex = Regex("""(\d+(?:\.\d+)+)""")
+        semverRegex.find(input)?.value?.let { return it }
+
+        // 2. Date version (e.g. 2026-09-06 or 2026.09.06)
+        val dateRegex = Regex("""(\d{4}[.-]\d{2}[.-]\d{2})""")
+        dateRegex.find(input)?.value?.let { return it.replace('-', '.') }
+
+        // 3. Build number (e.g. build-6, b6, v6)
+        val buildRegex = Regex("""(?:v|build|b)[-_]?(\d+)""", RegexOption.IGNORE_CASE)
+        buildRegex.find(input)?.groupValues?.getOrNull(1)?.let { return it }
+
+        return null
     }
 
     private fun compareSemver(v1: String, v2: String): Int {
@@ -400,12 +461,13 @@ class UpdateManager(private val context: Context) {
         title: String,
         assetUpdatedAt: String,
         assetDigest: String,
-        currentVersion: String
+        currentVersion: String,
+        isManual: Boolean
     ): Boolean {
         AppDiagnostics.logInfo(
             DiagnosticCodes.UPDATE_CHECK_START_701,
             TAG,
-            "Comparing remote: tag='$tag', title='$title', assetUpdatedAt='$assetUpdatedAt', digest='$assetDigest' with local: version='$currentVersion', buildTime=${BuildConfig.BUILD_TIME}"
+            "Comparing remote: tag='$tag', title='$title', assetUpdatedAt='$assetUpdatedAt', digest='$assetDigest' with local: version='$currentVersion', buildTime=${BuildConfig.BUILD_TIME}, isManual=$isManual"
         )
 
         // 1. Semantic Versioning comparison
@@ -425,10 +487,22 @@ class UpdateManager(private val context: Context) {
             }
         }
 
-        // 2. Check if identical build digest was already downloaded/installed
+        // 2. Check if identical build digest was already downloaded/installed or matches currently installed APK
         val lastInstalledDigest = prefs.getString(KEY_LAST_INSTALLED_DIGEST, "") ?: ""
+        val localApkDigest = getInstalledApkSha256(context)
+
+        if (assetDigest.isNotBlank() && localApkDigest.isNotBlank()) {
+            if (assetDigest.equals(localApkDigest, ignoreCase = true)) {
+                Log.i(TAG, "Asset digest matches currently installed APK: $assetDigest")
+                return false
+            } else {
+                Log.i(TAG, "Asset digest differs from running APK ($assetDigest vs $localApkDigest)")
+                if (isManual) return true
+            }
+        }
+
         if (assetDigest.isNotBlank() && lastInstalledDigest.isNotBlank() && assetDigest.equals(lastInstalledDigest, ignoreCase = true)) {
-            Log.i(TAG, "Identical asset digest already installed: $assetDigest")
+            Log.i(TAG, "Identical asset digest already installed previously: $assetDigest")
             return false
         }
 
@@ -453,7 +527,7 @@ class UpdateManager(private val context: Context) {
         )
 
         if (assetTimeMillis > 0L && localBaselineTime > 0L) {
-            val isAssetNewer = assetTimeMillis > (localBaselineTime + 60_000L)
+            val isAssetNewer = assetTimeMillis > (localBaselineTime + 30_000L)
             Log.i(TAG, "Timestamp check: assetTime=$assetTimeMillis ($assetUpdatedAt) vs localBaseline=$localBaselineTime -> isAssetNewer=$isAssetNewer")
             if (isAssetNewer) {
                 return true
@@ -476,6 +550,9 @@ class UpdateManager(private val context: Context) {
                 Log.i(TAG, "Rolling release assetTime > BuildConfig.BUILD_TIME")
                 return true
             }
+            if (isManual) {
+                return true
+            }
         }
 
         return false
@@ -490,5 +567,70 @@ class UpdateManager(private val context: Context) {
         private const val KEY_LAST_INSTALLED_DIGEST = "last_installed_asset_digest"
         private const val KEY_LAST_INSTALLED_TAG = "last_installed_tag"
         private const val KEY_LAST_INSTALLED_TIME = "last_installed_timestamp"
+
+        @Volatile
+        private var instance: UpdateManager? = null
+
+        fun getInstance(context: Context): UpdateManager {
+            return instance ?: synchronized(this) {
+                instance ?: UpdateManager(context.applicationContext).also { instance = it }
+            }
+        }
+
+        fun sanitizeGithubRepo(input: String): String {
+            val trimmed = input.trim()
+            if (trimmed.isBlank()) return DEFAULT_REPO
+
+            // Match various GitHub URL structures:
+            // https://api.github.com/repos/owner/repo/releases
+            // https://github.com/owner/repo/releases
+            // github.com/owner/repo
+            // owner/repo
+            val pattern = Regex("""(?:https?://)?(?:(?:api\.)?github\.com/(?:repos/)?)?([^/\s#?]+)/([^/\s#?]+)""", RegexOption.IGNORE_CASE)
+            val match = pattern.find(trimmed)
+            if (match != null) {
+                val owner = match.groupValues[1].trim()
+                val repo = match.groupValues[2].trim()
+                    .removeSuffix(".git")
+                    .removeSuffix("/releases")
+                    .removeSuffix("/releases/")
+                    .removeSuffix("/")
+                if (owner.isNotBlank() && repo.isNotBlank()) {
+                    return "$owner/$repo"
+                }
+            }
+
+            return trimmed
+                .removePrefix("https://api.github.com/repos/")
+                .removePrefix("http://api.github.com/repos/")
+                .removePrefix("https://github.com/")
+                .removePrefix("http://github.com/")
+                .removePrefix("github.com/")
+                .removeSuffix("/releases")
+                .removeSuffix("/releases/")
+                .removeSuffix(".git")
+                .trim('/')
+                .trim()
+                .ifBlank { DEFAULT_REPO }
+        }
+
+        fun getInstalledApkSha256(context: Context): String {
+            return try {
+                val apkPath = context.packageCodePath
+                val file = File(apkPath)
+                if (!file.exists() || !file.canRead()) return ""
+                val md = java.security.MessageDigest.getInstance("SHA-256")
+                file.inputStream().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    var len: Int
+                    while (input.read(buf).also { len = it } != -1) {
+                        md.update(buf, 0, len)
+                    }
+                }
+                "sha256:" + md.digest().joinToString("") { "%02x".format(it) }
+            } catch (_: Exception) {
+                ""
+            }
+        }
     }
 }

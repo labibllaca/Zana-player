@@ -277,7 +277,13 @@ object NaviromStrings {
         "updates_server_build" to "Server Build",
         "updates_reinstall_btn" to "Install from Server",
         "updates_last_checked" to "Last checked",
-        "updates_published" to "Uploaded"
+        "updates_published" to "Uploaded",
+        "updates_ready_to_install_title" to "Update Ready to Install",
+        "updates_install_now_btn" to "Install Now",
+        "updates_error_title" to "Update Check Error",
+        "updates_retry_btn" to "Retry",
+        "updates_repo_hint" to "Enter owner/repo or paste GitHub URL",
+        "updates_up_to_date_badge" to "Up to date"
     )
 
     private val albanianStrings = mapOf(
@@ -524,7 +530,13 @@ object NaviromStrings {
         "updates_server_build" to "Versioni në server",
         "updates_reinstall_btn" to "Instalo nga serveri",
         "updates_last_checked" to "Kontrolluar së fundmi",
-        "updates_published" to "Ngarkuar më"
+        "updates_published" to "Ngarkuar më",
+        "updates_ready_to_install_title" to "Përditësimi është gati për instalim",
+        "updates_install_now_btn" to "Instalo tani",
+        "updates_error_title" to "Gabim gjatë kontrollit",
+        "updates_retry_btn" to "Provo përsëri",
+        "updates_repo_hint" to "Shkruani pronari/depoja ose vegëzën GitHub",
+        "updates_up_to_date_badge" to "I përditësuar"
     )
 
     private val germanStrings = mapOf(
@@ -772,6 +784,12 @@ object NaviromStrings {
         "updates_server_build" to "Server-Version",
         "updates_reinstall_btn" to "Vom Server installieren",
         "updates_last_checked" to "Letzte Prüfung",
-        "updates_published" to "Bereitgestellt am"
+        "updates_published" to "Bereitgestellt am",
+        "updates_ready_to_install_title" to "Update bereit zur Installation",
+        "updates_install_now_btn" to "Jetzt installieren",
+        "updates_error_title" to "Fehler bei der Update-Prüfung",
+        "updates_retry_btn" to "Wiederholen",
+        "updates_repo_hint" to "Owner/Repo oder GitHub-URL eingeben",
+        "updates_up_to_date_badge" to "Aktuell"
     )
 }
