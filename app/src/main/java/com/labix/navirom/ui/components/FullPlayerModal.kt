@@ -19,6 +19,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -126,7 +127,7 @@ fun FullPlayerModal(
         "%d:%02d".format(min, sec)
     }
 
-    val backgroundColor = Color(0xFF1E1E1E) // Dark gray from the image
+    val backgroundColor = if (isSystemInDarkTheme()) Color(0xFF000000) else Color(0xFF1E1E1E)
     val cardColor = Color.White
     val textOnCard = Color.Black
     val textMutedOnCard = Color.Gray
