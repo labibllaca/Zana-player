@@ -100,7 +100,7 @@ class NaviromPlaybackService : MediaBrowserService() {
                 val intent = Intent(context, NaviromPlaybackService::class.java).apply {
                     action = ACTION_UPDATE_STATE
                 }
-                if (state.isPlaying) {
+                if (state.isPlaying || state.isBuffering) {
                     if (!isServiceRunningInForeground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         try {
                             context.startForegroundService(intent)
@@ -802,6 +802,7 @@ class NaviromPlaybackService : MediaBrowserService() {
         updateMediaSessionPlaybackState(state)
 
         // Update Metadata & Notification
+        val isActiveForeground = state.isPlaying || state.isBuffering
         if (lastCoverUrl != track.coverArtUrl) {
             lastCoverUrl = track.coverArtUrl
             try {
@@ -809,18 +810,18 @@ class NaviromPlaybackService : MediaBrowserService() {
             } catch (_: Exception) {}
             cachedBitmap = null
             updateMediaSessionMetadata(track, state.durationMs, null)
-            showNotification(track, state.isPlaying, null)
+            showNotification(track, isActiveForeground, null)
             serviceScope.launch(Dispatchers.IO) {
                 val bitmap = loadCoverArtBitmap(track.coverArtUrl)
                 cachedBitmap = bitmap
                 withContext(Dispatchers.Main) {
                     updateMediaSessionMetadata(track, state.durationMs, bitmap)
-                    showNotification(track, state.isPlaying, bitmap)
+                    showNotification(track, isActiveForeground, bitmap)
                 }
             }
         } else {
             updateMediaSessionMetadata(track, state.durationMs, cachedBitmap)
-            showNotification(track, state.isPlaying, cachedBitmap)
+            showNotification(track, isActiveForeground, cachedBitmap)
         }
     }
 
