@@ -29,11 +29,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.net.wifi.WifiManager
 import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
 import java.util.Calendar
+import java.util.Locale
 import java.util.UUID
 
 enum class NaviromTab {
@@ -922,6 +924,30 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     private fun getDeviceLocalIpAddresses(): List<String> {
         val localIps = LinkedHashSet<String>()
+
+        // 1. Highly reliable WifiManager extraction first to get the exact active Wi-Fi IP address
+        try {
+            val wm = getApplication<Application>().applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val connectionInfo = wm?.connectionInfo
+            val ipAddress = connectionInfo?.ipAddress ?: 0
+            if (ipAddress != 0) {
+                val ipString = String.format(
+                    Locale.US,
+                    "%d.%d.%d.%d",
+                    ipAddress and 0xff,
+                    ipAddress shr 8 and 0xff,
+                    ipAddress shr 16 and 0xff,
+                    ipAddress shr 24 and 0xff
+                )
+                if (ipString != "0.0.0.0" && ipString.isNotBlank()) {
+                    localIps.add(ipString)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NaviromViewModel", "Error reading IP from WifiManager", e)
+        }
+
+        // 2. ConnectivityManager fallback
         try {
             val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             val activeNetwork = cm?.activeNetwork
@@ -943,6 +969,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             android.util.Log.w("NaviromViewModel", "Error reading IP from LinkProperties", e)
         }
 
+        // 3. NetworkInterface fallback
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces != null && interfaces.hasMoreElements()) {
@@ -963,7 +990,13 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             android.util.Log.w("NaviromViewModel", "Error reading IP from NetworkInterface", e)
         }
 
-        return localIps.toList()
+        // Sort the list of IPs to prioritize standard local ranges (192.168.x.x > 10.x.x.x / 172.x.x.x > others)
+        val sortedIps = localIps.toList().sortedWith { ip1, ip2 ->
+            val p1 = if (ip1.startsWith("192.168.")) 0 else if (ip1.startsWith("10.") || ip1.startsWith("172.")) 1 else 2
+            val p2 = if (ip2.startsWith("192.168.")) 0 else if (ip2.startsWith("10.") || ip2.startsWith("172.")) 1 else 2
+            p1.compareTo(p2)
+        }
+        return sortedIps
     }
 
     fun scanLocalNetwork() {
@@ -1070,7 +1103,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     for (host in candidateHosts) {
                         try {
                             Socket().use { socket ->
-                                socket.connect(InetSocketAddress(host, targetPort), 300)
+                                socket.connect(InetSocketAddress(host, targetPort), 500)
                                 foundHost = host
                                 foundPort = targetPort
                                 break
@@ -1094,7 +1127,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                                             if (deviceIps.contains(targetIp)) return@async null
                                             try {
                                                 Socket().use { socket ->
-                                                    socket.connect(InetSocketAddress(targetIp, targetPort), 300)
+                                                    socket.connect(InetSocketAddress(targetIp, targetPort), 600)
                                                     return@async targetIp
                                                 }
                                             } catch (_: Exception) { }

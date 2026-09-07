@@ -504,6 +504,14 @@ class AudioPlayerController(
                         message = errMsg,
                         contextInfo = "Track: ${current?.title}"
                     )
+                    
+                    // -38 is MEDIA_ERROR_INVALID_OPERATION, which is a state machine warning (not a media stream error).
+                    // We must ignore it to prevent false skip-to-next and marking tracks as unplayable.
+                    if (what == -38 || extra == -38) {
+                        Log.w("AudioPlayer", "Ignoring non-fatal invalid operation error (-38)")
+                        return@setOnErrorListener true
+                    }
+
                     if (current != null) {
                         markTrackUnplayable(current.id)
                         skipToNextPlayableOrStop()
