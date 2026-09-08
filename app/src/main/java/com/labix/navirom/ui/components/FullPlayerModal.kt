@@ -127,10 +127,11 @@ fun FullPlayerModal(
         "%d:%02d".format(min, sec)
     }
 
-    val backgroundColor = if (isSystemInDarkTheme()) Color(0xFF000000) else Color(0xFF1E1E1E)
-    val cardColor = Color.White
-    val textOnCard = Color.Black
-    val textMutedOnCard = Color.Gray
+    val isDark = isSystemInDarkTheme()
+    val backgroundColor = if (isDark) Color(0xFF000000) else Color(0xFF1E1E1E)
+    val cardColor = if (isDark) Color(0xFF000000) else Color.White
+    val textOnCard = if (isDark) Color.White else Color.Black
+    val textMutedOnCard = if (isDark) Color.LightGray else Color.Gray
 
     Box(
         modifier = modifier
