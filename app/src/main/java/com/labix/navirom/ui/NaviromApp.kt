@@ -64,6 +64,7 @@ fun NaviromApp(
     val appThemeMode by viewModel.appThemeMode.collectAsStateWithLifecycle()
     val isCrossfadeEnabled by viewModel.isCrossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDurationSeconds by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
+    val isVinylEffectEnabled by viewModel.isVinylEffectEnabled.collectAsStateWithLifecycle()
     val focusUsernameTrigger by viewModel.focusUsernameTrigger.collectAsStateWithLifecycle()
 
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
@@ -379,8 +380,10 @@ fun NaviromApp(
                             statsSummary = listeningStats,
                             isCrossfadeEnabled = isCrossfadeEnabled,
                             crossfadeDurationSeconds = crossfadeDurationSeconds,
+                            isVinylEffectEnabled = isVinylEffectEnabled,
                             onSetCrossfadeEnabled = { viewModel.setCrossfadeEnabled(it) },
                             onSetCrossfadeDurationSeconds = { viewModel.setCrossfadeDurationSeconds(it) },
+                            onSetVinylEffectEnabled = { viewModel.setVinylEffectEnabled(it) },
                             onViewStats = { viewModel.setStatsScreenVisible(true) },
                             onSetLanguage = { viewModel.setLanguage(it) },
                             onSetThemeMode = { viewModel.setThemeMode(it) },
@@ -641,8 +644,10 @@ fun NaviromApp(
                         statsSummary = listeningStats,
                         isCrossfadeEnabled = isCrossfadeEnabled,
                         crossfadeDurationSeconds = crossfadeDurationSeconds,
+                        isVinylEffectEnabled = isVinylEffectEnabled,
                         onSetCrossfadeEnabled = { viewModel.setCrossfadeEnabled(it) },
                         onSetCrossfadeDurationSeconds = { viewModel.setCrossfadeDurationSeconds(it) },
+                        onSetVinylEffectEnabled = { viewModel.setVinylEffectEnabled(it) },
                         onViewStats = { viewModel.setStatsScreenVisible(true) },
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetThemeMode = { viewModel.setThemeMode(it) },
@@ -700,6 +705,7 @@ fun NaviromApp(
                 queueSize = queue.size,
                 lyricsData = currentLyrics,
                 appLanguage = appLanguage,
+                isVinylEffectEnabled = isVinylEffectEnabled,
                 onDismiss = { viewModel.setFullPlayerVisible(false) },
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNext = { viewModel.next() },
@@ -885,8 +891,10 @@ private fun TabContent(
     statsSummary: com.labix.navirom.data.stats.ListeningStatsSummary = com.labix.navirom.data.stats.ListeningStatsSummary(),
     isCrossfadeEnabled: Boolean,
     crossfadeDurationSeconds: Int = 5,
+    isVinylEffectEnabled: Boolean = false,
     onSetCrossfadeEnabled: (Boolean) -> Unit,
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
+    onSetVinylEffectEnabled: (Boolean) -> Unit = {},
     onViewStats: () -> Unit = {},
     onSetLanguage: (AppLanguage) -> Unit,
     onSetThemeMode: (AppThemeMode) -> Unit,
@@ -1070,8 +1078,10 @@ private fun TabContent(
                 statsSummary = statsSummary,
                 isCrossfadeEnabled = isCrossfadeEnabled,
                 crossfadeDurationSeconds = crossfadeDurationSeconds,
+                isVinylEffectEnabled = isVinylEffectEnabled,
                 onSetCrossfadeEnabled = onSetCrossfadeEnabled,
                 onSetCrossfadeDurationSeconds = onSetCrossfadeDurationSeconds,
+                onSetVinylEffectEnabled = onSetVinylEffectEnabled,
                 onViewStats = onViewStats,
                 onSetLanguage = onSetLanguage,
                 onSetThemeMode = onSetThemeMode,

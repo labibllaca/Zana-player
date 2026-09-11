@@ -18,7 +18,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,6 +80,7 @@ fun FullPlayerModal(
     queueSize: Int = 0,
     lyricsData: LyricsData = LyricsData(),
     appLanguage: AppLanguage = AppLanguage.ENGLISH,
+    isVinylEffectEnabled: Boolean = false,
     onDismiss: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -103,6 +107,21 @@ fun FullPlayerModal(
     var showMenu by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var customMinutesText by remember { mutableStateOf("30") }
+
+    var vinylRotationAngle by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled) {
+        if (isVinylEffectEnabled && playbackState.isPlaying) {
+            var lastTime = withFrameNanos { it }
+            while (isActive) {
+                withFrameNanos { frameTimeNanos ->
+                    val dtSeconds = (frameTimeNanos - lastTime) / 1_000_000_000f
+                    lastTime = frameTimeNanos
+                    // Smooth 360 degree revolution every 16 seconds
+                    vinylRotationAngle = (vinylRotationAngle + dtSeconds * (360f / 16f)) % 360f
+                }
+            }
+        }
+    }
 
     // Keep screen on while singing/viewing lyrics in full player modal
     val currentView = LocalView.current
@@ -407,6 +426,7 @@ fun FullPlayerModal(
                             )
 
                             // Artwork with lyric overlay at bottom
+                            val artworkShape = if (isVinylEffectEnabled) CircleShape else RoundedCornerShape(32.dp)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -414,8 +434,11 @@ fun FullPlayerModal(
                                     .graphicsLayer {
                                         scaleX = artworkScale
                                         scaleY = artworkScale
+                                        if (isVinylEffectEnabled) {
+                                            rotationZ = vinylRotationAngle
+                                        }
                                     }
-                                    .clip(RoundedCornerShape(32.dp))
+                                    .clip(artworkShape)
                             ) {
                                 SongAlbumCover(
                                     coverArtUrl = track.coverArtUrl,
@@ -519,6 +542,34 @@ fun FullPlayerModal(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                         }
+                                    }
+                                }
+
+                                if (isVinylEffectEnabled) {
+                                    // Subtle rim edge ring
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .border(
+                                                BorderStroke(3.dp, Color.Black.copy(alpha = 0.35f)),
+                                                CircleShape
+                                            )
+                                    )
+                                    // Center spindle hole & label ring
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(48.dp)
+                                            .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                                            .border(BorderStroke(2.dp, Color.White.copy(alpha = 0.75f)), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .background(if (isDark) Color.Black else Color(0xFF1E1E1E), CircleShape)
+                                                .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.9f)), CircleShape)
+                                        )
                                     }
                                 }
                             }

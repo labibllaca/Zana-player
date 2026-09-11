@@ -1,6 +1,6 @@
 package com.labix.navirom.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -68,8 +68,10 @@ fun ServerSettingsScreen(
     appThemeMode: AppThemeMode,
     isCrossfadeEnabled: Boolean = false,
     crossfadeDurationSeconds: Int = 5,
+    isVinylEffectEnabled: Boolean = false,
     onSetCrossfadeEnabled: (Boolean) -> Unit = {},
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
+    onSetVinylEffectEnabled: (Boolean) -> Unit = {},
     statsSummary: ListeningStatsSummary = ListeningStatsSummary(),
     onViewStats: () -> Unit = {},
     onSetLanguage: (AppLanguage) -> Unit,
@@ -634,84 +636,170 @@ fun ServerSettingsScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Vinyl Record Spinning Effect Switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = str("settings_vinyl_effect"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = str("settings_vinyl_effect_desc"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isVinylEffectEnabled,
+                        onCheckedChange = { onSetVinylEffectEnabled(it) }
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Multi-Select Library Filter (if server has music folders)
+        // Multi-Select Library Filter (if server has music folders) - Foldable & Initially Closed
         if (serverState.musicFolders.isNotEmpty()) {
+            var isLibraryFilterExpanded by remember { mutableStateOf(false) }
             val isAllSelected = serverState.selectedMusicFolderIds.isEmpty() || (serverState.selectedMusicFolderIds.size >= serverState.musicFolders.size)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = str("library_filter"),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (!isAllSelected) {
-                    TextButton(onClick = onSelectAllMusicFolders) {
-                        Text(str("select_all_libraries"), style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Master All Libraries option
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isAllSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        onClick = onSelectAllMusicFolders,
-                        modifier = Modifier.fillMaxWidth()
+                Column(modifier = Modifier.padding(14.dp)) {
+                    // Header that toggles folding
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                haptics.click()
+                                isLibraryFilterExpanded = !isLibraryFilterExpanded
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(Icons.Filled.AllInclusive, contentDescription = null, tint = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(str("all_libraries_combined"), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                            Icon(
+                                imageVector = Icons.Filled.FilterList,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column {
+                                Text(
+                                    text = str("library_filter"),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isAllSelected) str("all_libraries_combined") else "${serverState.selectedMusicFolderIds.size} / ${serverState.musicFolders.size} ${str("tracks_count")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Checkbox(checked = isAllSelected, onCheckedChange = { onSelectAllMusicFolders() })
+                        }
+                        IconButton(
+                            onClick = {
+                                haptics.click()
+                                isLibraryFilterExpanded = !isLibraryFilterExpanded
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isLibraryFilterExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (isLibraryFilterExpanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                    // Individual Folders
-                    serverState.musicFolders.forEach { folder ->
-                        val isChecked = !isAllSelected && serverState.selectedMusicFolderIds.contains(folder.id)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            onClick = { onToggleMusicFolder(folder.id) },
-                            modifier = Modifier.fillMaxWidth()
+
+                    AnimatedVisibility(
+                        visible = isLibraryFilterExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                            if (!isAllSelected) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
                                 ) {
-                                    Icon(Icons.Filled.Folder, contentDescription = null, tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Column {
-                                        Text(folder.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                                        Text("Folder ID: ${folder.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    TextButton(onClick = onSelectAllMusicFolders) {
+                                        Text(str("select_all_libraries"), style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
-                                Checkbox(checked = isChecked, onCheckedChange = { onToggleMusicFolder(folder.id) })
+                            }
+
+                            // Master All Libraries option
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isAllSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                onClick = onSelectAllMusicFolders,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Filled.AllInclusive, contentDescription = null, tint = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(str("all_libraries_combined"), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                                    }
+                                    Checkbox(checked = isAllSelected, onCheckedChange = { onSelectAllMusicFolders() })
+                                }
+                            }
+
+                            // Individual Folders
+                            serverState.musicFolders.forEach { folder ->
+                                val isChecked = !isAllSelected && serverState.selectedMusicFolderIds.contains(folder.id)
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                    onClick = { onToggleMusicFolder(folder.id) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Folder, contentDescription = null, tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Column {
+                                                Text(folder.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                                                Text("Folder ID: ${folder.id}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                        Checkbox(checked = isChecked, onCheckedChange = { onToggleMusicFolder(folder.id) })
+                                    }
+                                }
                             }
                         }
                     }

@@ -347,6 +347,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _crossfadeDurationSeconds = MutableStateFlow(prefs.getInt("crossfade_duration_seconds", 5))
     val crossfadeDurationSeconds: StateFlow<Int> = _crossfadeDurationSeconds.asStateFlow()
 
+    private val _isVinylEffectEnabled = MutableStateFlow(prefs.getBoolean("vinyl_effect_enabled", false))
+    val isVinylEffectEnabled: StateFlow<Boolean> = _isVinylEffectEnabled.asStateFlow()
+
     init {
         playerController.isCrossfadeEnabled = _isCrossfadeEnabled.value
         playerController.crossfadeDurationMs = _crossfadeDurationSeconds.value * 1000L
@@ -609,6 +612,11 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         _crossfadeDurationSeconds.value = clamped
         playerController.crossfadeDurationMs = clamped * 1000L
         prefs.edit().putInt("crossfade_duration_seconds", clamped).apply()
+    }
+
+    fun setVinylEffectEnabled(enabled: Boolean) {
+        _isVinylEffectEnabled.value = enabled
+        prefs.edit().putBoolean("vinyl_effect_enabled", enabled).apply()
     }
 
     fun setThemeMode(themeMode: AppThemeMode) {
@@ -906,6 +914,15 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     if (activeUrl.isNotBlank() && activeUrl != state.serverUrl) {
                         syncLibrary()
                     }
+                    // Continue/resume active search query if pending/present
+                    val currentQuery = _searchQuery.value
+                    if (currentQuery.isNotBlank() && !_isOfflineOnlyMode.value) {
+                        onSearchQueryChange(currentQuery)
+                    }
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    _serverState.update { it.copy(isConnected = false) }
                 }
             }
         }
@@ -1782,7 +1799,8 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         val localResults = performLocalSearch(query)
         _searchResults.value = localResults
 
-        if (_isOfflineOnlyMode.value || !_serverState.value.isConnected) {
+        val hasNetwork = isDeviceConnectedToNetwork()
+        if (_isOfflineOnlyMode.value || !_serverState.value.isConnected || !hasNetwork) {
             _isSearching.value = false
             if (query.trim().length >= 2 && (localResults.first.isNotEmpty() || localResults.second.isNotEmpty() || localResults.third.isNotEmpty())) {
                 addSearchQueryToHistory(query.trim())
@@ -1793,6 +1811,11 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         searchJob = viewModelScope.launch {
             _isSearching.value = true
             delay(200)
+
+            if (!isDeviceConnectedToNetwork() || !_serverState.value.isConnected || _isOfflineOnlyMode.value) {
+                _isSearching.value = false
+                return@launch
+            }
 
             val result = subsonicClient.search(query)
             result.onSuccess { (serverArtists, serverAlbums, serverTracks) ->
