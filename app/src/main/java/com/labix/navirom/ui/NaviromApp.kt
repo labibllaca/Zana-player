@@ -30,6 +30,9 @@ import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.ui.components.*
 import com.labix.navirom.update.AppUpdateInfo
 import com.labix.navirom.update.UpdateState
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.labix.navirom.ui.util.rememberNaviromHaptics
 import androidx.activity.compose.BackHandler
@@ -145,8 +148,21 @@ fun NaviromApp(
     val updateGithubRepo by viewModel.updateGithubRepo.collectAsStateWithLifecycle()
     val lastUpdateCheckedTime by viewModel.lastUpdateCheckedTime.collectAsStateWithLifecycle()
 
+    fun str(key: String): String = NaviromStrings.get(key, appLanguage)
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    val context = LocalContext.current
+    var backPressedOnce by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(backPressedOnce) {
+        if (backPressedOnce) {
+            delay(2000L)
+            backPressedOnce = false
+        }
+    }
 
     BackHandler(enabled = true) {
         if (drawerState.isOpen) {
@@ -157,12 +173,28 @@ fun NaviromApp(
             viewModel.setQueueSheetVisible(false)
         } else if (isStatsScreenVisible) {
             viewModel.setStatsScreenVisible(false)
+        } else if (selectedAlbumId != null || selectedPlaylistId != null || selectedArtistId != null) {
+            viewModel.selectAlbum(null)
+            viewModel.selectPlaylist(null)
+            viewModel.selectArtist(null)
+        } else if (searchQuery.isNotBlank()) {
+            viewModel.onSearchQueryChange("")
+        } else if (currentTab != NaviromTab.LIBRARY) {
+            viewModel.setTab(NaviromTab.LIBRARY)
         } else {
-            // Prevent back button from closing app
+            if (backPressedOnce) {
+                showExitDialog = true
+            } else {
+                backPressedOnce = true
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = str("press_back_again_to_exit"),
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
         }
     }
-
-    fun str(key: String): String = NaviromStrings.get(key, appLanguage)
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -769,6 +801,47 @@ fun NaviromApp(
             onDismiss = { viewModel.dismissAppUpdate() },
             onDownloadAndInstall = { viewModel.downloadAndInstallUpdate(it) }
         )
+
+        // Exit Confirmation Dialog
+        if (showExitDialog) {
+            AlertDialog(
+                onDismissRequest = { showExitDialog = false },
+                title = {
+                    Text(
+                        text = str("exit_dialog_title"),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                },
+                text = {
+                    Text(
+                        text = str("exit_dialog_desc"),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showExitDialog = false
+                            (context as? Activity)?.finish()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Text(str("exit_dialog_confirm"))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showExitDialog = false }
+                    ) {
+                        Text(str("exit_dialog_cancel"))
+                    }
+                },
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
     }
     }
 }
