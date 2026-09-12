@@ -740,25 +740,12 @@ fun FullPlayerModal(
                                             viewMode = PlayerViewMode.LYRICS
                                         }
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = Color(0xFFF3D959),
-                                            modifier = Modifier.size(26.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Mic,
-                                                    contentDescription = null,
-                                                    tint = Color.Black,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                            }
-                                        }
                                         AnimatedContent(
                                             targetState = currentLyricLineText,
                                             transitionSpec = {
@@ -766,23 +753,13 @@ fun FullPlayerModal(
                                                     .togetherWith(fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 2 })
                                             },
                                             label = "LyricPreviewBelowControls",
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.fillMaxWidth()
                                         ) { lineText ->
-                                            Text(
+                                            AutoResizingSingleLineLyric(
                                                 text = lineText,
-                                                color = textOnCard,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                color = textOnCard
                                             )
                                         }
-                                        Icon(
-                                            imageVector = Icons.Filled.ChevronRight,
-                                            contentDescription = "Expand Lyrics",
-                                            tint = textMutedOnCard,
-                                            modifier = Modifier.size(18.dp)
-                                        )
                                     }
                                 }
                             }
@@ -1423,4 +1400,43 @@ fun FullPlayerModal(
             }
         }
     }
+}
+
+@Composable
+private fun AutoResizingSingleLineLyric(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxFontSize: androidx.compose.ui.unit.TextUnit = 18.sp,
+    minFontSize: androidx.compose.ui.unit.TextUnit = 9.sp
+) {
+    val estimatedSize = remember(text) {
+        val len = text.length
+        when {
+            len <= 16 -> maxFontSize
+            len <= 26 -> 16.sp
+            len <= 38 -> 14.5.sp
+            len <= 52 -> 13.sp
+            len <= 70 -> 11.sp
+            else -> minFontSize
+        }
+    }
+    var fontSize by remember(text) { mutableStateOf(estimatedSize) }
+
+    Text(
+        text = text,
+        color = color,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        maxLines = 1,
+        softWrap = false,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+        onTextLayout = { layoutResult ->
+            if (layoutResult.hasVisualOverflow && fontSize > minFontSize) {
+                fontSize = (fontSize.value - 0.8f).coerceAtLeast(minFontSize.value).sp
+            }
+        },
+        modifier = modifier.fillMaxWidth()
+    )
 }

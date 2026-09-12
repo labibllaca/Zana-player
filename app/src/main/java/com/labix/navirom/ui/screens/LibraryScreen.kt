@@ -1182,24 +1182,24 @@ fun LibraryScreen(
                             }
 
                             items(musicFolders, key = { it.id }) { folder ->
-                                val isSelected = isAllSelected || selectedMusicFolderIds.contains(folder.id)
+                                val isChecked = !isAllSelected && selectedMusicFolderIds.contains(folder.id)
 
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
                                             haptics.toggle()
-                                            onToggleMusicFolder(folder.id)
+                                            onSelectMusicFolder(folder.id)
                                         },
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) {
+                                        containerColor = if (isChecked) {
                                             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                                         } else {
                                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                                         }
                                     ),
-                                    border = if (isSelected) {
+                                    border = if (isChecked) {
                                         androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                                     } else null
                                 ) {
@@ -1217,14 +1217,14 @@ fun LibraryScreen(
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(12.dp),
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                color = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                                 modifier = Modifier.size(40.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Filled.Folder,
                                                         contentDescription = null,
-                                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        tint = if (isChecked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                         modifier = Modifier.size(22.dp)
                                                     )
                                                 }
@@ -1245,7 +1245,7 @@ fun LibraryScreen(
                                         }
 
                                         Checkbox(
-                                            checked = isSelected,
+                                            checked = isChecked,
                                             onCheckedChange = {
                                                 haptics.toggle()
                                                 onToggleMusicFolder(folder.id)
@@ -1893,7 +1893,7 @@ fun LibraryScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                                 onClick = {
-                                    onToggleMusicFolder(folder.id)
+                                    onSelectMusicFolder(folder.id)
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {

@@ -779,7 +779,7 @@ fun ServerSettingsScreen(
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                    onClick = { onToggleMusicFolder(folder.id) },
+                                    onClick = { onSelectMusicFolder(folder.id) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(

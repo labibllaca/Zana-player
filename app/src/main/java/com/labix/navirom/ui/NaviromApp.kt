@@ -203,6 +203,7 @@ fun NaviromApp(
             LibrariesSidebarContent(
                 musicFolders = serverState.musicFolders,
                 selectedMusicFolderIds = serverState.selectedMusicFolderIds,
+                onSelectMusicFolder = { viewModel.selectMusicFolder(it) },
                 onToggleMusicFolder = { viewModel.toggleMusicFolder(it) },
                 onSelectAllMusicFolders = { viewModel.selectAllMusicFolders() },
                 onSyncLibrary = { viewModel.syncLibrary() },

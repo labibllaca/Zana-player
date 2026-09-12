@@ -22,6 +22,7 @@ import com.labix.navirom.data.api.dto.MusicFolderDto
 fun LibrariesSidebarContent(
     musicFolders: List<MusicFolderDto>,
     selectedMusicFolderIds: Set<String>,
+    onSelectMusicFolder: (String?) -> Unit = {},
     onToggleMusicFolder: (String) -> Unit,
     onSelectAllMusicFolders: () -> Unit,
     onSyncLibrary: () -> Unit,
@@ -176,7 +177,7 @@ fun LibrariesSidebarContent(
                         shape = RoundedCornerShape(14.dp),
                         color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         onClick = {
-                            onToggleMusicFolder(folder.id)
+                            onSelectMusicFolder(folder.id)
                         },
                         modifier = Modifier.fillMaxWidth().testTag("sidebar_folder_${folder.id}")
                     ) {
