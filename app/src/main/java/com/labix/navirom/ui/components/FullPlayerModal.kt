@@ -60,6 +60,7 @@ import com.labix.navirom.data.lyrics.LyricsData
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.RepeatMode
+import com.labix.navirom.data.model.SleepTimerOptions
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.util.rememberNaviromHaptics
@@ -81,6 +82,7 @@ fun FullPlayerModal(
     lyricsData: LyricsData = LyricsData(),
     appLanguage: AppLanguage = AppLanguage.ENGLISH,
     isVinylEffectEnabled: Boolean = false,
+    sleepTimerOptions: SleepTimerOptions = SleepTimerOptions(),
     onDismiss: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -92,7 +94,8 @@ fun FullPlayerModal(
     onDownloadTrack: () -> Unit,
     onOpenQueue: () -> Unit,
     onSetSpeed: (Float) -> Unit,
-    onSetSleepTimer: (Int?) -> Unit,
+    onSetSleepTimer: (Int?, SleepTimerOptions) -> Unit,
+    onUpdateSleepTimerOptions: ((SleepTimerOptions) -> Unit)? = null,
     onRefetchLyrics: () -> Unit = {},
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((String) -> Unit)? = null,
@@ -108,6 +111,20 @@ fun FullPlayerModal(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showArtistsDialog by remember { mutableStateOf(false) }
     var customMinutesText by remember { mutableStateOf("30") }
+
+    val isTimerActive = (playbackState.sleepTimerSecondsLeft != null && playbackState.sleepTimerSecondsLeft > 0) ||
+            (playbackState.sleepTimerMinutesLeft != null && playbackState.sleepTimerMinutesLeft > 0)
+
+    val activeOptions = playbackState.sleepTimerOptions
+    var disableBt by remember(activeOptions.disableBluetooth, sleepTimerOptions.disableBluetooth) {
+        mutableStateOf(activeOptions.disableBluetooth || sleepTimerOptions.disableBluetooth)
+    }
+    var disableWifi by remember(activeOptions.disableWifi, sleepTimerOptions.disableWifi) {
+        mutableStateOf(activeOptions.disableWifi || sleepTimerOptions.disableWifi)
+    }
+    var disableData by remember(activeOptions.disableMobileData, sleepTimerOptions.disableMobileData) {
+        mutableStateOf(activeOptions.disableMobileData || sleepTimerOptions.disableMobileData)
+    }
 
     var vinylRotationAngle by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled) {
@@ -225,48 +242,365 @@ fun FullPlayerModal(
             }
     ) {
         if (showSleepTimerDialog) {
+            val currentOptions = SleepTimerOptions(
+                disableBluetooth = disableBt,
+                disableWifi = disableWifi,
+                disableMobileData = disableData
+            )
+
             AlertDialog(
                 onDismissRequest = { showSleepTimerDialog = false },
-                title = { Text("Sleep Timer") },
+                icon = {
+                    Icon(
+                        imageVector = if (isTimerActive) Icons.Filled.HourglassTop else Icons.Filled.Timer,
+                        contentDescription = null,
+                        tint = if (isTimerActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = NaviromStrings.get("sleep_timer", appLanguage),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            textAlign = TextAlign.Center
+                        )
+                        if (isTimerActive && (playbackState.sleepTimerSecondsLeft ?: 0) > 0) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                    val totalSecs = playbackState.sleepTimerSecondsLeft ?: 0
+                                    val mins = totalSecs / 60
+                                    val secs = totalSecs % 60
+                                    Text(
+                                        text = "${NaviromStrings.get("sleep_timer_active_badge", appLanguage)}: %02d:%02d".format(mins, secs),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Select time before playback pauses:")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = NaviromStrings.get("sleep_timer_desc", appLanguage),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // Quick Presets Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Button(onClick = { onSetSleepTimer(15); showSleepTimerDialog = false }) { Text("15m") }
-                            Button(onClick = { onSetSleepTimer(30); showSleepTimerDialog = false }) { Text("30m") }
-                            Button(onClick = { onSetSleepTimer(45); showSleepTimerDialog = false }) { Text("45m") }
-                            Button(onClick = { onSetSleepTimer(60); showSleepTimerDialog = false }) { Text("60m") }
-                        }
-                        OutlinedTextField(
-                            value = customMinutesText,
-                            onValueChange = { customMinutesText = it },
-                            label = { Text("Custom minutes") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Button(
-                            onClick = {
-                                val mins = customMinutesText.toIntOrNull()
-                                if (mins != null && mins > 0) {
-                                    onSetSleepTimer(mins)
-                                    showSleepTimerDialog = false
+                            listOf(15, 30, 45, 60).forEach { mins ->
+                                val isSelected = isTimerActive && (playbackState.sleepTimerMinutesLeft == mins)
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptics.click()
+                                        onSetSleepTimer(mins, currentOptions)
+                                        showSleepTimerDialog = false
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = if (isSelected) {
+                                        ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    } else ButtonDefaults.filledTonalButtonColors()
+                                ) {
+                                    Text(
+                                        text = "${mins}m",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                    )
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Set Custom Timer")
+                            }
                         }
-                        TextButton(
-                            onClick = {
-                                onSetSleepTimer(null)
-                                showSleepTimerDialog = false
-                            },
+
+                        // Custom Minutes Input
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = customMinutesText,
+                                onValueChange = { customMinutesText = it.filter { ch -> ch.isDigit() }.take(4) },
+                                label = { Text(NaviromStrings.get("sleep_timer_custom_min", appLanguage)) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = {
+                                    val mins = customMinutesText.toIntOrNull()
+                                    if (mins != null && mins > 0) {
+                                        haptics.click()
+                                        onSetSleepTimer(mins, currentOptions)
+                                        showSleepTimerDialog = false
+                                    }
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.height(56.dp)
+                            ) {
+                                Text(NaviromStrings.get("sleep_timer_set_custom", appLanguage), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+
+                        // Action Toggles Section Header
+                        Text(
+                            text = NaviromStrings.get("sleep_timer_extra_actions", appLanguage),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        // Bluetooth Toggle Card
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Turn off Sleep Timer", color = MaterialTheme.colorScheme.error)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptics.toggle()
+                                        disableBt = !disableBt
+                                        val opt = currentOptions.copy(disableBluetooth = disableBt)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (disableBt) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Bluetooth,
+                                            contentDescription = null,
+                                            tint = if (disableBt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_bluetooth", appLanguage),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_bluetooth_desc", appLanguage),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = disableBt,
+                                    onCheckedChange = {
+                                        haptics.toggle()
+                                        disableBt = it
+                                        val opt = currentOptions.copy(disableBluetooth = it)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        // Wi-Fi Toggle Card
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptics.toggle()
+                                        disableWifi = !disableWifi
+                                        val opt = currentOptions.copy(disableWifi = disableWifi)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (disableWifi) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Wifi,
+                                            contentDescription = null,
+                                            tint = if (disableWifi) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_wifi", appLanguage),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_wifi_desc", appLanguage),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = disableWifi,
+                                    onCheckedChange = {
+                                        haptics.toggle()
+                                        disableWifi = it
+                                        val opt = currentOptions.copy(disableWifi = it)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        // Mobile Data Toggle Card
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptics.toggle()
+                                        disableData = !disableData
+                                        val opt = currentOptions.copy(disableMobileData = disableData)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (disableData) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.SignalCellularAlt,
+                                            contentDescription = null,
+                                            tint = if (disableData) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_mobile_data", appLanguage),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = NaviromStrings.get("sleep_timer_disable_mobile_data_desc", appLanguage),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = disableData,
+                                    onCheckedChange = {
+                                        haptics.toggle()
+                                        disableData = it
+                                        val opt = currentOptions.copy(disableMobileData = it)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        if (isTimerActive) {
+                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        // Turn off button if active
+                        if (isTimerActive) {
+                            FilledTonalButton(
+                                onClick = {
+                                    haptics.click()
+                                    onSetSleepTimer(null, currentOptions)
+                                    showSleepTimerDialog = false
+                                },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.TimerOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = NaviromStrings.get("sleep_timer_turn_off", appLanguage),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 },

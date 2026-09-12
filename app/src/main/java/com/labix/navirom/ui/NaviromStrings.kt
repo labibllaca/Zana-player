@@ -291,7 +291,22 @@ object NaviromStrings {
         "updates_error_title" to "Update Check Error",
         "updates_retry_btn" to "Retry",
         "updates_repo_hint" to "Enter owner/repo or paste GitHub URL",
-        "updates_up_to_date_badge" to "Up to date"
+        "updates_up_to_date_badge" to "Up to date",
+
+        // Sleep Timer
+        "sleep_timer" to "Sleep Timer",
+        "sleep_timer_desc" to "Select time before playback pauses:",
+        "sleep_timer_custom_min" to "Custom minutes",
+        "sleep_timer_set_custom" to "Set Custom Timer",
+        "sleep_timer_turn_off" to "Turn off Sleep Timer",
+        "sleep_timer_extra_actions" to "Actions on timer end:",
+        "sleep_timer_disable_bluetooth" to "Turn off Bluetooth",
+        "sleep_timer_disable_bluetooth_desc" to "Disconnects Bluetooth audio devices",
+        "sleep_timer_disable_wifi" to "Turn off Wi-Fi",
+        "sleep_timer_disable_wifi_desc" to "Disconnects from Wi-Fi networks",
+        "sleep_timer_disable_mobile_data" to "Turn off Mobile Data",
+        "sleep_timer_disable_mobile_data_desc" to "Disconnects cellular data connection",
+        "sleep_timer_active_badge" to "Timer Active"
     )
 
     private val albanianStrings = mapOf(
@@ -552,7 +567,22 @@ object NaviromStrings {
         "updates_error_title" to "Gabim gjatë kontrollit",
         "updates_retry_btn" to "Provo përsëri",
         "updates_repo_hint" to "Shkruani pronari/depoja ose vegëzën GitHub",
-        "updates_up_to_date_badge" to "I përditësuar"
+        "updates_up_to_date_badge" to "I përditësuar",
+
+        // Sleep Timer
+        "sleep_timer" to "Kohëmatësi i gjumit",
+        "sleep_timer_desc" to "Zgjidhni kohën para se të ndalet muzika:",
+        "sleep_timer_custom_min" to "Minuta të personalizuara",
+        "sleep_timer_set_custom" to "Vendos kohëmatësin",
+        "sleep_timer_turn_off" to "Fik kohëmatësin e gjumit",
+        "sleep_timer_extra_actions" to "Veprimet kur përfundon koha:",
+        "sleep_timer_disable_bluetooth" to "Fik Bluetooth",
+        "sleep_timer_disable_bluetooth_desc" to "Shkëput pajisjet audio Bluetooth",
+        "sleep_timer_disable_wifi" to "Fik Wi-Fi",
+        "sleep_timer_disable_wifi_desc" to "Shkëput lidhjen me rrjetin Wi-Fi",
+        "sleep_timer_disable_mobile_data" to "Fik të dhënat celulare",
+        "sleep_timer_disable_mobile_data_desc" to "Shkëput internetin e telefonit",
+        "sleep_timer_active_badge" to "Kohëmatësi aktiv"
     )
 
     private val germanStrings = mapOf(
@@ -814,6 +844,21 @@ object NaviromStrings {
         "updates_error_title" to "Fehler bei der Update-Prüfung",
         "updates_retry_btn" to "Wiederholen",
         "updates_repo_hint" to "Owner/Repo oder GitHub-URL eingeben",
-        "updates_up_to_date_badge" to "Aktuell"
+        "updates_up_to_date_badge" to "Aktuell",
+
+        // Sleep Timer
+        "sleep_timer" to "Sleep-Timer",
+        "sleep_timer_desc" to "Zeit auswählen, bis die Wiedergabe stoppt:",
+        "sleep_timer_custom_min" to "Eigene Minuten",
+        "sleep_timer_set_custom" to "Timer einstellen",
+        "sleep_timer_turn_off" to "Sleep-Timer ausschalten",
+        "sleep_timer_extra_actions" to "Aktionen nach Ablauf des Timers:",
+        "sleep_timer_disable_bluetooth" to "Bluetooth ausschalten",
+        "sleep_timer_disable_bluetooth_desc" to "Trennt verbundene Bluetooth-Audiogeräte",
+        "sleep_timer_disable_wifi" to "WLAN ausschalten",
+        "sleep_timer_disable_wifi_desc" to "Trennt die Verbindung zum WLAN-Netzwerk",
+        "sleep_timer_disable_mobile_data" to "Mobiles Internet ausschalten",
+        "sleep_timer_disable_mobile_data_desc" to "Trennt die mobile Datenverbindung",
+        "sleep_timer_active_badge" to "Timer aktiv"
     )
 }

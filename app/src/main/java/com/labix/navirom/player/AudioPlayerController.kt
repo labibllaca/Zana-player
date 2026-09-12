@@ -23,6 +23,7 @@ import com.labix.navirom.data.local.PlaybackQueueEntity
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.RepeatMode
+import com.labix.navirom.data.model.SleepTimerOptions
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -204,6 +205,8 @@ class AudioPlayerController(
 
     private var tickerJob: Job? = null
     private var sleepTimerJob: Job? = null
+    private var currentSleepTimerOptions = SleepTimerOptions()
+    private val deviceConnectionManager = DeviceConnectionManager(context)
     private var isPreparingNextForCrossfade = false
     private var hasCheckedQueueForCurrentTrack = false
     private var midSongCheckJob: Job? = null
@@ -877,10 +880,17 @@ class AudioPlayerController(
         }
     }
 
-    fun setSleepTimer(minutes: Int?) {
+    fun setSleepTimer(minutes: Int?, options: SleepTimerOptions = SleepTimerOptions()) {
         sleepTimerJob?.cancel()
+        currentSleepTimerOptions = options
         val totalSecs = if (minutes != null && minutes > 0) minutes * 60 else null
-        _playbackState.update { it.copy(sleepTimerMinutesLeft = minutes, sleepTimerSecondsLeft = totalSecs) }
+        _playbackState.update { 
+            it.copy(
+                sleepTimerMinutesLeft = minutes, 
+                sleepTimerSecondsLeft = totalSecs,
+                sleepTimerOptions = options
+            ) 
+        }
 
         if (minutes == null || minutes <= 0) return
 
@@ -899,6 +909,9 @@ class AudioPlayerController(
             }
             pause()
             _playbackState.update { it.copy(sleepTimerMinutesLeft = null, sleepTimerSecondsLeft = null) }
+
+            // Execute requested connection shutoffs (Bluetooth, Wi-Fi, Mobile Data)
+            deviceConnectionManager.executeSleepTimerActions(currentSleepTimerOptions)
         }
     }
 

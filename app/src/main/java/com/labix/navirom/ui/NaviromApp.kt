@@ -142,6 +142,7 @@ fun NaviromApp(
 
     val isFullPlayerVisible by viewModel.isFullPlayerVisible.collectAsStateWithLifecycle()
     val isQueueSheetVisible by viewModel.isQueueSheetVisible.collectAsStateWithLifecycle()
+    val sleepTimerOptions by viewModel.sleepTimerOptions.collectAsStateWithLifecycle()
 
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsStateWithLifecycle()
@@ -739,6 +740,7 @@ fun NaviromApp(
                 lyricsData = currentLyrics,
                 appLanguage = appLanguage,
                 isVinylEffectEnabled = isVinylEffectEnabled,
+                sleepTimerOptions = sleepTimerOptions,
                 onDismiss = { viewModel.setFullPlayerVisible(false) },
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNext = { viewModel.next() },
@@ -750,7 +752,8 @@ fun NaviromApp(
                 onDownloadTrack = { playbackState.currentTrack?.let { viewModel.downloadTrack(it) } },
                 onOpenQueue = { viewModel.setQueueSheetVisible(true) },
                 onSetSpeed = { viewModel.setPlaybackSpeed(it) },
-                onSetSleepTimer = { viewModel.setSleepTimer(it) },
+                onSetSleepTimer = { minutes, options -> viewModel.setSleepTimer(minutes, options) },
+                onUpdateSleepTimerOptions = { viewModel.updateSleepTimerOptions(it) },
                 onRefetchLyrics = { viewModel.refetchCurrentLyrics() },
                 onArtistClick = { artistId ->
                     viewModel.setFullPlayerVisible(false)

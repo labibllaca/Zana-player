@@ -79,6 +79,12 @@ enum class RepeatMode {
     ONE
 }
 
+data class SleepTimerOptions(
+    val disableBluetooth: Boolean = false,
+    val disableWifi: Boolean = false,
+    val disableMobileData: Boolean = false
+)
+
 data class PlaybackState(
     val currentTrack: NaviromTrack? = null,
     val isPlaying: Boolean = false,
@@ -90,6 +96,7 @@ data class PlaybackState(
     val playbackSpeed: Float = 1.0f,
     val sleepTimerMinutesLeft: Int? = null,
     val sleepTimerSecondsLeft: Int? = null,
+    val sleepTimerOptions: SleepTimerOptions = SleepTimerOptions(),
     val errorMessage: String? = null,
     val unplayableTrackIds: Set<String> = emptySet()
 ) {

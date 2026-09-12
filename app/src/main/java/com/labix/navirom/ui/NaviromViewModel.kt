@@ -130,6 +130,15 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     )
     val appThemeMode: StateFlow<AppThemeMode> = _appThemeMode.asStateFlow()
 
+    private val _sleepTimerOptions = MutableStateFlow(
+        SleepTimerOptions(
+            disableBluetooth = prefs.getBoolean("sleep_timer_disable_bt", false),
+            disableWifi = prefs.getBoolean("sleep_timer_disable_wifi", false),
+            disableMobileData = prefs.getBoolean("sleep_timer_disable_mobile_data", false)
+        )
+    )
+    val sleepTimerOptions: StateFlow<SleepTimerOptions> = _sleepTimerOptions.asStateFlow()
+
     // Current navigation state
     private val _currentTab = MutableStateFlow(NaviromTab.LIBRARY)
     val currentTab: StateFlow<NaviromTab> = _currentTab.asStateFlow()
@@ -1975,8 +1984,18 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         playerController.setPlaybackSpeed(speed)
     }
 
-    fun setSleepTimer(minutes: Int?) {
-        playerController.setSleepTimer(minutes)
+    fun setSleepTimer(minutes: Int?, options: SleepTimerOptions = _sleepTimerOptions.value) {
+        updateSleepTimerOptions(options)
+        playerController.setSleepTimer(minutes, options)
+    }
+
+    fun updateSleepTimerOptions(options: SleepTimerOptions) {
+        _sleepTimerOptions.value = options
+        prefs.edit()
+            .putBoolean("sleep_timer_disable_bt", options.disableBluetooth)
+            .putBoolean("sleep_timer_disable_wifi", options.disableWifi)
+            .putBoolean("sleep_timer_disable_mobile_data", options.disableMobileData)
+            .apply()
     }
 
     fun playNext(track: NaviromTrack) {
