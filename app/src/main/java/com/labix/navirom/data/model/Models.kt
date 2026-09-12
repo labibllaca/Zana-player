@@ -89,6 +89,7 @@ data class PlaybackState(
     val isShuffle: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val sleepTimerMinutesLeft: Int? = null,
+    val sleepTimerSecondsLeft: Int? = null,
     val errorMessage: String? = null,
     val unplayableTrackIds: Set<String> = emptySet()
 ) {

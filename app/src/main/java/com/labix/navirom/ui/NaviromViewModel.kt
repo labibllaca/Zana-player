@@ -347,7 +347,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _crossfadeDurationSeconds = MutableStateFlow(prefs.getInt("crossfade_duration_seconds", 5))
     val crossfadeDurationSeconds: StateFlow<Int> = _crossfadeDurationSeconds.asStateFlow()
 
-    private val _isVinylEffectEnabled = MutableStateFlow(prefs.getBoolean("vinyl_effect_enabled", false))
+    private val _isVinylEffectEnabled = MutableStateFlow(prefs.getBoolean("vinyl_effect_enabled", true))
     val isVinylEffectEnabled: StateFlow<Boolean> = _isVinylEffectEnabled.asStateFlow()
 
     init {

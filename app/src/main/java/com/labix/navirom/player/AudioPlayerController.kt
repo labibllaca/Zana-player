@@ -879,19 +879,26 @@ class AudioPlayerController(
 
     fun setSleepTimer(minutes: Int?) {
         sleepTimerJob?.cancel()
-        _playbackState.update { it.copy(sleepTimerMinutesLeft = minutes) }
+        val totalSecs = if (minutes != null && minutes > 0) minutes * 60 else null
+        _playbackState.update { it.copy(sleepTimerMinutesLeft = minutes, sleepTimerSecondsLeft = totalSecs) }
 
         if (minutes == null || minutes <= 0) return
 
         sleepTimerJob = scope.launch {
-            var remaining = minutes
-            while (remaining > 0) {
-                delay(60_000L)
-                remaining--
-                _playbackState.update { it.copy(sleepTimerMinutesLeft = remaining) }
+            var remainingSecs = minutes * 60
+            while (remainingSecs > 0) {
+                delay(1000L)
+                remainingSecs--
+                val minsLeft = (remainingSecs + 59) / 60
+                _playbackState.update {
+                    it.copy(
+                        sleepTimerMinutesLeft = minsLeft,
+                        sleepTimerSecondsLeft = remainingSecs
+                    )
+                }
             }
             pause()
-            _playbackState.update { it.copy(sleepTimerMinutesLeft = null) }
+            _playbackState.update { it.copy(sleepTimerMinutesLeft = null, sleepTimerSecondsLeft = null) }
         }
     }
 

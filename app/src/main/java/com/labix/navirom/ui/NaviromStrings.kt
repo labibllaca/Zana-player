@@ -54,6 +54,7 @@ object NaviromStrings {
         // Subtabs & Sections
         "subtab_overview" to "Overview",
         "subtab_libraries" to "Libraries",
+        "subtab_local_folders" to "Local Files",
         "subtab_songs" to "Songs",
         "subtab_albums" to "Albums",
         "subtab_artists" to "Artists",
@@ -314,6 +315,7 @@ object NaviromStrings {
         // Subtabs & Sections
         "subtab_overview" to "Përmbledhje",
         "subtab_libraries" to "Bibliotekat",
+        "subtab_local_folders" to "Skedarët Lokalë",
         "subtab_songs" to "Këngët",
         "subtab_albums" to "Albumet",
         "subtab_artists" to "Artistët",
@@ -574,6 +576,7 @@ object NaviromStrings {
         // Subtabs & Sections
         "subtab_overview" to "Übersicht",
         "subtab_libraries" to "Bibliotheken",
+        "subtab_local_folders" to "Lokale Dateien",
         "subtab_songs" to "Titel",
         "subtab_albums" to "Alben",
         "subtab_artists" to "Künstler",

@@ -106,6 +106,7 @@ fun FullPlayerModal(
     var viewMode by remember { mutableStateOf(PlayerViewMode.ARTWORK) }
     var showMenu by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showArtistsDialog by remember { mutableStateOf(false) }
     var customMinutesText by remember { mutableStateOf("30") }
 
     var vinylRotationAngle by remember { mutableFloatStateOf(0f) }
@@ -277,6 +278,94 @@ fun FullPlayerModal(
             )
         }
 
+        // Multi-artist selection popup
+        val artistList = remember(track.artist) {
+            track.artist.split(Regex("[,&/]|\\bfeat\\.?\\b|\\bft\\.?\\b|\\bwith\\b", RegexOption.IGNORE_CASE))
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+        }
+
+        if (showArtistsDialog) {
+            AlertDialog(
+                onDismissRequest = { showArtistsDialog = false },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Filled.People, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "Track Artists",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        artistList.forEach { artistName ->
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showArtistsDialog = false
+                                        onArtistClick?.invoke(track.artistId)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    Icons.Filled.Person,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = artistName,
+                                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.Filled.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showArtistsDialog = false }) {
+                        Text("Close")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
+
         AnimatedContent(
             targetState = viewMode,
             transitionSpec = {
@@ -306,25 +395,12 @@ fun FullPlayerModal(
                 val validSyncedLines = remember(lyricsData.syncedLines) {
                     lyricsData.syncedLines.filter { it.text.isNotBlank() }
                 }
-                val longestLineLength = remember(validSyncedLines, lyricsData.plainLyrics) {
-                    if (validSyncedLines.isNotEmpty()) {
-                        validSyncedLines.maxOfOrNull { it.text.trim().length } ?: 20
-                    } else if (lyricsData.plainLyrics.isNotBlank()) {
-                        lyricsData.plainLyrics.lines().filter { it.isNotBlank() }.maxOfOrNull { it.trim().length } ?: 20
-                    } else 20
-                }
-                val lyricOverlayFontSize = remember(longestLineLength) {
-                    when {
-                        longestLineLength <= 25 -> 24.sp
-                        longestLineLength <= 45 -> 20.sp
-                        longestLineLength <= 70 -> 17.sp
-                        else -> 15.sp
-                    }
-                }
-                val currentLyricLineText = remember(currentPosMs, validSyncedLines) {
+                val currentLyricLineText = remember(currentPosMs, validSyncedLines, lyricsData.plainLyrics) {
                     if (validSyncedLines.isNotEmpty()) {
                         val idx = validSyncedLines.indexOfLast { (it.timeMs - 500L) <= currentPosMs }
                         if (idx >= 0) validSyncedLines[idx].text else validSyncedLines.firstOrNull()?.text ?: ""
+                    } else if (lyricsData.plainLyrics.isNotBlank()) {
+                        lyricsData.plainLyrics.lines().firstOrNull { it.isNotBlank() } ?: ""
                     } else ""
                 }
 
@@ -332,7 +408,7 @@ fun FullPlayerModal(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // White Card
+                    // Top Card
                     Surface(
                         modifier = Modifier
                             .weight(1f)
@@ -347,7 +423,7 @@ fun FullPlayerModal(
                                 .padding(horizontal = 24.dp, vertical = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Top Bar
+                            // Top Bar: Back | Song Index | Saved (Heart) Button
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -374,46 +450,36 @@ fun FullPlayerModal(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 16.sp
                                 )
-                                Box {
-                                    IconButton(onClick = {
+
+                                // Saved / Favorite Icon at Top Right
+                                val savedFavScale by animateFloatAsState(
+                                    targetValue = if (isFavorite) 1.25f else 1.0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    ),
+                                    label = "topSavedFavScale"
+                                )
+                                IconButton(
+                                    onClick = {
                                         haptics.click()
-                                        showMenu = true
-                                    }) {
-                                        Icon(Icons.Filled.MoreHoriz, contentDescription = "More", tint = textOnCard)
+                                        onToggleFavorite()
+                                    },
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = savedFavScale
+                                        scaleY = savedFavScale
                                     }
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Go to Artist") },
-                                            onClick = {
-                                                showMenu = false
-                                                onArtistClick?.invoke(track.artistId)
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Go to Album") },
-                                            onClick = {
-                                                showMenu = false
-                                                onAlbumClick?.invoke(track.albumId)
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Album, contentDescription = null) }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Sleep Timer") },
-                                            onClick = {
-                                                showMenu = false
-                                                showSleepTimerDialog = true
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Timer, contentDescription = null) }
-                                        )
-                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = "Saved",
+                                        tint = if (isFavorite) Color(0xFFE91E63) else textOnCard,
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(20.dp))
 
                             // Artwork breathing scale based on playback state
                             val artworkScale by animateFloatAsState(
@@ -425,7 +491,7 @@ fun FullPlayerModal(
                                 label = "artworkScale"
                             )
 
-                            // Artwork with lyric overlay at bottom
+                            // Artwork with vinyl effect - vinyl rotates cleanly without overlaid text
                             val artworkShape = if (isVinylEffectEnabled) CircleShape else RoundedCornerShape(32.dp)
                             Box(
                                 modifier = Modifier
@@ -500,51 +566,6 @@ fun FullPlayerModal(
                                         )
                                 )
 
-                                if (currentLyricLineText.isNotBlank()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .align(Alignment.BottomCenter)
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color.Transparent,
-                                                        Color.Black.copy(alpha = 0.55f),
-                                                        Color.Black.copy(alpha = 0.88f)
-                                                    )
-                                                )
-                                            )
-                                            .clickable {
-                                                haptics.toggle()
-                                                viewMode = PlayerViewMode.LYRICS
-                                            }
-                                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        AnimatedContent(
-                                            targetState = currentLyricLineText,
-                                            transitionSpec = {
-                                                (fadeIn(animationSpec = tween(300)) + slideInVertically(animationSpec = tween(300)) { it / 2 })
-                                                    .togetherWith(fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200)) { -it / 2 })
-                                            },
-                                            label = "LyricOverlayText"
-                                        ) { lineText ->
-                                            Text(
-                                                text = lineText,
-                                                color = Color.White,
-                                                fontSize = lyricOverlayFontSize,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 2,
-                                                softWrap = true,
-                                                overflow = TextOverflow.Ellipsis,
-                                                lineHeight = (lyricOverlayFontSize.value * 1.25f).sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                }
-
                                 if (isVinylEffectEnabled) {
                                     // Subtle rim edge ring
                                     Box(
@@ -574,13 +595,12 @@ fun FullPlayerModal(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(32.dp))
+                            Spacer(modifier = Modifier.height(24.dp))
 
-                            // Title, Artist, and Saved Button
-                            Row(
+                            // Title & Artist (Full Width)
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalAlignment = Alignment.Start
                             ) {
                                 AnimatedContent(
                                     targetState = track.id,
@@ -589,70 +609,38 @@ fun FullPlayerModal(
                                             .togetherWith(fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 })
                                     },
                                     label = "fullPlayerTrackTitleAnim",
-                                    modifier = Modifier.weight(1f).padding(end = 16.dp)
+                                    modifier = Modifier.fillMaxWidth()
                                 ) { _ ->
                                     Column {
                                         Text(
                                             text = track.title,
                                             color = textOnCard,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 24.sp,
+                                            fontSize = 22.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = track.artist,
                                             color = textMutedOnCard,
-                                            fontSize = 16.sp,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.clickable { onArtistClick?.invoke(track.artistId) }
-                                        )
-                                    }
-                                }
-                                
-                                // Saved Button with bounce
-                                val savedFavScale by animateFloatAsState(
-                                    targetValue = if (isFavorite) 1.2f else 1.0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
-                                    ),
-                                    label = "savedFavScale"
-                                )
-
-                                Surface(
-                                    color = if (isFavorite) Color(0xFF1DB954) else Color(0xFFE0E0E0),
-                                    shape = CircleShape,
-                                    modifier = Modifier
-                                        .graphicsLayer {
-                                            scaleX = savedFavScale
-                                            scaleY = savedFavScale
-                                        }
-                                        .clickable { onToggleFavorite() }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                            contentDescription = "Saved",
-                                            tint = if (isFavorite) Color.White else textMutedOnCard,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Saved",
-                                            color = if (isFavorite) Color.White else textMutedOnCard,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
+                                            modifier = Modifier.clickable {
+                                                if (artistList.size > 1) {
+                                                    showArtistsDialog = true
+                                                } else {
+                                                    onArtistClick?.invoke(track.artistId)
+                                                }
+                                            }
                                         )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(18.dp))
 
                             // Seekbar
                             Slider(
@@ -681,9 +669,9 @@ fun FullPlayerModal(
                                 Text(text = formatTime(totalDurationMs), color = textMutedOnCard, fontSize = 12.sp)
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Controls
+                            // Playback Controls
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -738,18 +726,75 @@ fun FullPlayerModal(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Output device indicator removed
+                            // 1-Line Lyric Preview below control buttons
+                            if (currentLyricLineText.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isDark) Color(0xFF161616) else Color(0xFFF3F4F6),
+                                    border = BorderStroke(1.dp, if (isDark) Color(0xFF2E2E2E) else Color(0xFFE5E7EB)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            haptics.toggle()
+                                            viewMode = PlayerViewMode.LYRICS
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color(0xFFF3D959),
+                                            modifier = Modifier.size(26.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Mic,
+                                                    contentDescription = null,
+                                                    tint = Color.Black,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
+                                        AnimatedContent(
+                                            targetState = currentLyricLineText,
+                                            transitionSpec = {
+                                                (fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 2 })
+                                                    .togetherWith(fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 2 })
+                                            },
+                                            label = "LyricPreviewBelowControls",
+                                            modifier = Modifier.weight(1f)
+                                        ) { lineText ->
+                                            Text(
+                                                text = lineText,
+                                                color = textOnCard,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Filled.ChevronRight,
+                                            contentDescription = "Expand Lyrics",
+                                            tint = textMutedOnCard,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    // Bottom Dark Section
+                    // Bottom Dark Section: Lyrics Mic Button | [Artist, Album, Sleep Timer Countdown] | Queue Button
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(24.dp),
+                            .padding(horizontal = 24.dp, vertical = 18.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -757,24 +802,124 @@ fun FullPlayerModal(
                         Surface(
                             shape = CircleShape,
                             color = Color(0xFFF3D959), // Yellow
-                            modifier = Modifier.size(48.dp).clickable { viewMode = PlayerViewMode.LYRICS }
+                            modifier = Modifier.size(48.dp).clickable {
+                                haptics.toggle()
+                                viewMode = PlayerViewMode.LYRICS
+                            }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.Mic, contentDescription = "Lyrics", tint = Color.Black)
                             }
                         }
 
-                        // Lyrics by Genius text
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Lyrics by", color = Color.Gray, fontSize = 10.sp)
-                            Text("GENIUS", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        // Center Actions: Artist (single or multi popup), Album, Sleep Timer (with countdown)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. Artist Action Button
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF2C2C2C),
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clickable {
+                                        haptics.click()
+                                        if (artistList.size > 1) {
+                                            showArtistsDialog = true
+                                        } else {
+                                            onArtistClick?.invoke(track.artistId)
+                                        }
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (artistList.size > 1) Icons.Filled.People else Icons.Filled.Person,
+                                        contentDescription = "Artist",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+
+                            // 2. Album Action Button
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF2C2C2C),
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clickable {
+                                        haptics.click()
+                                        onAlbumClick?.invoke(track.albumId)
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Album,
+                                        contentDescription = "Album",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+
+                            // 3. Sleep Timer Action Button with Live Countdown
+                            val isTimerActive = (playbackState.sleepTimerSecondsLeft != null && playbackState.sleepTimerSecondsLeft > 0) ||
+                                    (playbackState.sleepTimerMinutesLeft != null && playbackState.sleepTimerMinutesLeft > 0)
+
+                            val timerCountdownText = remember(playbackState.sleepTimerSecondsLeft, playbackState.sleepTimerMinutesLeft) {
+                                val totalSecs = playbackState.sleepTimerSecondsLeft ?: (playbackState.sleepTimerMinutesLeft?.times(60) ?: 0)
+                                if (totalSecs <= 0) ""
+                                else {
+                                    val mins = totalSecs / 60
+                                    val secs = totalSecs % 60
+                                    "%02d:%02d".format(mins, secs)
+                                }
+                            }
+
+                            Surface(
+                                shape = if (isTimerActive) RoundedCornerShape(22.dp) else CircleShape,
+                                color = if (isTimerActive) MaterialTheme.colorScheme.primary else Color(0xFF2C2C2C),
+                                modifier = Modifier
+                                    .height(44.dp)
+                                    .then(if (isTimerActive) Modifier.padding(horizontal = 2.dp) else Modifier.width(44.dp))
+                                    .clickable {
+                                        haptics.click()
+                                        showSleepTimerDialog = true
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = if (isTimerActive) 12.dp else 0.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isTimerActive) Icons.Filled.HourglassTop else Icons.Filled.Timer,
+                                        contentDescription = "Sleep Timer",
+                                        tint = if (isTimerActive) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    if (isTimerActive && timerCountdownText.isNotBlank()) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = timerCountdownText,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         // Queue button
                         Surface(
                             shape = CircleShape,
                             color = Color(0xFF2C2C2C),
-                            modifier = Modifier.size(48.dp).clickable { onOpenQueue() }
+                            modifier = Modifier.size(48.dp).clickable {
+                                haptics.click()
+                                onOpenQueue()
+                            }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.QueueMusic, contentDescription = "Queue", tint = Color.White)
