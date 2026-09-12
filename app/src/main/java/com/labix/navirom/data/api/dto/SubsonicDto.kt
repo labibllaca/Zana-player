@@ -30,6 +30,7 @@ data class SubsonicResponse(
     val randomSongs: SongListDto? = null,
     val genres: GenresContainerDto? = null,
     val musicFolders: MusicFoldersContainerDto? = null,
+    val directory: DirectoryDto? = null,
     val lyrics: LyricsDto? = null,
     val lyricsList: LyricsListDto? = null,
     val starred: StarredDto? = null,
@@ -119,6 +120,7 @@ data class SongDto(
     val album: String? = null,
     val artist: String? = null,
     val track: Int? = null,
+    val discNumber: Int? = null,
     val year: Int? = null,
     val genre: String? = null,
     val coverArt: String? = null,
@@ -134,6 +136,15 @@ data class SongDto(
     val albumId: String? = null,
     val artistId: String? = null,
     val starred: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DirectoryDto(
+    val id: String = "",
+    val name: String = "",
+    val parent: String? = null,
+    val song: List<SongDto> = emptyList(),
+    val child: List<SongDto> = emptyList()
 )
 
 @JsonClass(generateAdapter = true)

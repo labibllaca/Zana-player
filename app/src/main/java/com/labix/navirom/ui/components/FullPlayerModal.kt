@@ -55,6 +55,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.labix.navirom.data.lyrics.LyricsData
 import com.labix.navirom.data.model.DownloadStatus
@@ -126,9 +129,21 @@ fun FullPlayerModal(
         mutableStateOf(activeOptions.disableMobileData || sleepTimerOptions.disableMobileData)
     }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isLifecycleResumed by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isLifecycleResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     var vinylRotationAngle by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled) {
-        if (isVinylEffectEnabled && playbackState.isPlaying) {
+    LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled, viewMode, isLifecycleResumed) {
+        if (isVinylEffectEnabled && playbackState.isPlaying && viewMode == PlayerViewMode.ARTWORK && isLifecycleResumed) {
             var lastTime = withFrameNanos { it }
             while (isActive) {
                 withFrameNanos { frameTimeNanos ->

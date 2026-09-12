@@ -20,6 +20,7 @@ import com.labix.navirom.player.AudioPlayerController
 import com.labix.navirom.update.AppUpdateInfo
 import com.labix.navirom.update.UpdateManager
 import com.labix.navirom.update.UpdateState
+import com.labix.navirom.ui.util.TrackOrderingHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -1720,7 +1721,37 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val res = subsonicClient.getAlbumDetails(albumId)
             res.onSuccess { (_, tracks) ->
-                _currentAlbumTracks.value = tracks
+                _currentAlbumTracks.value = TrackOrderingHelper.sortAlbumTracks(tracks)
+            }.onFailure {
+                val rawMap = _rawLibrarySongs.value.associateBy { it.id }
+                val cached = cachedTracks.value.map { entity ->
+                    val orig = rawMap[entity.id]
+                    NaviromTrack(
+                        id = entity.id,
+                        title = entity.title,
+                        artist = entity.artist,
+                        artistId = entity.artistId,
+                        album = entity.album,
+                        albumId = entity.albumId,
+                        durationSeconds = entity.durationSeconds,
+                        coverArtId = orig?.coverArtId ?: "",
+                        coverArtUrl = entity.coverArtUrl,
+                        streamUrl = entity.localFilePath.ifBlank { subsonicClient.getStreamUrl(entity.id) },
+                        path = orig?.path ?: "",
+                        year = entity.year,
+                        genre = entity.genre,
+                        suffix = entity.format,
+                        trackNumber = orig?.trackNumber,
+                        discNumber = orig?.discNumber,
+                        isFavorite = true
+                    )
+                }
+                val localSongs = (cached + _rawLibrarySongs.value)
+                    .filter { it.albumId == albumId || (albumId.startsWith("local_") && it.album.equals(albumId.removePrefix("local_"), ignoreCase = true)) }
+                    .distinctBy { it.id }
+                if (localSongs.isNotEmpty()) {
+                    _currentAlbumTracks.value = TrackOrderingHelper.sortAlbumTracks(localSongs)
+                }
             }
         }
     }

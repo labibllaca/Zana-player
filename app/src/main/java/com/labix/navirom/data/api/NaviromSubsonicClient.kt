@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 
 import com.labix.navirom.diagnostics.AppDiagnostics
 import com.labix.navirom.diagnostics.DiagnosticCodes
+import com.labix.navirom.ui.util.TrackOrderingHelper
 
 class NaviromSubsonicClient(
     private val okHttpClient: OkHttpClient = HttpClientProvider.client
@@ -345,21 +346,43 @@ class NaviromSubsonicClient(
 
     suspend fun getAlbumDetails(albumId: String): Result<Pair<NaviromAlbum, List<NaviromTrack>>> {
         return executeRequest("getAlbum.view", mapOf("id" to albumId)) { root ->
-            val albumDto = root.subsonicResponse?.album ?: throw IllegalStateException("Album not found")
-            val album = NaviromAlbum(
-                id = albumDto.id,
-                name = albumDto.name,
-                artist = albumDto.artist ?: "Unknown Artist",
-                artistId = albumDto.artistId ?: "",
-                coverArt = albumDto.coverArt ?: "",
-                coverArtUrl = getCoverArtUrl(albumDto.coverArt ?: albumDto.id),
-                songCount = albumDto.songCount ?: albumDto.song.size,
-                durationSeconds = albumDto.duration ?: 0,
-                year = albumDto.year,
-                genre = albumDto.genre ?: ""
-            )
+            val albumDto = root.subsonicResponse?.album
+            val dirDto = root.subsonicResponse?.directory
+            if (albumDto == null && dirDto == null) {
+                throw IllegalStateException("Album or directory details not found")
+            }
 
-            val tracks = albumDto.song.map { songDto ->
+            val album = if (albumDto != null) {
+                NaviromAlbum(
+                    id = albumDto.id,
+                    name = albumDto.name,
+                    artist = albumDto.artist ?: "Unknown Artist",
+                    artistId = albumDto.artistId ?: "",
+                    coverArt = albumDto.coverArt ?: "",
+                    coverArtUrl = getCoverArtUrl(albumDto.coverArt ?: albumDto.id),
+                    songCount = albumDto.songCount ?: albumDto.song.size,
+                    durationSeconds = albumDto.duration ?: 0,
+                    year = albumDto.year,
+                    genre = albumDto.genre ?: ""
+                )
+            } else {
+                val songs = dirDto!!.song.ifEmpty { dirDto.child }
+                NaviromAlbum(
+                    id = dirDto.id,
+                    name = dirDto.name,
+                    artist = songs.firstOrNull()?.artist ?: "Unknown Artist",
+                    artistId = songs.firstOrNull()?.artistId ?: "",
+                    coverArt = songs.firstOrNull()?.coverArt ?: dirDto.id,
+                    coverArtUrl = getCoverArtUrl(songs.firstOrNull()?.coverArt ?: dirDto.id),
+                    songCount = songs.size,
+                    durationSeconds = songs.sumOf { it.duration ?: 0 },
+                    year = songs.firstOrNull()?.year,
+                    genre = songs.firstOrNull()?.genre ?: ""
+                )
+            }
+
+            val rawSongs = albumDto?.song ?: dirDto?.song?.ifEmpty { dirDto.child } ?: emptyList()
+            val tracks = rawSongs.filter { !it.isDir }.map { songDto ->
                 NaviromTrack(
                     id = songDto.id,
                     title = songDto.title.ifBlank { "Untitled Track" },
@@ -377,12 +400,14 @@ class NaviromSubsonicClient(
                     bitRate = songDto.bitRate,
                     suffix = songDto.suffix ?: "mp3",
                     trackNumber = songDto.track,
+                    discNumber = songDto.discNumber,
                     isFavorite = songDto.starred != null,
                     sizeBytes = songDto.size ?: 0L
                 )
             }
 
-            Pair(album, tracks)
+            val sortedTracks = TrackOrderingHelper.sortAlbumTracks(tracks)
+            Pair(album, sortedTracks)
         }
     }
 

@@ -20,6 +20,7 @@ data class NaviromTrack(
     val bitRate: Int? = null,
     val suffix: String = "mp3",
     val trackNumber: Int? = null,
+    val discNumber: Int? = null,
     val isCached: Boolean = false,
     val localFilePath: String? = null,
     val isFavorite: Boolean = false,
