@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -47,6 +48,8 @@ import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.ServerConnectionUiState
 import com.labix.ui.theme.AccentEmerald
 
+import com.labix.navirom.player.SecureSettingsManager
+import com.labix.navirom.ui.components.SecureSettingsAssistantDialog
 import com.labix.navirom.diagnostics.AppDiagnostics
 import com.labix.navirom.ui.components.DebugLogsDialog
 import com.labix.navirom.ui.components.AppUpdateDialog
@@ -121,6 +124,7 @@ fun ServerSettingsScreen(
     var protocolExpanded by remember { mutableStateOf(false) }
     var folderExpanded by remember { mutableStateOf(false) }
     var showDebugLogsDialog by remember { mutableStateOf(false) }
+    var showSecureSettingsAssistant by remember { mutableStateOf(false) }
 
     fun str(key: String): String = NaviromStrings.get(key, appLanguage)
 
@@ -1506,6 +1510,82 @@ fun ServerSettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Advanced System Permissions & ADB Assistant card
+        val isSecureSettingsGranted = remember(showSecureSettingsAssistant) {
+            SecureSettingsManager.isWriteSecureSettingsGranted(context)
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("card_system_permissions_adb"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSecureSettingsGranted) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                }
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSecureSettingsGranted) Icons.Filled.VerifiedUser else Icons.Filled.AdminPanelSettings,
+                        contentDescription = null,
+                        tint = if (isSecureSettingsGranted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = str("secure_settings_title"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isSecureSettingsGranted) {
+                                str("secure_settings_badge_granted")
+                            } else {
+                                str("secure_settings_badge_missing")
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (isSecureSettingsGranted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (isSecureSettingsGranted) {
+                        "Die Berechtigung WRITE_SECURE_SETTINGS ist aktiv. Sleep-Timer kann Wi-Fi, Bluetooth und mobile Daten im Hintergrund ohne Bestätigungsdialoge abschalten."
+                    } else {
+                        "Ermöglicht dem Sleep-Timer, Wi-Fi, Bluetooth und Mobile Daten direkt im Hintergrund stumm abzuschalten (ohne System-Popups). Kann via Root, Shizuku oder ADB eingerichtet werden."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        haptics.click()
+                        showSecureSettingsAssistant = true
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(42.dp).testTag("btn_open_secure_settings_assistant")
+                ) {
+                    Icon(Icons.Filled.Terminal, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSecureSettingsGranted) "Berechtigungs-Status verwalten" else "ADB / Root Assistent öffnen",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // About section
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1532,6 +1612,13 @@ fun ServerSettingsScreen(
 
         if (showDebugLogsDialog) {
             DebugLogsDialog(onDismissRequest = { showDebugLogsDialog = false })
+        }
+
+        if (showSecureSettingsAssistant) {
+            SecureSettingsAssistantDialog(
+                appLanguage = appLanguage,
+                onDismiss = { showSecureSettingsAssistant = false }
+            )
         }
     }
 }

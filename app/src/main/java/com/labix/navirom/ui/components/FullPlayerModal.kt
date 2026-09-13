@@ -58,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.labix.navirom.player.SecureSettingsManager
+import com.labix.navirom.ui.components.SecureSettingsAssistantDialog
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -130,6 +132,7 @@ fun FullPlayerModal(
     var viewMode by remember { mutableStateOf(PlayerViewMode.ARTWORK) }
     var showMenu by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showSecureSettingsAssistant by remember { mutableStateOf(false) }
     var showArtistsDialog by remember { mutableStateOf(false) }
     var showTeksteShqipDialog by remember { mutableStateOf(false) }
     var teksteShqipUrlInput by remember { mutableStateOf("") }
@@ -665,6 +668,74 @@ fun FullPlayerModal(
                             }
                         }
 
+                        // Secure Settings / ADB Status & Assistant Launcher Card
+                        val isSecureSettingsGranted = remember(showSleepTimerDialog) {
+                            SecureSettingsManager.isWriteSecureSettingsGranted(context)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isSecureSettingsGranted) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    haptics.click()
+                                    showSecureSettingsAssistant = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isSecureSettingsGranted) Color(0xFF2E7D32).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (isSecureSettingsGranted) Icons.Filled.VerifiedUser else Icons.Filled.AdminPanelSettings,
+                                            contentDescription = null,
+                                            tint = if (isSecureSettingsGranted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isSecureSettingsGranted) {
+                                            NaviromStrings.get("secure_settings_badge_granted", appLanguage)
+                                        } else {
+                                            NaviromStrings.get("secure_settings_title", appLanguage)
+                                        },
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isSecureSettingsGranted) {
+                                            "Stilles Abschalten im Hintergrund aktiv"
+                                        } else {
+                                            "ADB / Root-Berechtigung auf Gerät einrichten"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
                         // Turn off button if active
                         if (isTimerActive) {
                             FilledTonalButton(
@@ -699,6 +770,13 @@ fun FullPlayerModal(
                         Text("Cancel")
                     }
                 }
+            )
+        }
+
+        if (showSecureSettingsAssistant) {
+            SecureSettingsAssistantDialog(
+                appLanguage = appLanguage,
+                onDismiss = { showSecureSettingsAssistant = false }
             )
         }
 

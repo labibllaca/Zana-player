@@ -314,7 +314,27 @@ object NaviromStrings {
         "sleep_timer_disable_mobile_data" to "Turn off Mobile Data",
         "sleep_timer_disable_mobile_data_desc" to "Disconnects cellular data connection",
         "sleep_timer_active_badge" to "Timer Active",
-        "permission_bluetooth_needed" to "Bluetooth permission is required to turn off Bluetooth devices"
+        "permission_bluetooth_needed" to "Bluetooth permission is required to turn off Bluetooth devices",
+
+        // Secure Settings & ADB Assistant
+        "secure_settings_title" to "Secure Settings & ADB Assistant",
+        "secure_settings_badge_granted" to "Permission Granted",
+        "secure_settings_badge_missing" to "Permission Required",
+        "secure_settings_desc" to "Android 10+ restricts apps from silently toggling Wi-Fi, Bluetooth, and Mobile Data in the background. Granting WRITE_SECURE_SETTINGS or using Root enables automatic background radio shutoff.",
+        "secure_settings_root_action" to "Execute on this Device (Root / Shizuku)",
+        "secure_settings_root_prompt" to "Do you want to execute the ADB permission grant command on this device via Root/Shizuku?",
+        "secure_settings_granting" to "Executing command...",
+        "secure_settings_granted_success" to "Permission granted successfully! Background radio toggle is now active.",
+        "secure_settings_grant_failed" to "Could not grant automatically. Please run the ADB command or grant Root access.",
+        "secure_settings_copy_cmd" to "Copy ADB Command",
+        "secure_settings_cmd_copied" to "ADB command copied to clipboard!",
+        "secure_settings_open_dev" to "Open Developer Options",
+        "secure_settings_open_shizuku" to "Open Shizuku",
+        "secure_settings_check_status" to "Check Permission Status",
+        "secure_settings_wireless_guide" to "Wireless Debugging / LADB: You can also execute the command without a PC using Wireless Debugging with Shizuku or LADB.",
+        "secure_settings_fallback_info" to "Without ADB/Root, the app will conveniently bring up the quick system toggle panel when the timer ends.",
+        "updates_highlights" to "Highlights & New Features",
+        "updates_view_changelog" to "Changelog & Details"
     )
 
     private val albanianStrings = mapOf(
@@ -598,7 +618,27 @@ object NaviromStrings {
         "sleep_timer_disable_mobile_data" to "Fik të dhënat celulare",
         "sleep_timer_disable_mobile_data_desc" to "Shkëput internetin e telefonit",
         "sleep_timer_active_badge" to "Kohëmatësi aktiv",
-        "permission_bluetooth_needed" to "Kërkohet leja e Bluetooth për të shkëputur pajisjet Bluetooth"
+        "permission_bluetooth_needed" to "Kërkohet leja e Bluetooth për të shkëputur pajisjet Bluetooth",
+
+        // Secure Settings & ADB Assistant
+        "secure_settings_title" to "Asistenti i lejeve ADB & Secure Settings",
+        "secure_settings_badge_granted" to "Leja është aktive",
+        "secure_settings_badge_missing" to "Kërkohet leja",
+        "secure_settings_desc" to "Nga Android 10+, sistemi kufizon fikjen automatike të Wi-Fi, Bluetooth dhe internetit celular në sfond. Dhënia e lejes WRITE_SECURE_SETTINGS ose Root mundëson fikjen e menjëhershme.",
+        "secure_settings_root_action" to "Ekzekuto në këtë pajisje (Root / Shizuku)",
+        "secure_settings_root_prompt" to "Dëshironi të ekzekutoni komandën e lejes ADB drejtpërdrejt në këtë pajisje përmes Root/Shizuku?",
+        "secure_settings_granting" to "Po ekzekutohet komanda...",
+        "secure_settings_granted_success" to "Leja u dha me sukses! Fikja automatike në sfond tani është aktive.",
+        "secure_settings_grant_failed" to "Ekzekutimi dështoi. Ju lutemi kontrolloni Root/Shizuku ose përdorni komandën ADB.",
+        "secure_settings_copy_cmd" to "Kopjo komandën ADB",
+        "secure_settings_cmd_copied" to "Komanda ADB u kopjua në kujtesë!",
+        "secure_settings_open_dev" to "Hap opsionet e zhvilluesit",
+        "secure_settings_open_shizuku" to "Hap Shizuku",
+        "secure_settings_check_status" to "Kontrollo statusin",
+        "secure_settings_wireless_guide" to "Wireless Debugging / LADB: Mund ta ekzekutoni komandën pa kompjuter duke përdorur Shizuku ose LADB.",
+        "secure_settings_fallback_info" to "Pa ADB/Root, aplikacioni do të shfaqë menynë e shpejtë të sistemit kur mbaron koha.",
+        "updates_highlights" to "Të rejat kryesore",
+        "updates_view_changelog" to "Regjistri i ndryshimeve"
     )
 
     private val germanStrings = mapOf(
@@ -883,6 +923,26 @@ object NaviromStrings {
         "sleep_timer_disable_mobile_data" to "Mobiles Internet ausschalten",
         "sleep_timer_disable_mobile_data_desc" to "Trennt die mobile Datenverbindung",
         "sleep_timer_active_badge" to "Timer aktiv",
-        "permission_bluetooth_needed" to "Bluetooth-Berechtigung ist erforderlich, um Bluetooth-Geräte auszuschalten"
+        "permission_bluetooth_needed" to "Bluetooth-Berechtigung ist erforderlich, um Bluetooth-Geräte auszuschalten",
+
+        // Secure Settings & ADB Assistant
+        "secure_settings_title" to "Secure Settings & ADB-Assistent",
+        "secure_settings_badge_granted" to "Berechtigung aktiv",
+        "secure_settings_badge_missing" to "Berechtigung erforderlich",
+        "secure_settings_desc" to "Ab Android 10+ verhindert das System das stille Abschalten von WLAN, Bluetooth und mobilem Internet im Hintergrund. Mit der Berechtigung WRITE_SECURE_SETTINGS oder Root kann Navirom diese direkt deaktivieren.",
+        "secure_settings_root_action" to "Auf diesem Gerät ausführen (Root / Shizuku)",
+        "secure_settings_root_prompt" to "Möchtest du den ADB-Berechtigungsbefehl jetzt direkt auf diesem Gerät via Root/Shizuku ausführen?",
+        "secure_settings_granting" to "Befehl wird ausgeführt...",
+        "secure_settings_granted_success" to "Berechtigung erfolgreich erteilt! Stilles Abschalten ist jetzt aktiv.",
+        "secure_settings_grant_failed" to "Automatische Ausführung fehlgeschlagen. Bitte Root/Shizuku prüfen oder den ADB-Befehl ausführen.",
+        "secure_settings_copy_cmd" to "ADB-Befehl kopieren",
+        "secure_settings_cmd_copied" to "ADB-Befehl in Zwischenablage kopiert!",
+        "secure_settings_open_dev" to "Entwickleroptionen öffnen",
+        "secure_settings_open_shizuku" to "Shizuku öffnen",
+        "secure_settings_check_status" to "Status prüfen",
+        "secure_settings_wireless_guide" to "Wireless Debugging / LADB: Der Befehl kann ohne PC direkt auf dem Gerät über Wireless Debugging mit Shizuku oder LADB ausgeführt werden.",
+        "secure_settings_fallback_info" to "Ohne ADB/Root öffnet die App nach Ablauf des Timers bequem das System-Schnellmenü zum 1-Tap-Ausschalten.",
+        "updates_highlights" to "Highlights & Neuerungen",
+        "updates_view_changelog" to "Änderungsprotokoll & Details"
     )
 }

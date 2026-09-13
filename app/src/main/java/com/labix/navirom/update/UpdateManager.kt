@@ -222,7 +222,30 @@ class UpdateManager(private val context: Context) {
 
             val tagName = targetRelease.optString("tag_name", "")
             val title = targetRelease.optString("name", tagName).ifBlank { tagName }
-            val body = targetRelease.optString("body", "Neue Funktionen und Fehlerbehebungen.")
+            
+            // Build aggregated changelog from all intermediate newer releases
+            val changelogBuilder = StringBuilder()
+            if (higherSemverCandidates.size > 1) {
+                for (cand in higherSemverCandidates) {
+                    val relBody = cand.release.optString("body", "").trim()
+                    val relTag = cand.tagName
+                    val relTitle = cand.title
+                    if (relBody.isNotBlank()) {
+                        if (changelogBuilder.isNotEmpty()) changelogBuilder.append("\n\n---\n\n")
+                        changelogBuilder.append("### $relTag")
+                        if (relTitle.isNotBlank() && relTitle != relTag) {
+                            changelogBuilder.append(" — $relTitle")
+                        }
+                        changelogBuilder.append("\n\n").append(relBody)
+                    }
+                }
+            } else if (higherSemverCandidates.size == 1) {
+                val relBody = higherSemverCandidates.first().release.optString("body", "").trim()
+                changelogBuilder.append(relBody)
+            }
+
+            val aggregatedBody = if (changelogBuilder.isNotBlank()) changelogBuilder.toString() else targetRelease.optString("body", "")
+            val body = if (aggregatedBody.isNotBlank()) aggregatedBody else "Neue Funktionen, Verbesserungen und Fehlerbehebungen."
             val publishedAt = targetRelease.optString("published_at", "")
             val htmlUrl = targetRelease.optString("html_url", "https://github.com/$repo")
             val apkDownloadUrl = latestApkAsset.optString("browser_download_url", "")

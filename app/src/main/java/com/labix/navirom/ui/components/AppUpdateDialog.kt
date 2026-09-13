@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -135,24 +136,31 @@ fun AppUpdateDialog(
                         }
 
                         // Changelog Section
-                        Text(
-                            text = str("updates_changelog"),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = info.body.ifBlank { "Automated release build from GitHub Actions." },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(12.dp)
+                                text = str("updates_changelog"),
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = info.tagName,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        RichChangelogView(rawChangelog = info.body)
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -502,3 +510,189 @@ fun AppUpdateBanner(
         }
     }
 }
+
+sealed class ChangelogItem {
+    data class VersionHeader(val title: String) : ChangelogItem()
+    data class SectionHeader(val title: String) : ChangelogItem()
+    data class Bullet(val text: String, val tag: String? = null, val author: String? = null) : ChangelogItem()
+    data class Paragraph(val text: String) : ChangelogItem()
+}
+
+fun parseChangelog(raw: String): List<ChangelogItem> {
+    if (raw.isBlank()) return emptyList()
+    val lines = raw.lines()
+    val items = mutableListOf<ChangelogItem>()
+
+    for (line in lines) {
+        val trimmed = line.trim()
+        if (trimmed.isBlank()) continue
+
+        // Skip dividers and raw footer diff links
+        if (trimmed == "---" || trimmed.startsWith("Full Changelog:", ignoreCase = true) || trimmed.startsWith("See the full diff:", ignoreCase = true)) {
+            continue
+        }
+
+        if (trimmed.startsWith("### v") || trimmed.startsWith("## v") || trimmed.startsWith("### Version") || trimmed.startsWith("## Version")) {
+            val title = trimmed.replace(Regex("^#+\\s*"), "").trim()
+            items.add(ChangelogItem.VersionHeader(title))
+        } else if (trimmed.startsWith("#")) {
+            val title = trimmed.replace(Regex("^#+\\s*"), "").trim()
+            items.add(ChangelogItem.SectionHeader(title))
+        } else if (trimmed.startsWith("* ") || trimmed.startsWith("- ") || trimmed.startsWith("+ ") || trimmed.startsWith("• ")) {
+            var content = trimmed.substring(2).trim()
+
+            // Extract author if formatted like "... by @username in https://..." or "... by @username"
+            var author: String? = null
+            val authorMatch = Regex("\\s+by\\s+(@[a-zA-Z0-9_-]+)(?:\\s+in\\s+https?://\\S+)?").find(content)
+            if (authorMatch != null) {
+                author = authorMatch.groupValues[1]
+                content = content.replace(authorMatch.value, "").trim()
+            }
+
+            // Remove trailing PR links like in https://github.com/...
+            content = content.replace(Regex("\\s+in\\s+https?://\\S+"), "").trim()
+
+            // Remove commit hash badges like [1234567]
+            content = content.replace(Regex("\\[[0-9a-f]{6,10}\\]"), "").trim()
+
+            // Check if there is a category prefix like [Feature], [Fix], [UI], [Audio], [Lyrics], etc.
+            var tag: String? = null
+            val tagMatch = Regex("^\\[([a-zA-Z0-9_\\-\\s]{2,15})\\]\\s*").find(content)
+            if (tagMatch != null) {
+                tag = tagMatch.groupValues[1]
+                content = content.replace(tagMatch.value, "").trim()
+            }
+
+            if (content.isNotBlank()) {
+                items.add(ChangelogItem.Bullet(text = content, tag = tag, author = author))
+            }
+        } else {
+            items.add(ChangelogItem.Paragraph(trimmed))
+        }
+    }
+    return items
+}
+
+@Composable
+fun RichChangelogView(
+    rawChangelog: String,
+    modifier: Modifier = Modifier
+) {
+    val items = remember(rawChangelog) { parseChangelog(rawChangelog) }
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (items.isEmpty()) {
+                Text(
+                    text = "• Neue Funktionen, Fehlerbehebungen und Leistungsverbesserungen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            } else {
+                items.forEach { item ->
+                    when (item) {
+                        is ChangelogItem.VersionHeader -> {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Stars,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                        is ChangelogItem.SectionHeader -> {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        is ChangelogItem.Bullet -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (item.tag != null) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    if (item.tag != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = item.tag,
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = item.text,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 17.sp
+                                    )
+                                    if (item.author != null) {
+                                        Text(
+                                            text = "von ${item.author}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        is ChangelogItem.Paragraph -> {
+                            Text(
+                                text = item.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 17.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
