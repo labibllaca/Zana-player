@@ -35,7 +35,8 @@ fun MiniPlayerBar(
     onTogglePlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClose: () -> Unit = {}
 ) {
     val track = playbackState.currentTrack ?: return
     val haptics = rememberNaviromHaptics()
@@ -102,7 +103,7 @@ fun MiniPlayerBar(
                                     if (!gestureHandled) {
                                         totalDragX += dragAmount.x
                                         totalDragY += dragAmount.y
-                                        val threshold = 55f
+                                        val threshold = 50f
                                         if (kotlin.math.abs(totalDragX) > kotlin.math.abs(totalDragY) * 1.2f && kotlin.math.abs(totalDragX) > threshold) {
                                             change.consume()
                                             gestureHandled = true
@@ -113,6 +114,12 @@ fun MiniPlayerBar(
                                                 haptics.click()
                                                 onPrevious()
                                             }
+                                        } else if (kotlin.math.abs(totalDragY) > kotlin.math.abs(totalDragX) * 1.2f && totalDragY > threshold) {
+                                            // Swipe down to close playing song
+                                            change.consume()
+                                            gestureHandled = true
+                                            haptics.click()
+                                            onClose()
                                         }
                                     }
                                 }
