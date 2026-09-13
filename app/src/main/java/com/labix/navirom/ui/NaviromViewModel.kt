@@ -2059,6 +2059,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateSleepTimerOptions(options: SleepTimerOptions) {
         _sleepTimerOptions.value = options
+        playerController.updateSleepTimerOptions(options)
         prefs.edit()
             .putBoolean("sleep_timer_disable_bt", options.disableBluetooth)
             .putBoolean("sleep_timer_disable_wifi", options.disableWifi)

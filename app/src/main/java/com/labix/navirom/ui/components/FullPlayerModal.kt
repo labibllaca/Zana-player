@@ -32,6 +32,14 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
 import android.os.SystemClock
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -131,6 +139,31 @@ fun FullPlayerModal(
     }
     var disableData by remember(activeOptions.disableMobileData, sleepTimerOptions.disableMobileData) {
         mutableStateOf(activeOptions.disableMobileData || sleepTimerOptions.disableMobileData)
+    }
+
+    val context = LocalContext.current
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(
+                context,
+                NaviromStrings.get("permission_bluetooth_needed", appLanguage),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val checkAndRequestBtPermission = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val hasPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasPerm) {
+                bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -362,7 +395,16 @@ fun FullPlayerModal(
                                 FilledTonalButton(
                                     onClick = {
                                         haptics.click()
-                                        onSetSleepTimer(mins, currentOptions)
+                                        if (disableBt) {
+                                            checkAndRequestBtPermission()
+                                        }
+                                        val opt = currentOptions.copy(
+                                            disableBluetooth = disableBt,
+                                            disableWifi = disableWifi,
+                                            disableMobileData = disableData
+                                        )
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        onSetSleepTimer(mins, opt)
                                         showSleepTimerDialog = false
                                     },
                                     modifier = Modifier
@@ -403,7 +445,16 @@ fun FullPlayerModal(
                                     val mins = customMinutesText.toIntOrNull()
                                     if (mins != null && mins > 0) {
                                         haptics.click()
-                                        onSetSleepTimer(mins, currentOptions)
+                                        if (disableBt) {
+                                            checkAndRequestBtPermission()
+                                        }
+                                        val opt = currentOptions.copy(
+                                            disableBluetooth = disableBt,
+                                            disableWifi = disableWifi,
+                                            disableMobileData = disableData
+                                        )
+                                        onUpdateSleepTimerOptions?.invoke(opt)
+                                        onSetSleepTimer(mins, opt)
                                         showSleepTimerDialog = false
                                     }
                                 },
@@ -437,12 +488,13 @@ fun FullPlayerModal(
                                     .fillMaxWidth()
                                     .clickable {
                                         haptics.toggle()
-                                        disableBt = !disableBt
-                                        val opt = currentOptions.copy(disableBluetooth = disableBt)
-                                        onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
+                                        val newBt = !disableBt
+                                        if (newBt) {
+                                            checkAndRequestBtPermission()
                                         }
+                                        disableBt = newBt
+                                        val opt = currentOptions.copy(disableBluetooth = newBt)
+                                        onUpdateSleepTimerOptions?.invoke(opt)
                                     }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -478,12 +530,12 @@ fun FullPlayerModal(
                                     checked = disableBt,
                                     onCheckedChange = {
                                         haptics.toggle()
+                                        if (it) {
+                                            checkAndRequestBtPermission()
+                                        }
                                         disableBt = it
                                         val opt = currentOptions.copy(disableBluetooth = it)
                                         onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
-                                        }
                                     }
                                 )
                             }
@@ -500,12 +552,10 @@ fun FullPlayerModal(
                                     .fillMaxWidth()
                                     .clickable {
                                         haptics.toggle()
-                                        disableWifi = !disableWifi
-                                        val opt = currentOptions.copy(disableWifi = disableWifi)
+                                        val newWifi = !disableWifi
+                                        disableWifi = newWifi
+                                        val opt = currentOptions.copy(disableWifi = newWifi)
                                         onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
-                                        }
                                     }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -544,9 +594,6 @@ fun FullPlayerModal(
                                         disableWifi = it
                                         val opt = currentOptions.copy(disableWifi = it)
                                         onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
-                                        }
                                     }
                                 )
                             }
@@ -563,12 +610,10 @@ fun FullPlayerModal(
                                     .fillMaxWidth()
                                     .clickable {
                                         haptics.toggle()
-                                        disableData = !disableData
-                                        val opt = currentOptions.copy(disableMobileData = disableData)
+                                        val newData = !disableData
+                                        disableData = newData
+                                        val opt = currentOptions.copy(disableMobileData = newData)
                                         onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
-                                        }
                                     }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -607,9 +652,6 @@ fun FullPlayerModal(
                                         disableData = it
                                         val opt = currentOptions.copy(disableMobileData = it)
                                         onUpdateSleepTimerOptions?.invoke(opt)
-                                        if (isTimerActive) {
-                                            onSetSleepTimer(playbackState.sleepTimerMinutesLeft, opt)
-                                        }
                                     }
                                 )
                             }

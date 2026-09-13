@@ -884,7 +884,12 @@ class AudioPlayerController(
         }
     }
 
-    fun setSleepTimer(minutes: Int?, options: SleepTimerOptions = SleepTimerOptions()) {
+    fun updateSleepTimerOptions(options: SleepTimerOptions) {
+        currentSleepTimerOptions = options
+        _playbackState.update { it.copy(sleepTimerOptions = options) }
+    }
+
+    fun setSleepTimer(minutes: Int?, options: SleepTimerOptions = currentSleepTimerOptions) {
         sleepTimerJob?.cancel()
         currentSleepTimerOptions = options
         val totalSecs = if (minutes != null && minutes > 0) minutes * 60 else null
