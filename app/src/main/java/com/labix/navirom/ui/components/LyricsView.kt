@@ -32,6 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import com.labix.navirom.data.lyrics.LyricsData
 import com.labix.navirom.data.lyrics.LyricsSource
 import com.labix.navirom.ui.AppLanguage
@@ -48,6 +55,7 @@ fun LyricsView(
     onSeekTo: (Long) -> Unit,
     onRefetch: () -> Unit,
     onFetchTeksteShqip: ((String?) -> Unit)? = null,
+    onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberNaviromHaptics()
@@ -67,10 +75,85 @@ fun LyricsView(
 
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val plainScrollState = rememberScrollState()
 
     // Filter out blank/empty lines
     val validSyncedLines = remember(lyricsData.syncedLines) {
         lyricsData.syncedLines.filter { it.text.isNotBlank() }
+    }
+
+    val hasAnyLyrics = validSyncedLines.isNotEmpty() || lyricsData.plainLyrics.isNotBlank()
+    val isLyricsAvailable = !lyricsData.isLoading && lyricsData.error == null && hasAnyLyrics
+
+    var accumulatedDownwardDrag by remember { mutableFloatStateOf(0f) }
+
+    val lyricsNestedScrollConnection = remember(onClose) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f && accumulatedDownwardDrag > 0f) {
+                    val consumed = (-available.y).coerceAtMost(accumulatedDownwardDrag)
+                    accumulatedDownwardDrag -= consumed
+                    return Offset(0f, -consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (onClose != null && available.y > 0f) {
+                    accumulatedDownwardDrag += available.y
+                    if (accumulatedDownwardDrag > 45f) {
+                        accumulatedDownwardDrag = 0f
+                        haptics.toggle()
+                        onClose.invoke()
+                        return available
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                accumulatedDownwardDrag = 0f
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                accumulatedDownwardDrag = 0f
+                if (onClose != null && available.y > 150f) {
+                    haptics.toggle()
+                    onClose.invoke()
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+
+    val noLyricsDragModifier = if (onClose != null && !isLyricsAvailable) {
+        Modifier.pointerInput(Unit) {
+            var totalY = 0f
+            var handled = false
+            detectDragGestures(
+                onDragStart = { totalY = 0f; handled = false },
+                onDragEnd = { totalY = 0f; handled = false },
+                onDragCancel = { totalY = 0f; handled = false },
+                onDrag = { change, dragAmount ->
+                    if (!handled) {
+                        totalY += dragAmount.y
+                        if (totalY > 35f) {
+                            change.consume()
+                            handled = true
+                            haptics.toggle()
+                            onClose.invoke()
+                        }
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier
     }
 
     // Find active lyric line based on current playback timestamp with a 0.5s anticipation offset
@@ -105,6 +188,8 @@ fun LyricsView(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .nestedScroll(lyricsNestedScrollConnection)
+            .then(noLyricsDragModifier)
             .testTag("lyrics_view"),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -368,7 +453,7 @@ fun LyricsView(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(plainScrollState)
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

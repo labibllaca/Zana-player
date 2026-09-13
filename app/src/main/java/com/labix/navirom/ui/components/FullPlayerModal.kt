@@ -59,6 +59,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -1529,6 +1533,86 @@ fun FullPlayerModal(
             } else {
                 // Lyrics View
                 val listState = rememberLazyListState()
+                val plainScrollState = rememberScrollState()
+
+                val validSyncedLines = remember(lyricsData.syncedLines) {
+                    lyricsData.syncedLines.filter { it.text.isNotBlank() }
+                }
+                val hasAnyLyrics = validSyncedLines.isNotEmpty() || lyricsData.plainLyrics.isNotBlank()
+                val isLyricsAvailable = !lyricsData.isLoading && lyricsData.error == null && hasAnyLyrics
+
+                var accumulatedDownwardDrag by remember { mutableFloatStateOf(0f) }
+
+                val lyricsNestedScrollConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                            if (available.y < 0f && accumulatedDownwardDrag > 0f) {
+                                val consumed = (-available.y).coerceAtMost(accumulatedDownwardDrag)
+                                accumulatedDownwardDrag -= consumed
+                                return Offset(0f, -consumed)
+                            }
+                            return Offset.Zero
+                        }
+
+                        override fun onPostScroll(
+                            consumed: Offset,
+                            available: Offset,
+                            source: NestedScrollSource
+                        ): Offset {
+                            // When child scrollable is at the top and cannot scroll down any further, available.y > 0
+                            if (available.y > 0f) {
+                                accumulatedDownwardDrag += available.y
+                                if (accumulatedDownwardDrag > 45f) {
+                                    accumulatedDownwardDrag = 0f
+                                    haptics.toggle()
+                                    viewMode = PlayerViewMode.ARTWORK
+                                    return available
+                                }
+                            }
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPreFling(available: Velocity): Velocity {
+                            accumulatedDownwardDrag = 0f
+                            return Velocity.Zero
+                        }
+
+                        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                            accumulatedDownwardDrag = 0f
+                            if (available.y > 150f) {
+                                haptics.toggle()
+                                viewMode = PlayerViewMode.ARTWORK
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
+
+                val noLyricsDragModifier = if (!isLyricsAvailable) {
+                    Modifier.pointerInput(Unit) {
+                        var totalY = 0f
+                        var handled = false
+                        detectDragGestures(
+                            onDragStart = { totalY = 0f; handled = false },
+                            onDragEnd = { totalY = 0f; handled = false },
+                            onDragCancel = { totalY = 0f; handled = false },
+                            onDrag = { change, dragAmount ->
+                                if (!handled) {
+                                    totalY += dragAmount.y
+                                    if (totalY > 35f) {
+                                        change.consume()
+                                        handled = true
+                                        haptics.toggle()
+                                        viewMode = PlayerViewMode.ARTWORK
+                                    }
+                                }
+                            }
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -1804,6 +1888,8 @@ fun FullPlayerModal(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .nestedScroll(lyricsNestedScrollConnection)
+                            .then(noLyricsDragModifier)
                     ) {
                         if (lyricsData.isLoading) {
                             CircularProgressIndicator(
@@ -2031,7 +2117,7 @@ fun FullPlayerModal(
                                 }
                             } else {
                                 // Plain lyrics
-                                Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 48.dp).verticalScroll(rememberScrollState())) {
+                                Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 48.dp).verticalScroll(plainScrollState)) {
                                     Text(
                                         text = lyricsData.plainLyrics,
                                         color = Color.White,
