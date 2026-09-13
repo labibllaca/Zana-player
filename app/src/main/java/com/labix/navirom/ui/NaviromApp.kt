@@ -767,6 +767,9 @@ fun NaviromApp(
                 onSetSleepTimer = { minutes, options -> viewModel.setSleepTimer(minutes, options) },
                 onUpdateSleepTimerOptions = { viewModel.updateSleepTimerOptions(it) },
                 onRefetchLyrics = { viewModel.refetchCurrentLyrics() },
+                onFetchTeksteShqipLyrics = { url ->
+                    viewModel.fetchLyricsFromTeksteShqip(url, playbackState.currentTrack)
+                },
                 onArtistClick = { artistId ->
                     viewModel.setFullPlayerVisible(false)
                     viewModel.setTab(NaviromTab.LIBRARY)

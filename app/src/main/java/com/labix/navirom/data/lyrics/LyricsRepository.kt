@@ -26,6 +26,7 @@ enum class LyricsSource(val displayNameEn: String, val displayNameSq: String) {
     EMBEDDED_FILE("Embedded in File", "Brenda skedarit"),
     NAVIDROME_SERVER("Navidrome Server", "Serveri Navidrome"),
     ONLINE_LRCLIB("Online (LrcLib Synced)", "Nga Interneti (LrcLib)"),
+    ONLINE_TEKSTESHQIP("Online (TeksteShqip)", "Nga Interneti (TeksteShqip)"),
     NOT_FOUND("Not Found", "Nuk u gjet")
 }
 
@@ -66,6 +67,7 @@ class LyricsRepository(
 ) {
     private val TAG = "LyricsRepository"
     private val okHttpClient = HttpClientProvider.client
+    val teksteShqipService = TeksteShqipLyricsService(context)
 
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -126,6 +128,13 @@ class LyricsRepository(
             return@withContext onlineLyrics
         }
 
+        // 4. STEP 4: Check Online (TeksteShqip.com)
+        val teksteShqipLyrics = teksteShqipService.fetchLyricsForTrack(track)
+        if (teksteShqipLyrics != null && teksteShqipLyrics.plainLyrics.isNotBlank()) {
+            saveAndCacheLyrics(track, teksteShqipLyrics)
+            return@withContext teksteShqipLyrics
+        }
+
         // If not found anywhere
         val notFoundData = LyricsData(
             trackId = track.id,
@@ -133,9 +142,31 @@ class LyricsRepository(
             artist = track.artist,
             source = LyricsSource.NOT_FOUND,
             isSynced = false,
-            plainLyrics = "No lyrics found for \"${track.title}\" by ${track.artist}.\n\nChecked local file, Navidrome server, and online synchronized lyrics database."
+            plainLyrics = "No lyrics found for \"${track.title}\" by ${track.artist}.\n\nChecked local file, Navidrome server, online database (LrcLib), and TeksteShqip."
         )
         return@withContext notFoundData
+    }
+
+    suspend fun fetchAndSaveTeksteShqipLyrics(track: NaviromTrack, customUrl: String? = null): LyricsData = withContext(Dispatchers.IO) {
+        val lyrics = if (!customUrl.isNullOrBlank()) {
+            teksteShqipService.fetchLyricsFromUrl(customUrl, track)
+        } else {
+            teksteShqipService.fetchLyricsForTrack(track)
+        }
+
+        if (lyrics != null && lyrics.plainLyrics.isNotBlank()) {
+            saveAndCacheLyrics(track, lyrics)
+            lyrics
+        } else {
+            LyricsData(
+                trackId = track.id,
+                title = track.title,
+                artist = track.artist,
+                source = LyricsSource.ONLINE_TEKSTESHQIP,
+                isSynced = false,
+                plainLyrics = "Nuk u gjet tekst në TeksteShqip për \"${track.title}\"."
+            )
+        }
     }
 
     private fun extractLocalFileLyrics(filePath: String): LyricsData? {

@@ -632,6 +632,16 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         fetchLyricsForTrack(track, forceRefresh = true)
     }
 
+    fun fetchLyricsFromTeksteShqip(customUrl: String? = null, track: NaviromTrack? = null) {
+        val targetTrack = track ?: playbackState.value.currentTrack ?: return
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch {
+            _currentLyrics.value = LyricsData(trackId = targetTrack.id, isLoading = true)
+            val lyrics = lyricsRepository.fetchAndSaveTeksteShqipLyrics(targetTrack, customUrl)
+            _currentLyrics.value = lyrics
+        }
+    }
+
     fun setStatsScreenVisible(visible: Boolean) {
         _isStatsScreenVisible.value = visible
     }

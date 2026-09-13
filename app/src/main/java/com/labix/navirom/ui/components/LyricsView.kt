@@ -47,10 +47,14 @@ fun LyricsView(
     appLanguage: AppLanguage,
     onSeekTo: (Long) -> Unit,
     onRefetch: () -> Unit,
+    onFetchTeksteShqip: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberNaviromHaptics()
     fun str(key: String): String = NaviromStrings.get(key, appLanguage)
+
+    var showTeksteShqipDialog by remember { mutableStateOf(false) }
+    var teksteShqipUrlInput by remember { mutableStateOf("") }
 
     // Keep screen on while lyrics view is active for seamless karaoke/sing-along
     val currentView = LocalView.current
@@ -94,6 +98,7 @@ fun LyricsView(
         LyricsSource.EMBEDDED_FILE -> str("lyrics_source_file")
         LyricsSource.NAVIDROME_SERVER -> str("lyrics_source_server")
         LyricsSource.ONLINE_LRCLIB -> str("lyrics_source_online")
+        LyricsSource.ONLINE_TEKSTESHQIP -> str("lyrics_source_teksteshqip")
         LyricsSource.NOT_FOUND -> str("lyrics_not_found")
     }
 
@@ -118,19 +123,40 @@ fun LyricsView(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Icon(
                         imageVector = if (lyricsData.isSynced) Icons.Filled.SyncAlt else Icons.Filled.TextFields,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = sourceLabel,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (onFetchTeksteShqip != null) {
+                        SuggestionChip(
+                            onClick = {
+                                if (teksteShqipUrlInput.isBlank()) {
+                                    if (lyricsData.artist.contains("leonora", ignoreCase = true) ||
+                                        lyricsData.title.contains("vritet", ignoreCase = true)
+                                    ) {
+                                        teksteShqipUrlInput = "https://teksteshqip.com/leonora-jakupi/teksti/1848928"
+                                    }
+                                }
+                                showTeksteShqipDialog = true
+                            },
+                            label = { Text("TeksteShqip", style = MaterialTheme.typography.labelSmall) },
+                            icon = {
+                                Icon(Icons.Filled.Language, contentDescription = null, modifier = Modifier.size(12.dp))
+                            },
+                            modifier = Modifier.height(26.dp)
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -216,11 +242,31 @@ fun LyricsView(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = onRefetch,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(str("lyrics_reload"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onRefetch,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(str("lyrics_reload"))
+                        }
+                        if (onFetchTeksteShqip != null) {
+                            FilledTonalButton(
+                                onClick = {
+                                    if (teksteShqipUrlInput.isBlank() &&
+                                        (lyricsData.artist.contains("leonora", ignoreCase = true) ||
+                                                lyricsData.title.contains("vritet", ignoreCase = true))
+                                    ) {
+                                        teksteShqipUrlInput = "https://teksteshqip.com/leonora-jakupi/teksti/1848928"
+                                    }
+                                    showTeksteShqipDialog = true
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Filled.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("TeksteShqip")
+                            }
+                        }
                     }
                 }
             }
@@ -333,6 +379,46 @@ fun LyricsView(
                     textAlign = TextAlign.Center
                 )
             }
+        }
+
+        if (showTeksteShqipDialog && onFetchTeksteShqip != null) {
+            AlertDialog(
+                onDismissRequest = { showTeksteShqipDialog = false },
+                title = { Text(str("lyrics_teksteshqip_dialog_title")) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = str("lyrics_teksteshqip_desc"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value = teksteShqipUrlInput,
+                            onValueChange = { teksteShqipUrlInput = it },
+                            label = { Text("URL") },
+                            placeholder = { Text("https://teksteshqip.com/leonora-jakupi/teksti/1848928") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                val url = teksteShqipUrlInput.trim().ifBlank { null }
+                                onFetchTeksteShqip(url)
+                                showTeksteShqipDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (teksteShqipUrlInput.isNotBlank()) str("lyrics_teksteshqip_fetch") else str("lyrics_teksteshqip_search_auto"))
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showTeksteShqipDialog = false }) {
+                        Text(str("cancel"))
+                    }
+                }
+            )
         }
     }
 }

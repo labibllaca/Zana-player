@@ -72,6 +72,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.labix.navirom.data.lyrics.LyricsData
+import com.labix.navirom.data.lyrics.LyricsSource
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.RepeatMode
@@ -112,6 +113,7 @@ fun FullPlayerModal(
     onSetSleepTimer: (Int?, SleepTimerOptions) -> Unit,
     onUpdateSleepTimerOptions: ((SleepTimerOptions) -> Unit)? = null,
     onRefetchLyrics: () -> Unit = {},
+    onFetchTeksteShqipLyrics: ((String?) -> Unit)? = null,
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -125,6 +127,8 @@ fun FullPlayerModal(
     var showMenu by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showArtistsDialog by remember { mutableStateOf(false) }
+    var showTeksteShqipDialog by remember { mutableStateOf(false) }
+    var teksteShqipUrlInput by remember { mutableStateOf("") }
     var customMinutesText by remember { mutableStateOf("30") }
 
     val isTimerActive = (playbackState.sleepTimerSecondsLeft != null && playbackState.sleepTimerSecondsLeft > 0) ||
@@ -776,6 +780,55 @@ fun FullPlayerModal(
                 confirmButton = {
                     TextButton(onClick = { showArtistsDialog = false }) {
                         Text("Close")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
+
+        if (showTeksteShqipDialog) {
+            AlertDialog(
+                onDismissRequest = { showTeksteShqipDialog = false },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("TeksteShqip")
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Fetch lyrics from TeksteShqip.com or enter a song URL (e.g. for Leonora Jakupi).",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value = teksteShqipUrlInput,
+                            onValueChange = { teksteShqipUrlInput = it },
+                            label = { Text("URL") },
+                            placeholder = { Text("https://teksteshqip.com/leonora-jakupi/teksti/1848928") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                val url = teksteShqipUrlInput.trim().ifBlank { null }
+                                onFetchTeksteShqipLyrics?.invoke(url)
+                                showTeksteShqipDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (teksteShqipUrlInput.isNotBlank()) "Fetch Lyrics" else "Auto-Search TeksteShqip")
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showTeksteShqipDialog = false }) {
+                        Text("Cancel")
                     }
                 },
                 shape = RoundedCornerShape(24.dp)
@@ -1747,24 +1800,101 @@ fun FullPlayerModal(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                OutlinedButton(
-                                    onClick = onRefetchLyrics,
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f))
-                                ) {
-                                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retry", fontSize = 13.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OutlinedButton(
+                                        onClick = onRefetchLyrics,
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f))
+                                    ) {
+                                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Retry", fontSize = 13.sp)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (teksteShqipUrlInput.isBlank()) {
+                                                if (track.artist.contains("leonora", ignoreCase = true) ||
+                                                    track.title.contains("vritet", ignoreCase = true)
+                                                ) {
+                                                    teksteShqipUrlInput = "https://teksteshqip.com/leonora-jakupi/teksti/1848928"
+                                                }
+                                            }
+                                            showTeksteShqipDialog = true
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD54F)),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.6f))
+                                    ) {
+                                        Icon(Icons.Filled.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("TeksteShqip", fontSize = 13.sp)
+                                    }
                                 }
                             }
                         } else {
-                            // Dots indicator
+                            // Top indicator bar with source and TeksteShqip button
                             Row(
-                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color.Gray))
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color.White))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.45f),
+                                    modifier = Modifier.padding(2.dp)
+                                ) {
+                                    val srcText = when (lyricsData.source) {
+                                        LyricsSource.EMBEDDED_FILE -> "Embedded in File"
+                                        LyricsSource.NAVIDROME_SERVER -> "Navidrome Server"
+                                        LyricsSource.ONLINE_LRCLIB -> "LrcLib Synced"
+                                        LyricsSource.ONLINE_TEKSTESHQIP -> "TeksteShqip"
+                                        LyricsSource.NOT_FOUND -> ""
+                                    }
+                                    Text(
+                                        text = srcText,
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.45f),
+                                    modifier = Modifier.clickable {
+                                        if (teksteShqipUrlInput.isBlank()) {
+                                            if (track.artist.contains("leonora", ignoreCase = true) ||
+                                                track.title.contains("vritet", ignoreCase = true)
+                                            ) {
+                                                teksteShqipUrlInput = "https://teksteshqip.com/leonora-jakupi/teksti/1848928"
+                                            }
+                                        }
+                                        showTeksteShqipDialog = true
+                                    }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Language,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFD54F),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            "TeksteShqip",
+                                            color = Color(0xFFFFD54F),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                             val validSyncedLines = remember(lyricsData.syncedLines) {
                                 lyricsData.syncedLines.filter { it.text.isNotBlank() }
