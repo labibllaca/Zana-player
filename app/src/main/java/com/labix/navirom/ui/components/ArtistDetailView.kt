@@ -2,7 +2,9 @@ package com.labix.navirom.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -94,11 +96,18 @@ fun ArtistDetailView(
             }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header bar
+            val resolvedCoverArtUrl = remember(artist, albums, songs) {
+                artist?.coverArtUrl?.takeIf { it.isNotBlank() }
+                    ?: albums.firstOrNull { it.coverArtUrl.isNotBlank() }?.coverArtUrl
+                    ?: songs.firstOrNull { it.coverArtUrl.isNotBlank() }?.coverArtUrl
+                    ?: ""
+            }
+
+            // Compact Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
@@ -114,113 +123,147 @@ fun ArtistDetailView(
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = artist?.name ?: str("tab_library"),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    text = str("subtab_artists"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // Artist Hero Section
-            Box(
+            // Compact Artist Info & Artwork Section
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        )
-                    )
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                if (artist?.coverArtUrl?.isNotBlank() == true) {
-                    AsyncImage(
-                        model = artist.coverArtUrl,
-                        contentDescription = artist.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-                                )
-                            )
-                    )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.Bottom
-                ) {
-                    Text(
-                        text = artist?.name ?: "Unknown Artist",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
-                        color = if (artist?.coverArtUrl?.isNotBlank() == true) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${albums.size} ${if (albums.size == 1) "Album" else "Albums"} • ${songs.size} ${if (songs.size == 1) "Song" else "Songs"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (artist?.coverArtUrl?.isNotBlank() == true) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                }
-            }
-
-            // Floating Play and Shuffle Actions for Songs Tab
-            if (songs.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Button(
-                        onClick = {
-                            haptics.toggle()
-                            onPlayAllSongs()
-                        },
+                    // Artist Portrait Image - Worthy 1:1 framing with rounded corners and border
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .testTag("artist_play_all_btn"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(16.dp)
+                            .size(86.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            )
+                            .border(
+                                BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                                RoundedCornerShape(18.dp)
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(str("btn_play_all"), fontWeight = FontWeight.Bold)
+                        if (resolvedCoverArtUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = resolvedCoverArtUrl,
+                                contentDescription = artist?.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(42.dp)
+                            )
+                        }
                     }
 
-                    FilledTonalButton(
-                        onClick = {
-                            haptics.toggle()
-                            onShuffleAllSongs()
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .testTag("artist_shuffle_all_btn"),
-                        shape = RoundedCornerShape(16.dp)
+                    // Artist Info & Compact Action Buttons
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(imageVector = Icons.Filled.Shuffle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(str("btn_shuffle_all"), fontWeight = FontWeight.Bold)
+                        Text(
+                            text = artist?.name ?: "Unknown Artist",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${albums.size} ${if (albums.size == 1) "Album" else "Albums"} • ${songs.size} ${if (songs.size == 1) "Song" else "Songs"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        if (songs.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = {
+                                        haptics.toggle()
+                                        onPlayAllSongs()
+                                    },
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .weight(1f)
+                                        .testTag("artist_play_all_btn"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = str("btn_play_all"),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1
+                                    )
+                                }
+
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptics.toggle()
+                                        onShuffleAllSongs()
+                                    },
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .weight(1f)
+                                        .testTag("artist_shuffle_all_btn"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Shuffle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = str("btn_shuffle_all"),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Tabs to switch between Albums and Songs
             TabRow(

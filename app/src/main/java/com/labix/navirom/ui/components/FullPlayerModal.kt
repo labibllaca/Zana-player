@@ -864,13 +864,21 @@ fun FullPlayerModal(
                 val validSyncedLines = remember(lyricsData.syncedLines) {
                     lyricsData.syncedLines.filter { it.text.isNotBlank() }
                 }
-                val currentLyricLineText = remember(currentPosMs, validSyncedLines, lyricsData.plainLyrics) {
+                val lyricPreviewPair = remember(currentPosMs, validSyncedLines, lyricsData.plainLyrics) {
                     if (validSyncedLines.isNotEmpty()) {
                         val idx = validSyncedLines.indexOfLast { (it.timeMs - 500L) <= currentPosMs }
-                        if (idx >= 0) validSyncedLines[idx].text else validSyncedLines.firstOrNull()?.text ?: ""
+                        val activeIdx = if (idx >= 0) idx else 0
+                        val l1 = validSyncedLines.getOrNull(activeIdx)?.text.orEmpty()
+                        val l2 = validSyncedLines.getOrNull(activeIdx + 1)?.text.orEmpty()
+                        Pair(l1, l2)
                     } else if (lyricsData.plainLyrics.isNotBlank()) {
-                        lyricsData.plainLyrics.lines().firstOrNull { it.isNotBlank() } ?: ""
-                    } else ""
+                        val nonBlank = lyricsData.plainLyrics.lines().map { it.trim() }.filter { it.isNotBlank() }
+                        val l1 = nonBlank.getOrNull(0).orEmpty()
+                        val l2 = nonBlank.getOrNull(1).orEmpty()
+                        Pair(l1, l2)
+                    } else {
+                        Pair("", "")
+                    }
                 }
 
                 // Main Artwork View
@@ -1317,8 +1325,8 @@ fun FullPlayerModal(
                                 }
                             }
 
-                            // 1-Line Lyric Preview below control buttons
-                            if (currentLyricLineText.isNotBlank()) {
+                            // 2-Line Lyric Preview below control buttons (retaining exact spacing of surrounding elements)
+                            if (lyricPreviewPair.first.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
@@ -1334,22 +1342,45 @@ fun FullPlayerModal(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         AnimatedContent(
-                                            targetState = currentLyricLineText,
+                                            targetState = lyricPreviewPair,
                                             transitionSpec = {
-                                                (fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 2 })
-                                                    .togetherWith(fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 2 })
+                                                (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 })
+                                                    .togetherWith(fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 3 })
                                             },
                                             label = "LyricPreviewBelowControls",
                                             modifier = Modifier.fillMaxWidth()
-                                        ) { lineText ->
-                                            AutoResizingSingleLineLyric(
-                                                text = lineText,
-                                                color = textOnCard
-                                            )
+                                        ) { (currentLine, nextLine) ->
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = currentLine,
+                                                    color = textOnCard,
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = if (nextLine.isBlank()) 2 else 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (nextLine.isNotBlank()) {
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = nextLine,
+                                                        color = textMutedOnCard,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        textAlign = TextAlign.Center,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
