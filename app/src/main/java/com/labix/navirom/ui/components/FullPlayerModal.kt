@@ -28,6 +28,10 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import android.os.SystemClock
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -142,15 +146,36 @@ fun FullPlayerModal(
     }
 
     var vinylRotationAngle by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled, viewMode, isLifecycleResumed) {
-        if (isVinylEffectEnabled && playbackState.isPlaying && viewMode == PlayerViewMode.ARTWORK && isLifecycleResumed) {
+    var isVinylScratching by remember { mutableStateOf(false) }
+    var vinylScratchVelocity by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(playbackState.isPlaying, isVinylEffectEnabled, viewMode, isLifecycleResumed, isVinylScratching) {
+        if (isVinylEffectEnabled && viewMode == PlayerViewMode.ARTWORK && isLifecycleResumed) {
+            val normalSpeed = 360f / 16f // 22.5 deg/sec at standard vinyl rotation
+            val targetSpeed = if (playbackState.isPlaying) normalSpeed else 0f
+            if (!isVinylScratching && vinylScratchVelocity == 0f && playbackState.isPlaying) {
+                vinylScratchVelocity = targetSpeed
+            }
             var lastTime = withFrameNanos { it }
             while (isActive) {
                 withFrameNanos { frameTimeNanos ->
-                    val dtSeconds = (frameTimeNanos - lastTime) / 1_000_000_000f
+                    val dtSeconds = ((frameTimeNanos - lastTime) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
                     lastTime = frameTimeNanos
-                    // Smooth 360 degree revolution every 16 seconds
-                    vinylRotationAngle = (vinylRotationAngle + dtSeconds * (360f / 16f)) % 360f
+                    if (!isVinylScratching) {
+                        if (kotlin.math.abs(vinylScratchVelocity - targetSpeed) > 0.5f) {
+                            // Realistic turntable slipmat friction decay towards target rotational speed
+                            val friction = 3.5f
+                            val decay = kotlin.math.exp(-friction * dtSeconds)
+                            vinylScratchVelocity = vinylScratchVelocity * decay + targetSpeed * (1f - decay)
+                        } else {
+                            vinylScratchVelocity = targetSpeed
+                        }
+
+                        if (vinylScratchVelocity != 0f) {
+                            vinylRotationAngle = (vinylRotationAngle + vinylScratchVelocity * dtSeconds) % 360f
+                            if (vinylRotationAngle < 0f) vinylRotationAngle += 360f
+                        }
+                    }
                 }
             }
         }
@@ -842,13 +867,108 @@ fun FullPlayerModal(
 
                             // Artwork with vinyl effect - vinyl rotates cleanly without overlaid text
                             val artworkShape = if (isVinylEffectEnabled) CircleShape else RoundedCornerShape(32.dp)
+
+                            // Platter depression spring animation while vinyl is being scratched
+                            val vinylPlatterScale by animateFloatAsState(
+                                targetValue = if (isVinylScratching) 0.982f else 1.0f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "vinylPlatterScale"
+                            )
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f)
+                                    .then(
+                                        if (isVinylEffectEnabled) {
+                                            Modifier.pointerInput(Unit) {
+                                                val center = Offset(size.width / 2f, size.height / 2f)
+                                                val maxRadius = size.width / 2f
+                                                awaitEachGesture {
+                                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                                    val downTimeMs = SystemClock.uptimeMillis()
+                                                    val initialDist = (down.position - center).getDistance()
+                                                    if (initialDist <= maxRadius) {
+                                                        var prevPos = down.position
+                                                        var prevAngleRad = kotlin.math.atan2(prevPos.y - center.y, prevPos.x - center.x)
+                                                        var totalAngularTravel = 0f
+                                                        var totalLinearTravel = 0f
+                                                        var isScratchConfirmed = false
+                                                        var lastTimeMs = downTimeMs
+                                                        var currentAngularVelocity = 0f
+                                                        var accumulatedHapticAngle = 0f
+
+                                                        do {
+                                                            val event = awaitPointerEvent()
+                                                            val currentChange = event.changes.firstOrNull { it.id == down.id } ?: break
+                                                            if (currentChange.pressed) {
+                                                                val curPos = currentChange.position
+                                                                val now = SystemClock.uptimeMillis()
+                                                                val dt = (now - lastTimeMs).coerceAtLeast(1) / 1000f
+                                                                lastTimeMs = now
+
+                                                                val distFromCenter = (curPos - center).getDistance()
+                                                                if (distFromCenter > 20f) {
+                                                                    val curAngleRad = kotlin.math.atan2(curPos.y - center.y, curPos.x - center.x)
+                                                                    var deltaRad = curAngleRad - prevAngleRad
+                                                                    while (deltaRad > Math.PI) deltaRad -= (2 * Math.PI).toFloat()
+                                                                    while (deltaRad < -Math.PI) deltaRad += (2 * Math.PI).toFloat()
+                                                                    val deltaDegrees = Math.toDegrees(deltaRad.toDouble()).toFloat()
+
+                                                                    totalAngularTravel += kotlin.math.abs(deltaDegrees)
+                                                                    totalLinearTravel += (curPos - prevPos).getDistance()
+
+                                                                    if (!isScratchConfirmed && (totalAngularTravel > 2.0f || totalLinearTravel > 8f)) {
+                                                                        isScratchConfirmed = true
+                                                                        isVinylScratching = true
+                                                                    }
+
+                                                                    if (isScratchConfirmed) {
+                                                                        currentChange.consume()
+                                                                        vinylRotationAngle = (vinylRotationAngle + deltaDegrees) % 360f
+                                                                        if (vinylRotationAngle < 0f) vinylRotationAngle += 360f
+
+                                                                        val instVelocity = deltaDegrees / dt
+                                                                        currentAngularVelocity = currentAngularVelocity * 0.35f + instVelocity * 0.65f
+
+                                                                        accumulatedHapticAngle += kotlin.math.abs(deltaDegrees)
+                                                                        if (accumulatedHapticAngle >= 14f) {
+                                                                            haptics.tick()
+                                                                            accumulatedHapticAngle = 0f
+                                                                        }
+                                                                    }
+                                                                    prevAngleRad = curAngleRad
+                                                                }
+                                                                prevPos = curPos
+                                                            }
+                                                        } while (event.changes.any { it.pressed })
+
+                                                        if (isScratchConfirmed) {
+                                                            isVinylScratching = false
+                                                            vinylScratchVelocity = currentAngularVelocity.coerceIn(-1800f, 1800f)
+                                                        } else {
+                                                            val durationMs = SystemClock.uptimeMillis() - downTimeMs
+                                                            if (durationMs > 500L && onAlbumClick != null) {
+                                                                haptics.click()
+                                                                onAlbumClick.invoke(track.albumId)
+                                                            } else {
+                                                                haptics.toggle()
+                                                                viewMode = PlayerViewMode.LYRICS
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
                                     .graphicsLayer {
-                                        scaleX = artworkScale
-                                        scaleY = artworkScale
+                                        scaleX = artworkScale * (if (isVinylEffectEnabled) vinylPlatterScale else 1.0f)
+                                        scaleY = artworkScale * (if (isVinylEffectEnabled) vinylPlatterScale else 1.0f)
                                         if (isVinylEffectEnabled) {
                                             rotationZ = vinylRotationAngle
                                         }
@@ -862,60 +982,87 @@ fun FullPlayerModal(
                                     shape = RoundedCornerShape(0.dp),
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            var totalX = 0f
-                                            var totalY = 0f
-                                            var handled = false
-                                            detectDragGestures(
-                                                onDragStart = { totalX = 0f; totalY = 0f; handled = false },
-                                                onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
-                                                onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
-                                                onDrag = { change, dragAmount ->
-                                                    if (!handled) {
-                                                        totalX += dragAmount.x
-                                                        totalY += dragAmount.y
-                                                        val th = 50f
-                                                        if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
-                                                            change.consume()
-                                                            handled = true
-                                                            if (totalX < -th) {
-                                                                // Swipe Left -> Next
-                                                                haptics.click()
-                                                                onNext()
-                                                            } else if (totalX > th) {
-                                                                // Swipe Right -> Previous
-                                                                haptics.click()
-                                                                onPrevious()
+                                        .then(
+                                            if (!isVinylEffectEnabled) {
+                                                Modifier
+                                                    .pointerInput(Unit) {
+                                                        var totalX = 0f
+                                                        var totalY = 0f
+                                                        var handled = false
+                                                        detectDragGestures(
+                                                            onDragStart = { totalX = 0f; totalY = 0f; handled = false },
+                                                            onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
+                                                            onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
+                                                            onDrag = { change, dragAmount ->
+                                                                if (!handled) {
+                                                                    totalX += dragAmount.x
+                                                                    totalY += dragAmount.y
+                                                                    val th = 50f
+                                                                    if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
+                                                                        change.consume()
+                                                                        handled = true
+                                                                        if (totalX < -th) {
+                                                                            // Swipe Left -> Next
+                                                                            haptics.click()
+                                                                            onNext()
+                                                                        } else if (totalX > th) {
+                                                                            // Swipe Right -> Previous
+                                                                            haptics.click()
+                                                                            onPrevious()
+                                                                        }
+                                                                    } else if (kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.2f && kotlin.math.abs(totalY) > th) {
+                                                                        if (totalY < -th) {
+                                                                            // Swipe Up -> Lyrics View
+                                                                            change.consume()
+                                                                            handled = true
+                                                                            haptics.toggle()
+                                                                            viewMode = PlayerViewMode.LYRICS
+                                                                        } else if (totalY > th) {
+                                                                            // Swipe Down -> Minimize
+                                                                            change.consume()
+                                                                            handled = true
+                                                                            haptics.click()
+                                                                            onDismiss()
+                                                                        }
+                                                                    }
+                                                                }
                                                             }
-                                                        } else if (kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.2f && kotlin.math.abs(totalY) > th) {
-                                                            if (totalY < -th) {
-                                                                // Swipe Up -> Lyrics View
-                                                                change.consume()
-                                                                handled = true
-                                                                haptics.toggle()
-                                                                viewMode = PlayerViewMode.LYRICS
-                                                            } else if (totalY > th) {
-                                                                // Swipe Down -> Minimize
-                                                                change.consume()
-                                                                handled = true
-                                                                haptics.click()
-                                                                onDismiss()
-                                                            }
-                                                        }
+                                                        )
                                                     }
-                                                }
-                                            )
-                                        }
-                                        .combinedClickable(
-                                            onClick = {
-                                                haptics.toggle()
-                                                viewMode = PlayerViewMode.LYRICS
-                                            },
-                                            onLongClick = { onAlbumClick?.invoke(track.albumId) }
+                                                    .combinedClickable(
+                                                        onClick = {
+                                                            haptics.toggle()
+                                                            viewMode = PlayerViewMode.LYRICS
+                                                        },
+                                                        onLongClick = { onAlbumClick?.invoke(track.albumId) }
+                                                    )
+                                            } else {
+                                                Modifier
+                                            }
                                         )
                                 )
 
                                 if (isVinylEffectEnabled) {
+                                    // Concentric micro-groove ring 1
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize(0.80f)
+                                            .align(Alignment.Center)
+                                            .border(
+                                                BorderStroke(0.75.dp, Color.White.copy(alpha = 0.12f)),
+                                                CircleShape
+                                            )
+                                    )
+                                    // Concentric micro-groove ring 2
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize(0.60f)
+                                            .align(Alignment.Center)
+                                            .border(
+                                                BorderStroke(0.75.dp, Color.White.copy(alpha = 0.09f)),
+                                                CircleShape
+                                            )
+                                    )
                                     // Subtle rim edge ring
                                     Box(
                                         modifier = Modifier
