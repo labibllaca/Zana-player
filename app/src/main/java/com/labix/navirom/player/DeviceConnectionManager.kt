@@ -224,12 +224,16 @@ class DeviceConnectionManager(private val context: Context) {
                 @Suppress("DEPRECATION")
                 val adapter = bluetoothManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
                 if (adapter != null && adapter.isEnabled) {
-                    val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(intent)
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(context, "Sleep timer: Please toggle Bluetooth off", Toast.LENGTH_SHORT).show()
+                        try {
+                            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            }
+                            context.startActivity(intent)
+                            Toast.makeText(context, "Sleep timer: Please toggle Bluetooth off", Toast.LENGTH_SHORT).show()
+                        } catch (e: Throwable) {
+                            Log.w(TAG, "Could not start Bluetooth settings activity", e)
+                        }
                     }
                 }
             } catch (t: Throwable) {
@@ -304,33 +308,40 @@ class DeviceConnectionManager(private val context: Context) {
             Log.w(TAG, "Legacy WifiManager disable failed", t)
         }
 
-        // 5. If Wi-Fi is still connected on modern Android (API 29+) without root:
+        // 5. If Wi-Fi is still enabled on modern Android (API 29+) without root:
         // Launch system Internet / Wi-Fi panel so user can toggle it off in 1 tap
         if (!disabled) {
             try {
+                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                val isWifiOn = wifiManager?.isWifiEnabled == true
                 val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                val isWifi = cm?.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-                if (isWifi) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        try {
-                            val panelIntent = Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(panelIntent)
-                        } catch (_: Throwable) {
-                            val panelIntent = Intent(Settings.Panel.ACTION_WIFI).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(panelIntent)
-                        }
-                    } else {
-                        val settingsIntent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        context.startActivity(settingsIntent)
-                    }
+                val hasWifiActive = cm?.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+
+                if (isWifiOn || hasWifiActive) {
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(context, "Sleep timer: Please toggle Wi-Fi off", Toast.LENGTH_SHORT).show()
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                val panelIntent = Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                }
+                                context.startActivity(panelIntent)
+                            } else {
+                                val settingsIntent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                }
+                                context.startActivity(settingsIntent)
+                            }
+                            Toast.makeText(context, "Sleep timer: Please toggle Wi-Fi off", Toast.LENGTH_SHORT).show()
+                        } catch (_: Throwable) {
+                            try {
+                                val settingsIntent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                }
+                                context.startActivity(settingsIntent)
+                            } catch (e: Throwable) {
+                                Log.w(TAG, "Failed opening Wi-Fi settings", e)
+                            }
+                        }
                     }
                 }
             } catch (t: Throwable) {
@@ -340,6 +351,8 @@ class DeviceConnectionManager(private val context: Context) {
     }
 
     suspend fun disableMobileData() = withContext(Dispatchers.IO) {
+        var disabled = false
+
         // 1. Try shell commands
         val commands = listOf(
             "svc data disable",
@@ -348,6 +361,7 @@ class DeviceConnectionManager(private val context: Context) {
         )
         for (cmd in commands) {
             if (runCommand(cmd)) {
+                disabled = true
                 Log.d(TAG, "Mobile data disabled via shell: $cmd")
                 return@withContext
             }
@@ -362,6 +376,7 @@ class DeviceConnectionManager(private val context: Context) {
                     setMobileDataEnabledMethod.isAccessible = true
                     setMobileDataEnabledMethod.invoke(telephonyManager, false)
                     Log.d(TAG, "Mobile data disable invoked via TelephonyManager reflection")
+                    disabled = true
                     return@withContext
                 } catch (e: Throwable) {
                     Log.d(TAG, "TelephonyManager reflection not available: ${e.message}")
@@ -375,12 +390,35 @@ class DeviceConnectionManager(private val context: Context) {
                     setMobileDataEnabledMethod.isAccessible = true
                     setMobileDataEnabledMethod.invoke(connectivityManager, false)
                     Log.d(TAG, "Mobile data disable invoked via ConnectivityManager reflection")
+                    disabled = true
                 } catch (e: Throwable) {
                     Log.d(TAG, "ConnectivityManager reflection not available: ${e.message}")
                 }
             }
         } catch (e: Throwable) {
             Log.w(TAG, "Could not disable mobile data directly: ${e.message}")
+        }
+
+        // 3. Fallback: Launch Cellular / Data Settings if unrooted
+        if (!disabled) {
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    val intent = Intent(Settings.ACTION_DATA_ROAMING_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    context.startActivity(intent)
+                    Toast.makeText(context, "Sleep timer: Please toggle Mobile Data off", Toast.LENGTH_SHORT).show()
+                } catch (_: Throwable) {
+                    try {
+                        val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Failed opening Mobile Data settings", e)
+                    }
+                }
+            }
         }
     }
 
