@@ -134,6 +134,8 @@ fun NaviromApp(
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val localTracks by viewModel.localTracks.collectAsStateWithLifecycle()
+    val localFolders by viewModel.localFolders.collectAsStateWithLifecycle()
+    val disabledLocalFolderIds by viewModel.disabledLocalFolderIds.collectAsStateWithLifecycle()
     val isScanningLocalAudio by viewModel.isScanningLocalAudio.collectAsStateWithLifecycle()
 
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
@@ -209,6 +211,11 @@ fun NaviromApp(
                 onSelectMusicFolder = { viewModel.selectMusicFolder(it) },
                 onToggleMusicFolder = { viewModel.toggleMusicFolder(it) },
                 onSelectAllMusicFolders = { viewModel.selectAllMusicFolders() },
+                localFolders = localFolders,
+                disabledLocalFolderIds = disabledLocalFolderIds,
+                onToggleLocalFolder = { viewModel.toggleLocalFolder(it) },
+                onSelectAllLocalFolders = { viewModel.selectAllLocalFolders() },
+                onDeselectAllLocalFolders = { viewModel.deselectAllLocalFolders() },
                 onSyncLibrary = { viewModel.syncLibrary() },
                 onCloseSidebar = { scope.launch { drawerState.close() } },
                 str = ::str
@@ -463,6 +470,12 @@ fun NaviromApp(
                             onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
                             onDismissUpdate = { viewModel.dismissAppUpdate() },
                             localTracks = localTracks,
+                            localFolders = localFolders,
+                            disabledLocalFolderIds = disabledLocalFolderIds,
+                            onToggleLocalFolder = { viewModel.toggleLocalFolder(it) },
+                            onSetLocalFolderEnabled = { id, enabled -> viewModel.setLocalFolderEnabled(id, enabled) },
+                            onSelectAllLocalFolders = { viewModel.selectAllLocalFolders() },
+                            onDeselectAllLocalFolders = { viewModel.deselectAllLocalFolders() },
                             isScanningLocalAudio = isScanningLocalAudio,
                             onScanLocalAudio = { viewModel.scanLocalAudio() }
                         )
@@ -734,6 +747,12 @@ fun NaviromApp(
                         onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
                         onDismissUpdate = { viewModel.dismissAppUpdate() },
                         localTracks = localTracks,
+                        localFolders = localFolders,
+                        disabledLocalFolderIds = disabledLocalFolderIds,
+                        onToggleLocalFolder = { viewModel.toggleLocalFolder(it) },
+                        onSetLocalFolderEnabled = { id, enabled -> viewModel.setLocalFolderEnabled(id, enabled) },
+                        onSelectAllLocalFolders = { viewModel.selectAllLocalFolders() },
+                        onDeselectAllLocalFolders = { viewModel.deselectAllLocalFolders() },
                         isScanningLocalAudio = isScanningLocalAudio,
                         onScanLocalAudio = { viewModel.scanLocalAudio() }
                     )
@@ -1026,6 +1045,12 @@ private fun TabContent(
     onSetGithubRepo: (String) -> Unit = {},
     onDismissUpdate: () -> Unit = {},
     localTracks: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
+    localFolders: List<com.labix.navirom.data.local.LocalMusicFolder> = emptyList(),
+    disabledLocalFolderIds: Set<String> = emptySet(),
+    onToggleLocalFolder: (String) -> Unit = {},
+    onSetLocalFolderEnabled: (String, Boolean) -> Unit = { _, _ -> },
+    onSelectAllLocalFolders: () -> Unit = {},
+    onDeselectAllLocalFolders: () -> Unit = {},
     isScanningLocalAudio: Boolean = false,
     onScanLocalAudio: () -> Unit = {}
 ) {
@@ -1095,6 +1120,12 @@ private fun TabContent(
                 isLoadingArtistDetails = isLoadingArtistDetails,
                 onSelectArtist = onSelectArtist,
                 localTracks = localTracks,
+                localFolders = localFolders,
+                disabledLocalFolderIds = disabledLocalFolderIds,
+                onToggleLocalFolder = onToggleLocalFolder,
+                onSetLocalFolderEnabled = onSetLocalFolderEnabled,
+                onSelectAllLocalFolders = onSelectAllLocalFolders,
+                onDeselectAllLocalFolders = onDeselectAllLocalFolders,
                 isScanningLocalAudio = isScanningLocalAudio,
                 onScanLocalAudio = onScanLocalAudio
             )

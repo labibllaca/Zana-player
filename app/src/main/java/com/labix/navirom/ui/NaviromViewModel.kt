@@ -216,6 +216,17 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val localAudioRepository = LocalAudioRepository(application)
     private val _localTracks = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val localTracks: StateFlow<List<NaviromTrack>> = _localTracks.asStateFlow()
+    private val _localFolders = MutableStateFlow<List<LocalMusicFolder>>(emptyList())
+    val localFolders: StateFlow<List<LocalMusicFolder>> = _localFolders.asStateFlow()
+    private val _disabledLocalFolderIds = MutableStateFlow<Set<String>>(
+        prefs.getStringSet("disabled_local_folder_ids", emptySet()) ?: emptySet()
+    )
+    val disabledLocalFolderIds: StateFlow<Set<String>> = _disabledLocalFolderIds.asStateFlow()
+
+    val activeLocalTracks: StateFlow<List<NaviromTrack>> = combine(_localFolders, _disabledLocalFolderIds) { folders, disabledIds ->
+        folders.filter { !disabledIds.contains(it.id) }.flatMap { it.tracks }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _isScanningLocalAudio = MutableStateFlow(false)
     val isScanningLocalAudio: StateFlow<Boolean> = _isScanningLocalAudio.asStateFlow()
 
@@ -224,7 +235,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             _isScanningLocalAudio.value = true
             try {
                 val scanned = localAudioRepository.getLocalAudioTracks()
+                val folders = localAudioRepository.groupTracksIntoFolders(scanned)
                 _localTracks.value = scanned
+                _localFolders.value = folders
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -233,12 +246,45 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun toggleLocalFolder(folderId: String) {
+        val current = _disabledLocalFolderIds.value.toMutableSet()
+        if (current.contains(folderId)) {
+            current.remove(folderId) // Enable folder
+        } else {
+            current.add(folderId) // Disable folder
+        }
+        _disabledLocalFolderIds.value = current
+        prefs.edit().putStringSet("disabled_local_folder_ids", current).apply()
+    }
+
+    fun setLocalFolderEnabled(folderId: String, enabled: Boolean) {
+        val current = _disabledLocalFolderIds.value.toMutableSet()
+        if (enabled) {
+            current.remove(folderId)
+        } else {
+            current.add(folderId)
+        }
+        _disabledLocalFolderIds.value = current
+        prefs.edit().putStringSet("disabled_local_folder_ids", current).apply()
+    }
+
+    fun selectAllLocalFolders() {
+        _disabledLocalFolderIds.value = emptySet()
+        prefs.edit().putStringSet("disabled_local_folder_ids", emptySet()).apply()
+    }
+
+    fun deselectAllLocalFolders() {
+        val allIds = _localFolders.value.map { it.id }.toSet()
+        _disabledLocalFolderIds.value = allIds
+        prefs.edit().putStringSet("disabled_local_folder_ids", allIds).apply()
+    }
+
     val recentlyPlayedTracks: StateFlow<List<NaviromTrack>> = recentSongsRepository.getRecentlyPlayed(50)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _songSortOrder = MutableStateFlow(SongSortOrder.NAME)
     val songSortOrder: StateFlow<SongSortOrder> = _songSortOrder.asStateFlow()
 
-    val librarySongs: StateFlow<List<NaviromTrack>> = combine(_rawLibrarySongs, _localTracks, _songSortOrder) { serverSongs, localSongs, order ->
+    val librarySongs: StateFlow<List<NaviromTrack>> = combine(_rawLibrarySongs, activeLocalTracks, _songSortOrder) { serverSongs, localSongs, order ->
         val combined = (serverSongs + localSongs).distinctBy { it.id }
         when (order) {
             SongSortOrder.NAME -> combined.sortedBy { it.title.lowercase() }
@@ -1857,7 +1903,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
 
         // Memory loaded tracks
-        (_newestTracks.value + _currentAlbumTracks.value + _currentPlaylistTracks.value + _quickMixTracks.value + _localTracks.value).forEach { track ->
+        (_newestTracks.value + _currentAlbumTracks.value + _currentPlaylistTracks.value + _quickMixTracks.value + activeLocalTracks.value).forEach { track ->
             if (!allLocalTracks.containsKey(track.id)) {
                 allLocalTracks[track.id] = track
             }

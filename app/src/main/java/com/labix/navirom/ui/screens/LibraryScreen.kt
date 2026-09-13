@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.labix.navirom.data.model.*
+import com.labix.navirom.data.local.LocalMusicFolder
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.LibrarySubTab
 import com.labix.navirom.ui.NaviromStrings
@@ -106,6 +107,12 @@ fun LibraryScreen(
     isLoadingArtistDetails: Boolean = false,
     onSelectArtist: (String?) -> Unit = {},
     localTracks: List<NaviromTrack> = emptyList(),
+    localFolders: List<LocalMusicFolder> = emptyList(),
+    disabledLocalFolderIds: Set<String> = emptySet(),
+    onToggleLocalFolder: (String) -> Unit = {},
+    onSetLocalFolderEnabled: (String, Boolean) -> Unit = { _, _ -> },
+    onSelectAllLocalFolders: () -> Unit = {},
+    onDeselectAllLocalFolders: () -> Unit = {},
     isScanningLocalAudio: Boolean = false,
     onScanLocalAudio: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -480,7 +487,8 @@ fun LibraryScreen(
                     selected = subTab == LibrarySubTab.LIBRARIES,
                     onClick = { onSubTabSelected(LibrarySubTab.LIBRARIES) },
                     label = {
-                        val countSuffix = if (musicFolders.isNotEmpty()) " (${musicFolders.size})" else ""
+                        val totalFolderCount = musicFolders.size + localFolders.size
+                        val countSuffix = if (totalFolderCount > 0) " ($totalFolderCount)" else ""
                         Text("${str("subtab_local_folders")}$countSuffix")
                     },
                     leadingIcon = {
@@ -1090,16 +1098,399 @@ fun LibraryScreen(
                     }
                 }
                 LibrarySubTab.LIBRARIES -> {
-                    // Local Music Folders tab
-                    val isAllSelected = selectedMusicFolderIds.isEmpty() || (selectedMusicFolderIds.size >= musicFolders.size)
+                    // Local Music Folders & Server Libraries tab
+                    val isAllServerSelected = selectedMusicFolderIds.isEmpty() || (selectedMusicFolderIds.size >= musicFolders.size)
+                    val activeLocalFolderCount = localFolders.count { !disabledLocalFolderIds.contains(it.id) }
+                    val allLocalSelected = disabledLocalFolderIds.isEmpty() && localFolders.isNotEmpty()
 
                     LazyColumn(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize().testTag("local_files_tab_list")
                     ) {
-                        // Header Banner Card
+                        // Section 1: Local On-Device Audio Folders Banner
                         item {
+                            Card(
+                                shape = RoundedCornerShape(24.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                                modifier = Modifier.fillMaxWidth().testTag("local_device_music_card")
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(44.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.SdStorage,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = str("local_music_folders_title"),
+                                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                            )
+                                            Text(
+                                                text = if (localFolders.isNotEmpty()) {
+                                                    String.format(str("local_folders_active"), activeLocalFolderCount, localFolders.size) + " • ${localFolders.sumOf { it.trackCount }} ${str("tracks_count")}"
+                                                } else {
+                                                    str("local_music_folders_subtitle")
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        if (localFolders.isNotEmpty()) {
+                                            Button(
+                                                onClick = {
+                                                    haptics.click()
+                                                    if (allLocalSelected) {
+                                                        onDeselectAllLocalFolders()
+                                                    } else {
+                                                        onSelectAllLocalFolders()
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                                )
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (allLocalSelected) Icons.Filled.Deselect else Icons.Filled.SelectAll,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (allLocalSelected) str("deselect_all_local_folders") else str("select_all_local_folders"),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                haptics.click()
+                                                requestLocalPermission()
+                                            },
+                                            modifier = if (localFolders.isNotEmpty()) Modifier.weight(1f) else Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            enabled = !isScanningLocalAudio,
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                            ),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.35f))
+                                        ) {
+                                            if (isScanningLocalAudio) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Scanning...", style = MaterialTheme.typography.labelSmall)
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Refresh,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (localFolders.isEmpty()) str("scan_device_folders") else str("rescan_device_folders"),
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Local Folders List
+                        if (localFolders.isNotEmpty()) {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${str("local_folders_header")} (${localFolders.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${activeLocalFolderCount} ${str("deck_discover").lowercase()} / ${localFolders.size}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                            }
+
+                            items(localFolders, key = { "local_folder_${it.id}" }) { folder ->
+                                val isFolderEnabled = !disabledLocalFolderIds.contains(folder.id)
+                                var isExpanded by remember(folder.id) { mutableStateOf(false) }
+
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("local_folder_card_${folder.id.hashCode()}"),
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isFolderEnabled) {
+                                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                        }
+                                    ),
+                                    border = if (isFolderEnabled) {
+                                        androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f))
+                                    } else {
+                                        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                    }
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                                        // Top Row: Folder Icon, Names, Status Badge & Checkbox
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = if (isFolderEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
+                                                    modifier = Modifier.size(42.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = if (isFolderEnabled) Icons.Filled.Folder else Icons.Outlined.FolderOff,
+                                                            contentDescription = null,
+                                                            tint = if (isFolderEnabled) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(22.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = folder.name,
+                                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                            color = if (isFolderEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = if (isFolderEnabled) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                        ) {
+                                                            Text(
+                                                                text = if (isFolderEnabled) "Aktiv" else "Deaktiviert",
+                                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                                color = if (isFolderEnabled) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                                    Text(
+                                                        text = "${folder.trackCount} ${str("tracks_count")} • " +
+                                                                "${if (folder.totalDurationSeconds >= 3600) "${folder.totalDurationSeconds / 3600}h ${(folder.totalDurationSeconds % 3600) / 60}m" else "${folder.totalDurationSeconds / 60} min"}",
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+
+                                                    Text(
+                                                        text = folder.displayPath,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+
+                                            // Checkbox toggle for activating/deactivating this folder
+                                            Checkbox(
+                                                checked = isFolderEnabled,
+                                                onCheckedChange = {
+                                                    haptics.toggle()
+                                                    onToggleLocalFolder(folder.id)
+                                                },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = MaterialTheme.colorScheme.tertiary
+                                                ),
+                                                modifier = Modifier.testTag("toggle_local_folder_${folder.id.hashCode()}")
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Actions Row: Play All Folder, Shuffle Folder, Expand/Collapse
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    haptics.click()
+                                                    if (!isFolderEnabled) {
+                                                        onToggleLocalFolder(folder.id)
+                                                    }
+                                                    onPlayAll(folder.tracks)
+                                                },
+                                                shape = RoundedCornerShape(10.dp),
+                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                            ) {
+                                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(str("local_folder_play_all"), style = MaterialTheme.typography.labelMedium)
+                                            }
+
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    haptics.click()
+                                                    if (!isFolderEnabled) {
+                                                        onToggleLocalFolder(folder.id)
+                                                    }
+                                                    onShuffleAll(folder.tracks)
+                                                },
+                                                shape = RoundedCornerShape(10.dp),
+                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
+                                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                            ) {
+                                                Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(str("local_folder_shuffle"), style = MaterialTheme.typography.labelMedium)
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    haptics.click()
+                                                    isExpanded = !isExpanded
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        // Expandable Track List inside Folder
+                                        AnimatedVisibility(
+                                            visible = isExpanded,
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 10.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                                Spacer(modifier = Modifier.height(4.dp))
+
+                                                folder.tracks.forEachIndexed { idx, track ->
+                                                    val isTrackPlaying = currentTrack?.id == track.id && isPlaying
+                                                    TrackListItem(
+                                                        track = track,
+                                                        isPlaying = isTrackPlaying,
+                                                        isCurrentTrack = currentTrack?.id == track.id,
+                                                        downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
+                                                        downloadProgress = downloadProgresses[track.id] ?: 0f,
+                                                        isFavorite = favoriteIds.contains(track.id),
+                                                        onTrackClick = { onTrackClick(track, folder.tracks) },
+                                                        onToggleFavorite = { onToggleFavorite(track.id) },
+                                                        onDownloadClick = { onDownloadTrack(track) },
+                                                        onPlayNext = { onPlayNext(track) },
+                                                        onAddToQueue = { onAddToQueue(track) }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(20.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.FolderOff,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Text(
+                                            text = str("no_local_folders_found"),
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 2: Navidrome Server Libraries Header
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Card(
                                 shape = RoundedCornerShape(24.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -1131,7 +1522,7 @@ fun LibraryScreen(
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                                             )
                                             Text(
-                                                text = if (isAllSelected) {
+                                                text = if (isAllServerSelected) {
                                                     "${str("all_libraries_combined")} (${musicFolders.size} folders)"
                                                 } else {
                                                     "${selectedMusicFolderIds.size} / ${musicFolders.size} folders active"
@@ -1161,13 +1552,13 @@ fun LibraryScreen(
                                             )
                                         ) {
                                             Icon(
-                                                imageVector = if (isAllSelected) Icons.Filled.DoneAll else Icons.Filled.SelectAll,
+                                                imageVector = if (isAllServerSelected) Icons.Filled.DoneAll else Icons.Filled.SelectAll,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (isAllSelected) "Reset Filter" else "Select All",
+                                                text = if (isAllServerSelected) "Reset Filter" else "Select All",
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -1200,125 +1591,11 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Local Device Music Card
-                        item {
-                            Card(
-                                shape = RoundedCornerShape(20.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                                modifier = Modifier.fillMaxWidth().testTag("local_device_music_card")
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                                            modifier = Modifier.size(40.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.SdStorage,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                            }
-                                        }
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Local Device Audio",
-                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = if (localTracks.isNotEmpty()) "${localTracks.size} audio files found on device" else "Directly scan local music on this device",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        Button(
-                                            onClick = {
-                                                haptics.click()
-                                                requestLocalPermission()
-                                            },
-                                            shape = RoundedCornerShape(12.dp),
-                                            enabled = !isScanningLocalAudio,
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = MaterialTheme.colorScheme.tertiary,
-                                                contentColor = MaterialTheme.colorScheme.onTertiary
-                                            )
-                                        ) {
-                                            if (isScanningLocalAudio) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(16.dp),
-                                                    color = MaterialTheme.colorScheme.onTertiary,
-                                                    strokeWidth = 2.dp
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Scanning...", style = MaterialTheme.typography.labelSmall)
-                                            } else {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Refresh,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(if (localTracks.isEmpty()) "Scan Device" else "Rescan", style = MaterialTheme.typography.labelSmall)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (localTracks.isNotEmpty()) {
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "On-Device Tracks (${localTracks.size})",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        TextButton(onClick = { onPlayAll(localTracks) }) {
-                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Play All", style = MaterialTheme.typography.labelMedium)
-                                        }
-                                    }
-                                }
-                            }
-
-                            items(localTracks, key = { "local_${it.id}" }) { track ->
-                                val isTrackPlaying = currentTrack?.id == track.id && isPlaying
-                                TrackListItem(
-                                    track = track,
-                                    isPlaying = isTrackPlaying,
-                                    isCurrentTrack = currentTrack?.id == track.id,
-                                    downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
-                                    downloadProgress = downloadProgresses[track.id] ?: 0f,
-                                    isFavorite = favoriteIds.contains(track.id),
-                                    onTrackClick = { onTrackClick(track, localTracks) },
-                                    onToggleFavorite = { onToggleFavorite(track.id) },
-                                    onDownloadClick = { onDownloadTrack(track) },
-                                    onPlayNext = { onPlayNext(track) },
-                                    onAddToQueue = { onAddToQueue(track) }
-                                )
-                            }
-                        }
-
-                        // Music Folders List
+                        // Navidrome Server Music Folders List
                         if (musicFolders.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "Music Folders (${musicFolders.size})",
+                                    text = "${str("server_libraries_title")} (${musicFolders.size})",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -1326,7 +1603,7 @@ fun LibraryScreen(
                             }
 
                             items(musicFolders, key = { it.id }) { folder ->
-                                val isChecked = !isAllSelected && selectedMusicFolderIds.contains(folder.id)
+                                val isChecked = !isAllServerSelected && selectedMusicFolderIds.contains(folder.id)
 
                                 Card(
                                     modifier = Modifier

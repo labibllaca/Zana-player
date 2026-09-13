@@ -8,6 +8,17 @@ import android.provider.MediaStore
 import com.labix.navirom.data.model.NaviromTrack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+
+data class LocalMusicFolder(
+    val id: String,
+    val name: String,
+    val path: String,
+    val displayPath: String,
+    val trackCount: Int,
+    val totalDurationSeconds: Int,
+    val tracks: List<NaviromTrack> = emptyList()
+)
 
 class LocalAudioRepository(private val context: Context) {
 
@@ -104,4 +115,65 @@ class LocalAudioRepository(private val context: Context) {
 
         tracks
     }
+
+    suspend fun getLocalAudioFolders(): List<LocalMusicFolder> = withContext(Dispatchers.IO) {
+        val tracks = getLocalAudioTracks()
+        groupTracksIntoFolders(tracks)
+    }
+
+    fun groupTracksIntoFolders(tracks: List<NaviromTrack>): List<LocalMusicFolder> {
+        val groups = tracks.groupBy { track ->
+            val fp = track.path.ifBlank { "" }
+            if (fp.isNotBlank()) {
+                try {
+                    val parent = File(fp).parentFile
+                    parent?.absolutePath ?: "Internal Storage"
+                } catch (e: Exception) {
+                    "Internal Storage"
+                }
+            } else {
+                "Internal Storage"
+            }
+        }
+
+        return groups.map { (folderPath, folderTracks) ->
+            val folderFile = try { File(folderPath) } catch (e: Exception) { null }
+            val (name, displayPath) = formatFolderNames(folderPath, folderFile)
+            val durationSec = folderTracks.sumOf { it.durationSeconds }
+
+            LocalMusicFolder(
+                id = folderPath,
+                name = name,
+                path = folderPath,
+                displayPath = displayPath,
+                trackCount = folderTracks.size,
+                totalDurationSeconds = durationSec,
+                tracks = folderTracks.sortedBy { it.title.lowercase() }
+            )
+        }.sortedBy { it.name.lowercase() }
+    }
+
+    private fun formatFolderNames(folderPath: String, file: File?): Pair<String, String> {
+        if (folderPath == "Internal Storage") {
+            return Pair("Interner Speicher", "Internal Storage")
+        }
+        val emulatedPrefix = "/storage/emulated/0"
+        if (folderPath.startsWith(emulatedPrefix)) {
+            val relative = folderPath.removePrefix(emulatedPrefix).trim('/')
+            if (relative.isBlank()) {
+                return Pair("Interner Speicher", emulatedPrefix)
+            }
+            val folderName = if (relative.contains('/')) relative else relative
+            return Pair(folderName, relative)
+        }
+        if (folderPath.startsWith("/storage/")) {
+            val parts = folderPath.removePrefix("/storage/").trim('/').split('/')
+            val folderName = parts.lastOrNull() ?: file?.name ?: "SD-Card"
+            val display = "SD: " + parts.drop(1).joinToString("/")
+            return Pair(folderName, if (display.endsWith(": ")) "SD-Karte" else display)
+        }
+        val name = file?.name?.ifBlank { "Musik-Ordner" } ?: "Musik-Ordner"
+        return Pair(name, folderPath)
+    }
 }
+

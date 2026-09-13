@@ -334,7 +334,23 @@ object NaviromStrings {
         "secure_settings_wireless_guide" to "Wireless Debugging / LADB: You can also execute the command without a PC using Wireless Debugging with Shizuku or LADB.",
         "secure_settings_fallback_info" to "Without ADB/Root, the app will conveniently bring up the quick system toggle panel when the timer ends.",
         "updates_highlights" to "Highlights & New Features",
-        "updates_view_changelog" to "Changelog & Details"
+        "updates_view_changelog" to "Changelog & Details",
+
+        // Local Folders
+        "local_music_folders_title" to "Local Music Folders",
+        "local_music_folders_subtitle" to "Manage on-device folders to include in your library and playback",
+        "local_folders_active" to "%d of %d folders active",
+        "local_folder_all_active" to "All Local Folders Active",
+        "local_folder_deactivated" to "Folder Disabled",
+        "local_folder_enable_prompt" to "Enable folder to play songs in library",
+        "scan_device_folders" to "Scan Device",
+        "rescan_device_folders" to "Rescan",
+        "no_local_folders_found" to "No local audio folders found on device",
+        "local_folder_play_all" to "Play Folder",
+        "local_folder_shuffle" to "Shuffle Folder",
+        "select_all_local_folders" to "Select All",
+        "deselect_all_local_folders" to "Deselect All",
+        "local_folders_header" to "On-Device Audio Folders"
     )
 
     private val albanianStrings = mapOf(
@@ -638,7 +654,23 @@ object NaviromStrings {
         "secure_settings_wireless_guide" to "Wireless Debugging / LADB: Mund ta ekzekutoni komandën pa kompjuter duke përdorur Shizuku ose LADB.",
         "secure_settings_fallback_info" to "Pa ADB/Root, aplikacioni do të shfaqë menynë e shpejtë të sistemit kur mbaron koha.",
         "updates_highlights" to "Të rejat kryesore",
-        "updates_view_changelog" to "Regjistri i ndryshimeve"
+        "updates_view_changelog" to "Regjistri i ndryshimeve",
+
+        // Local Folders
+        "local_music_folders_title" to "Dosjet e Muzikës Lokale",
+        "local_music_folders_subtitle" to "Menaxhoni dosjet në pajisje për t'i përfshirë në bibliotekë dhe dëgjim",
+        "local_folders_active" to "%d nga %d dosje aktive",
+        "local_folder_all_active" to "Të gjitha dosjet lokale aktive",
+        "local_folder_deactivated" to "Dosja e çaktivizuar",
+        "local_folder_enable_prompt" to "Aktivizo dosjen për të luajtur këngë",
+        "scan_device_folders" to "Skano pajisjen",
+        "rescan_device_folders" to "Risko",
+        "no_local_folders_found" to "Nuk u gjetën dosje me muzikë në pajisje",
+        "local_folder_play_all" to "Luaj dosjen",
+        "local_folder_shuffle" to "Përziej dosjen",
+        "select_all_local_folders" to "Zgjidhi të gjitha",
+        "deselect_all_local_folders" to "Çzgjidhi të gjitha",
+        "local_folders_header" to "Dosjet e Muzikës në Pajisje"
     )
 
     private val germanStrings = mapOf(
@@ -943,6 +975,22 @@ object NaviromStrings {
         "secure_settings_wireless_guide" to "Wireless Debugging / LADB: Der Befehl kann ohne PC direkt auf dem Gerät über Wireless Debugging mit Shizuku oder LADB ausgeführt werden.",
         "secure_settings_fallback_info" to "Ohne ADB/Root öffnet die App nach Ablauf des Timers bequem das System-Schnellmenü zum 1-Tap-Ausschalten.",
         "updates_highlights" to "Highlights & Neuerungen",
-        "updates_view_changelog" to "Änderungsprotokoll & Details"
+        "updates_view_changelog" to "Änderungsprotokoll & Details",
+
+        // Local Folders
+        "local_music_folders_title" to "Lokale Musik-Ordner",
+        "local_music_folders_subtitle" to "Geräte-Ordner für Mediathek und Wiedergabe verwalten",
+        "local_folders_active" to "%d von %d Ordner aktiv",
+        "local_folder_all_active" to "Alle lokalen Ordner aktiv",
+        "local_folder_deactivated" to "Ordner deaktiviert",
+        "local_folder_enable_prompt" to "Ordner aktivieren um Titel abzuspielen",
+        "scan_device_folders" to "Gerät scannen",
+        "rescan_device_folders" to "Neu scannen",
+        "no_local_folders_found" to "Keine lokalen Musik-Ordner auf dem Gerät gefunden",
+        "local_folder_play_all" to "Ordner abspielen",
+        "local_folder_shuffle" to "Ordner mischen",
+        "select_all_local_folders" to "Alle aktivieren",
+        "deselect_all_local_folders" to "Alle deaktivieren",
+        "local_folders_header" to "Lokale Geräte-Ordner"
     )
 }
