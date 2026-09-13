@@ -105,10 +105,40 @@ fun LibraryScreen(
     currentArtistSongs: List<NaviromTrack> = emptyList(),
     isLoadingArtistDetails: Boolean = false,
     onSelectArtist: (String?) -> Unit = {},
+    localTracks: List<NaviromTrack> = emptyList(),
+    isScanningLocalAudio: Boolean = false,
+    onScanLocalAudio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     fun str(key: String): String = NaviromStrings.get(key, appLanguage)
     val haptics = rememberNaviromHaptics()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onScanLocalAudio()
+        }
+    }
+
+    val requestLocalPermission = {
+        val perm = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            perm
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (hasPerm) {
+            onScanLocalAudio()
+        } else {
+            permissionLauncher.launch(perm)
+        }
+    }
 
     var showFolderSwitcherDialog by remember { mutableStateOf(false) }
 
@@ -1167,6 +1197,120 @@ fun LibraryScreen(
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        // Local Device Music Card
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth().testTag("local_device_music_card")
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.SdStorage,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Local Device Audio",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = if (localTracks.isNotEmpty()) "${localTracks.size} audio files found on device" else "Directly scan local music on this device",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                haptics.click()
+                                                requestLocalPermission()
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            enabled = !isScanningLocalAudio,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                                contentColor = MaterialTheme.colorScheme.onTertiary
+                                            )
+                                        ) {
+                                            if (isScanningLocalAudio) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    color = MaterialTheme.colorScheme.onTertiary,
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Scanning...", style = MaterialTheme.typography.labelSmall)
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Refresh,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(if (localTracks.isEmpty()) "Scan Device" else "Rescan", style = MaterialTheme.typography.labelSmall)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (localTracks.isNotEmpty()) {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "On-Device Tracks (${localTracks.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        TextButton(onClick = { onPlayAll(localTracks) }) {
+                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Play All", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                }
+                            }
+
+                            items(localTracks, key = { "local_${it.id}" }) { track ->
+                                val isTrackPlaying = currentTrack?.id == track.id && isPlaying
+                                TrackListItem(
+                                    track = track,
+                                    isPlaying = isTrackPlaying,
+                                    isCurrentTrack = currentTrack?.id == track.id,
+                                    downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
+                                    downloadProgress = downloadProgresses[track.id] ?: 0f,
+                                    isFavorite = favoriteIds.contains(track.id),
+                                    onTrackClick = { onTrackClick(track, localTracks) },
+                                    onToggleFavorite = { onToggleFavorite(track.id) },
+                                    onDownloadClick = { onDownloadTrack(track) },
+                                    onPlayNext = { onPlayNext(track) },
+                                    onAddToQueue = { onAddToQueue(track) }
+                                )
                             }
                         }
 

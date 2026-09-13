@@ -320,6 +320,10 @@ class AudioPlayerController(
             return File(path).exists()
         }
 
+        if (resolvedUrl.startsWith("content://")) {
+            return true
+        }
+
         // 3. Network URL probe (safely closing all streams)
         return try {
             val connection = (java.net.URL(resolvedUrl).openConnection() as java.net.HttpURLConnection).apply {

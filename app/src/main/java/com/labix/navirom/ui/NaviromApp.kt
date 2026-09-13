@@ -133,6 +133,8 @@ fun NaviromApp(
     val isOfflineOnlyMode by viewModel.isOfflineOnlyMode.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
+    val localTracks by viewModel.localTracks.collectAsStateWithLifecycle()
+    val isScanningLocalAudio by viewModel.isScanningLocalAudio.collectAsStateWithLifecycle()
 
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val queue by viewModel.currentQueue.collectAsStateWithLifecycle()
@@ -459,7 +461,10 @@ fun NaviromApp(
                             onDownloadAndInstallUpdate = { viewModel.downloadAndInstallUpdate(it) },
                             onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
                             onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
-                            onDismissUpdate = { viewModel.dismissAppUpdate() }
+                            onDismissUpdate = { viewModel.dismissAppUpdate() },
+                            localTracks = localTracks,
+                            isScanningLocalAudio = isScanningLocalAudio,
+                            onScanLocalAudio = { viewModel.scanLocalAudio() }
                         )
                     }
 
@@ -727,7 +732,10 @@ fun NaviromApp(
                         onDownloadAndInstallUpdate = { viewModel.downloadAndInstallUpdate(it) },
                         onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
                         onSetGithubRepo = { viewModel.setUpdateGithubRepo(it) },
-                        onDismissUpdate = { viewModel.dismissAppUpdate() }
+                        onDismissUpdate = { viewModel.dismissAppUpdate() },
+                        localTracks = localTracks,
+                        isScanningLocalAudio = isScanningLocalAudio,
+                        onScanLocalAudio = { viewModel.scanLocalAudio() }
                     )
                 }
             }
@@ -1013,7 +1021,10 @@ private fun TabContent(
     onDownloadAndInstallUpdate: (AppUpdateInfo) -> Unit = {},
     onSetAutoCheckUpdates: (Boolean) -> Unit = {},
     onSetGithubRepo: (String) -> Unit = {},
-    onDismissUpdate: () -> Unit = {}
+    onDismissUpdate: () -> Unit = {},
+    localTracks: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
+    isScanningLocalAudio: Boolean = false,
+    onScanLocalAudio: () -> Unit = {}
 ) {
     AnimatedContent(
         targetState = currentTab,
@@ -1079,7 +1090,10 @@ private fun TabContent(
                 currentArtistAlbums = currentArtistAlbums,
                 currentArtistSongs = currentArtistSongs,
                 isLoadingArtistDetails = isLoadingArtistDetails,
-                onSelectArtist = onSelectArtist
+                onSelectArtist = onSelectArtist,
+                localTracks = localTracks,
+                isScanningLocalAudio = isScanningLocalAudio,
+                onScanLocalAudio = onScanLocalAudio
             )
         }
         NaviromTab.PLAYLISTS -> {

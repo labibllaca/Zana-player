@@ -213,17 +213,38 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     private val _rawLibrarySongs = MutableStateFlow<List<NaviromTrack>>(emptyList())
 
+    private val localAudioRepository = LocalAudioRepository(application)
+    private val _localTracks = MutableStateFlow<List<NaviromTrack>>(emptyList())
+    val localTracks: StateFlow<List<NaviromTrack>> = _localTracks.asStateFlow()
+    private val _isScanningLocalAudio = MutableStateFlow(false)
+    val isScanningLocalAudio: StateFlow<Boolean> = _isScanningLocalAudio.asStateFlow()
+
+    fun scanLocalAudio() {
+        viewModelScope.launch {
+            _isScanningLocalAudio.value = true
+            try {
+                val scanned = localAudioRepository.getLocalAudioTracks()
+                _localTracks.value = scanned
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isScanningLocalAudio.value = false
+            }
+        }
+    }
+
     val recentlyPlayedTracks: StateFlow<List<NaviromTrack>> = recentSongsRepository.getRecentlyPlayed(50)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _songSortOrder = MutableStateFlow(SongSortOrder.NAME)
     val songSortOrder: StateFlow<SongSortOrder> = _songSortOrder.asStateFlow()
 
-    val librarySongs: StateFlow<List<NaviromTrack>> = combine(_rawLibrarySongs, _songSortOrder) { songs, order ->
+    val librarySongs: StateFlow<List<NaviromTrack>> = combine(_rawLibrarySongs, _localTracks, _songSortOrder) { serverSongs, localSongs, order ->
+        val combined = (serverSongs + localSongs).distinctBy { it.id }
         when (order) {
-            SongSortOrder.NAME -> songs.sortedBy { it.title.lowercase() }
-            SongSortOrder.DURATION -> songs.sortedByDescending { it.durationSeconds }
-            SongSortOrder.RECENTLY_ADDED -> songs // Order as received from newest/last input
-            SongSortOrder.ARTIST -> songs.sortedBy { it.artist.lowercase() }
+            SongSortOrder.NAME -> combined.sortedBy { it.title.lowercase() }
+            SongSortOrder.DURATION -> combined.sortedByDescending { it.durationSeconds }
+            SongSortOrder.RECENTLY_ADDED -> combined // Order as received from newest/last input
+            SongSortOrder.ARTIST -> combined.sortedBy { it.artist.lowercase() }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -367,6 +388,21 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         loadSearchHistoryFromPrefs()
         loadActiveServerConfig()
         observePlaybackForLyricsAndStats()
+
+        val hasLocalAudioPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                getApplication(),
+                android.Manifest.permission.READ_MEDIA_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                getApplication(),
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (hasLocalAudioPermission) {
+            scanLocalAudio()
+        }
 
         try {
             val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -1811,7 +1847,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
 
         // Memory loaded tracks
-        (_newestTracks.value + _currentAlbumTracks.value + _currentPlaylistTracks.value + _quickMixTracks.value).forEach { track ->
+        (_newestTracks.value + _currentAlbumTracks.value + _currentPlaylistTracks.value + _quickMixTracks.value + _localTracks.value).forEach { track ->
             if (!allLocalTracks.containsKey(track.id)) {
                 allLocalTracks[track.id] = track
             }
@@ -1900,6 +1936,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     fun findTrackById(trackId: String): NaviromTrack? {
         if (playbackState.value.currentTrack?.id == trackId) return playbackState.value.currentTrack
         currentQueue.value.find { it.id == trackId }?.let { return it }
+        _localTracks.value.find { it.id == trackId }?.let { return it }
         _currentPlaylistTracks.value.find { it.id == trackId }?.let { return it }
         _currentAlbumTracks.value.find { it.id == trackId }?.let { return it }
         _currentArtistSongs.value.find { it.id == trackId }?.let { return it }
