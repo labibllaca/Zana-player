@@ -32,9 +32,42 @@ import com.labix.navirom.ui.NaviromViewModel
 import com.labix.navirom.ui.components.AppSplashScreen
 import com.labix.ui.theme.MyApplicationTheme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import com.labix.navirom.diagnostics.AppDiagnostics
+import java.lang.ref.WeakReference
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        private var instanceRef: WeakReference<MainActivity>? = null
+
+        fun getInstance(): MainActivity? = instanceRef?.get()
+
+        fun Context.findActivity(): Activity? {
+            var ctx: Context? = this
+            while (ctx is ContextWrapper) {
+                if (ctx is Activity) return ctx
+                ctx = ctx.baseContext
+            }
+            return null
+        }
+
+        fun closeApplication(context: Context? = null) {
+            try {
+                if (context != null) {
+                    NaviromPlaybackService.stopService(context)
+                }
+            } catch (_: Exception) {}
+
+            try {
+                val act = instanceRef?.get() ?: context?.findActivity() ?: (context as? Activity)
+                act?.finishAndRemoveTask()
+                act?.finishAffinity()
+            } catch (_: Exception) {}
+        }
+    }
+
     private val viewModel: NaviromViewModel by viewModels()
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
@@ -45,6 +78,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instanceRef = WeakReference(this)
         AppDiagnostics.init(applicationContext)
 
         // Configure Coil image caching to prevent memory leaks from album arts
@@ -126,6 +160,13 @@ class MainActivity : ComponentActivity() {
             NaviromPlaybackService.stopService(this)
             finishAndRemoveTask()
             finishAffinity()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instanceRef?.get() == this) {
+            instanceRef = null
         }
     }
 }

@@ -420,7 +420,20 @@ class UpdateManager(private val context: Context) {
                 } catch (_: Exception) {}
             }
 
+            // 1. Stop background playback service so audio and foreground notifications are stopped
+            try {
+                com.labix.navirom.player.NaviromPlaybackService.stopService(context)
+            } catch (_: Exception) {}
+
+            // 2. Start the system package installer
             context.startActivity(intent)
+
+            // 3. Close the application completely so the system package installer is displayed cleanly
+            try {
+                com.labix.MainActivity.closeApplication(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to close MainActivity on update install", e)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error launching package installer", e)
             AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, "Install failed: ${e.message}", e)
