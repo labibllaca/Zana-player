@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudDownload
@@ -40,10 +41,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.labix.BuildConfig
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.update.AppUpdateInfo
 import com.labix.navirom.update.UpdateState
+
+fun formatReleaseDate(isoDate: String): String {
+    if (isoDate.isBlank()) return ""
+    return try {
+        val clean = isoDate.replace("Z", "").replace("T", " ")
+        if (clean.length >= 16) {
+            val datePart = clean.substring(0, 10)
+            val timePart = clean.substring(11, 16)
+            "$datePart • $timePart"
+        } else {
+            clean.take(10)
+        }
+    } catch (_: Exception) {
+        isoDate.take(10)
+    }
+}
 
 @Composable
 fun AppUpdateDialog(
@@ -64,17 +82,19 @@ fun AppUpdateDialog(
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(26.dp),
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 6.dp,
                     modifier = modifier
                         .fillMaxWidth(0.92f)
-                        .padding(vertical = 24.dp)
+                        .heightIn(max = 660.dp)
+                        .padding(vertical = 16.dp)
                         .testTag("app_update_dialog")
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(22.dp)
+                            .fillMaxWidth()
+                            .padding(20.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
                         // Header
@@ -103,31 +123,11 @@ fun AppUpdateDialog(
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.secondaryContainer
-                                    ) {
-                                        Text(
-                                            text = info.tagName,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                    if (info.apkSize > 0) {
-                                        val mbSize = "%.1f MB".format(info.apkSize / (1024f * 1024f))
-                                        Text(
-                                            text = "• $mbSize",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = "${str("updates_published")}: ${formatReleaseDate(info.assetUpdatedAt.ifBlank { info.publishedAt }).ifBlank { info.tagName }}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
 
                             IconButton(onClick = onDismiss) {
@@ -135,19 +135,129 @@ fun AppUpdateDialog(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        // Release Title
-                        if (info.title.isNotBlank() && info.title != info.tagName) {
-                            Text(
-                                text = info.title,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                        // Version Transition & Info Card
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Current -> New Version Badges
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surface
+                                    ) {
+                                        Text(
+                                            text = "v${BuildConfig.VERSION_NAME}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Text(
+                                            text = info.tagName,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.weight(1f))
+
+                                    if (info.apkSize > 0) {
+                                        val mbSize = "%.1f MB".format(info.apkSize / (1024f * 1024f))
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Download,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Text(
+                                                    text = mbSize,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (info.apkName.isNotBlank() && info.apkName != "zana-update.apk") {
+                                    Text(
+                                        text = "Package: ${info.apkName}",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
 
-                        // Changelog Section
+                        // Release Title Headline (if present and meaningful)
+                        if (info.title.isNotBlank() && info.title != info.tagName) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = info.title,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Changelog Section Header
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -155,12 +265,12 @@ fun AppUpdateDialog(
                         ) {
                             Text(
                                 text = str("updates_changelog"),
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                             ) {
                                 Text(
                                     text = info.tagName,
@@ -171,12 +281,17 @@ fun AppUpdateDialog(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        
-                        RichChangelogView(rawChangelog = info.body)
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        // Formatted Changelog & Release Notes
+                        RichChangelogView(
+                            rawChangelog = info.body,
+                            appLanguage = appLanguage
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
 
                         // Actions
+                        val sizeText = if (info.apkSize > 0) " (%.1f MB)".format(info.apkSize / (1024f * 1024f)) else ""
                         Button(
                             onClick = { onDownloadAndInstall(info) },
                             shape = RoundedCornerShape(14.dp),
@@ -187,7 +302,7 @@ fun AppUpdateDialog(
                         ) {
                             Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(str("updates_install_btn"), fontWeight = FontWeight.Bold)
+                            Text("${str("updates_install_btn")}$sizeText", fontWeight = FontWeight.Bold)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -225,6 +340,7 @@ fun AppUpdateDialog(
             val downloadedMb = "%.1f".format(updateState.downloadedBytes / (1024f * 1024f))
             val totalMb = if (updateState.totalBytes > 0) "%.1f MB".format(updateState.totalBytes / (1024f * 1024f)) else "..."
             val tag = updateState.updateInfo?.tagName ?: ""
+            val title = updateState.updateInfo?.title ?: ""
 
             Dialog(
                 onDismissRequest = { /* Don't dismiss during download */ },
@@ -255,6 +371,16 @@ fun AppUpdateDialog(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        if (title.isNotBlank() && title != tag) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "$downloadedMb MB / $totalMb (${(progress * 100).toInt()}%)",
@@ -285,6 +411,7 @@ fun AppUpdateDialog(
 
         is UpdateState.Installing -> {
             val tag = updateState.updateInfo.tagName
+            val title = updateState.updateInfo.title
 
             Dialog(
                 onDismissRequest = { /* Don't dismiss during installation */ },
@@ -315,6 +442,16 @@ fun AppUpdateDialog(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        if (title.isNotBlank() && title != tag) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = str("updates_preparing_installer"),
@@ -368,6 +505,13 @@ fun AppUpdateDialog(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
+                                    if (latest.publishedAt.isNotBlank() || latest.assetUpdatedAt.isNotBlank()) {
+                                        Text(
+                                            text = "${str("updates_published")}: ${formatReleaseDate(latest.assetUpdatedAt.ifBlank { latest.publishedAt })}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                     if (latest.apkSize > 0) {
                                         val mbSize = "%.1f MB".format(latest.apkSize / (1024f * 1024f))
                                         Text(
@@ -596,46 +740,85 @@ fun parseChangelog(raw: String): List<ChangelogItem> {
         if (trimmed.isBlank()) continue
 
         // Skip dividers and raw footer diff links
-        if (trimmed == "---" || trimmed.startsWith("Full Changelog:", ignoreCase = true) || trimmed.startsWith("See the full diff:", ignoreCase = true)) {
+        if (trimmed == "---" || trimmed == "***" || trimmed == "___" ||
+            trimmed.startsWith("Full Changelog:", ignoreCase = true) ||
+            trimmed.startsWith("See the full diff:", ignoreCase = true) ||
+            trimmed.startsWith("**Full Changelog**", ignoreCase = true)
+        ) {
             continue
         }
 
-        if (trimmed.startsWith("### v") || trimmed.startsWith("## v") || trimmed.startsWith("### Version") || trimmed.startsWith("## Version")) {
+        // Version headers e.g. ### v1.2.0 or ## 1.2.0
+        if (trimmed.startsWith("### v", ignoreCase = true) || 
+            trimmed.startsWith("## v", ignoreCase = true) || 
+            trimmed.startsWith("# v", ignoreCase = true) ||
+            trimmed.startsWith("### Version", ignoreCase = true) || 
+            trimmed.startsWith("## Version", ignoreCase = true)
+        ) {
             val title = trimmed.replace(Regex("^#+\\s*"), "").trim()
             items.add(ChangelogItem.VersionHeader(title))
-        } else if (trimmed.startsWith("#")) {
+            continue
+        }
+
+        // Section headers e.g. ## What's Changed, ### 🚀 Features, **New Features**
+        if (trimmed.startsWith("#")) {
             val title = trimmed.replace(Regex("^#+\\s*"), "").trim()
             items.add(ChangelogItem.SectionHeader(title))
-        } else if (trimmed.startsWith("* ") || trimmed.startsWith("- ") || trimmed.startsWith("+ ") || trimmed.startsWith("• ")) {
-            var content = trimmed.substring(2).trim()
+            continue
+        }
+
+        if (trimmed.startsWith("**") && trimmed.endsWith("**") && trimmed.length > 4 && !trimmed.contains("\n")) {
+            val title = trimmed.removeSurrounding("**").trim()
+            items.add(ChangelogItem.SectionHeader(title))
+            continue
+        }
+
+        // Bullet points: *, -, +, •, or numbered lists (1., 2., etc.)
+        val bulletMatch = Regex("^(?:[*+\\-•]|\\d+\\.)\\s+(.*)$").find(trimmed)
+        if (bulletMatch != null) {
+            var content = bulletMatch.groupValues[1].trim()
 
             // Extract author if formatted like "... by @username in https://..." or "... by @username"
             var author: String? = null
-            val authorMatch = Regex("\\s+by\\s+(@[a-zA-Z0-9_-]+)(?:\\s+in\\s+https?://\\S+)?").find(content)
+            val authorMatch = Regex("\\s+by\\s+(@[a-zA-Z0-9_\\-]+)(?:\\s+in\\s+\\S+)?", RegexOption.IGNORE_CASE).find(content)
             if (authorMatch != null) {
                 author = authorMatch.groupValues[1]
                 content = content.replace(authorMatch.value, "").trim()
             }
 
-            // Remove trailing PR links like in https://github.com/...
-            content = content.replace(Regex("\\s+in\\s+https?://\\S+"), "").trim()
+            // Remove trailing PR / issue links like "in #123" or "in https://github.com/..."
+            content = content.replace(Regex("\\s+in\\s+(?:#[0-9]+|https?://\\S+)", RegexOption.IGNORE_CASE), "").trim()
 
-            // Remove commit hash badges like [1234567]
-            content = content.replace(Regex("\\[[0-9a-f]{6,10}\\]"), "").trim()
+            // Remove commit hash badges like [1234567] or (1234567)
+            content = content.replace(Regex("[\\[(][0-9a-f]{7,10}[)\\]]"), "").trim()
 
-            // Check if there is a category prefix like [Feature], [Fix], [UI], [Audio], [Lyrics], etc.
+            // Extract category tags like [Feature], [Fix], [UI], [Audio], [Lyrics], [Bug], [Perf]
             var tag: String? = null
-            val tagMatch = Regex("^\\[([a-zA-Z0-9_\\-\\s]{2,15})\\]\\s*").find(content)
+            val tagMatch = Regex("^\\[([a-zA-Z0-9_\\-\\s]{2,16})\\]\\s*").find(content)
             if (tagMatch != null) {
                 tag = tagMatch.groupValues[1]
                 content = content.replace(tagMatch.value, "").trim()
+            } else {
+                val prefixMatch = Regex("^(feat|fix|perf|ui|style|refactor|chore|docs):\\s*", RegexOption.IGNORE_CASE).find(content)
+                if (prefixMatch != null) {
+                    tag = prefixMatch.groupValues[1].uppercase()
+                    content = content.replace(prefixMatch.value, "").trim()
+                }
             }
 
-            if (content.isNotBlank()) {
-                items.add(ChangelogItem.Bullet(text = content, tag = tag, author = author))
+            // Clean markdown asterisks inside bullet text for clean display
+            val cleanText = content.replace("**", "").replace("`", "").trim()
+
+            if (cleanText.isNotBlank()) {
+                items.add(ChangelogItem.Bullet(text = cleanText, tag = tag, author = author))
             }
-        } else {
-            items.add(ChangelogItem.Paragraph(trimmed))
+            continue
+        }
+
+        // Paragraphs / general text
+        val cleanParagraph = trimmed.replace("**", "").replace("`", "").trim()
+        if (cleanParagraph.isNotBlank()) {
+            items.add(ChangelogItem.Paragraph(cleanParagraph))
         }
     }
     return items
@@ -644,6 +827,7 @@ fun parseChangelog(raw: String): List<ChangelogItem> {
 @Composable
 fun RichChangelogView(
     rawChangelog: String,
+    appLanguage: AppLanguage = AppLanguage.GERMAN,
     modifier: Modifier = Modifier
 ) {
     val items = remember(rawChangelog) { parseChangelog(rawChangelog) }
@@ -651,6 +835,7 @@ fun RichChangelogView(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -660,8 +845,13 @@ fun RichChangelogView(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (items.isEmpty()) {
+                val fallbackText = when (appLanguage) {
+                    AppLanguage.GERMAN -> "• Neue Funktionen, Verbesserungen und Leistungsoptimierungen für die beste Musikwiedergabe."
+                    AppLanguage.ALBANIAN -> "• Veçori të reja, përmirësime dhe optimizime të performancës për dëgjim optimal të muzikës."
+                    AppLanguage.ENGLISH -> "• New features, improvements, and performance optimizations for the best music playback experience."
+                }
                 Text(
-                    text = "• Neue Funktionen, Fehlerbehebungen und Leistungsverbesserungen.",
+                    text = fallbackText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -722,7 +912,7 @@ fun RichChangelogView(
                                     if (item.tag != null) {
                                         Surface(
                                             shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
                                             modifier = Modifier.padding(bottom = 2.dp)
                                         ) {
                                             Text(
@@ -740,8 +930,13 @@ fun RichChangelogView(
                                         lineHeight = 17.sp
                                     )
                                     if (item.author != null) {
+                                        val authorPrefix = when (appLanguage) {
+                                            AppLanguage.GERMAN -> "von"
+                                            AppLanguage.ALBANIAN -> "nga"
+                                            AppLanguage.ENGLISH -> "by"
+                                        }
                                         Text(
-                                            text = "von ${item.author}",
+                                            text = "$authorPrefix ${item.author}",
                                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                         )
