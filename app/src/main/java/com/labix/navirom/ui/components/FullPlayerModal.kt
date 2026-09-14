@@ -18,6 +18,14 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1071,8 +1079,134 @@ fun FullPlayerModal(
                                 label = "vinylPlatterScale"
                             )
 
+                            // Bigger circle line breathing pulse when music is actively playing
+                            val infiniteCircleTransition = rememberInfiniteTransition(label = "biggerCirclePulse")
+                            val circlePulseScale by if (playbackState.isPlaying) {
+                                infiniteCircleTransition.animateFloat(
+                                    initialValue = 1.0f,
+                                    targetValue = 1.028f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(2200, easing = FastOutSlowInEasing),
+                                        repeatMode = AnimRepeatMode.Reverse
+                                    ),
+                                    label = "circlePulseScale"
+                                )
+                            } else {
+                                remember { mutableFloatStateOf(1.0f) }
+                            }
+
+                            val currentTrackProgress = remember(currentPosMs, totalDurationMs) {
+                                if (totalDurationMs > 0L) {
+                                    (currentPosMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+                            }
+
                             Box(
+                                contentAlignment = Alignment.Center,
                                 modifier = Modifier
+                                    .size(maxArtworkSize)
+                                    .aspectRatio(1f)
+                            ) {
+                                // Elegant line of a bigger circle framing the central play-view artwork
+                                val circleLineColor = textOnCard.copy(alpha = if (isDark) 0.22f else 0.16f)
+                                val circleSubtleHaloColor = textOnCard.copy(alpha = if (isDark) 0.08f else 0.05f)
+                                val progressLineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                                val accentDotColor = textOnCard
+
+                                Canvas(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            scaleX = circlePulseScale
+                                            scaleY = circlePulseScale
+                                        }
+                                ) {
+                                    val centerOffset = Offset(size.width / 2f, size.height / 2f)
+                                    val baseRadius = (size.minDimension / 2f)
+                                    // Radius for the line of a bigger circle
+                                    val ringRadius = baseRadius + 15.dp.toPx()
+                                    val outerHaloRadius = ringRadius + 6.dp.toPx()
+
+                                    // 1. Ultra-subtle outer ambient dash orbit ring
+                                    drawCircle(
+                                        color = circleSubtleHaloColor,
+                                        radius = outerHaloRadius,
+                                        center = centerOffset,
+                                        style = Stroke(
+                                            width = 1.dp.toPx(),
+                                            pathEffect = PathEffect.dashPathEffect(
+                                                floatArrayOf(4.dp.toPx(), 10.dp.toPx()),
+                                                0f
+                                            )
+                                        )
+                                    )
+
+                                    // 2. Line of the bigger circle
+                                    drawCircle(
+                                        color = circleLineColor,
+                                        radius = ringRadius,
+                                        center = centerOffset,
+                                        style = Stroke(width = 1.5.dp.toPx())
+                                    )
+
+                                    // 3. Four cardinal micro-notch / tick indicators (12, 3, 6, 9 o'clock)
+                                    val tickLength = 5.dp.toPx()
+                                    for (i in 0 until 4) {
+                                        val angleDeg = i * 90f
+                                        val rad = Math.toRadians(angleDeg.toDouble())
+                                        val cosVal = Math.cos(rad).toFloat()
+                                        val sinVal = Math.sin(rad).toFloat()
+                                        val startX = centerOffset.x + (ringRadius - tickLength / 2f) * cosVal
+                                        val startY = centerOffset.y + (ringRadius - tickLength / 2f) * sinVal
+                                        val endX = centerOffset.x + (ringRadius + tickLength / 2f) * cosVal
+                                        val endY = centerOffset.y + (ringRadius + tickLength / 2f) * sinVal
+                                        drawLine(
+                                            color = circleLineColor.copy(alpha = if (isDark) 0.40f else 0.28f),
+                                            start = Offset(startX, startY),
+                                            end = Offset(endX, endY),
+                                            strokeWidth = 1.5.dp.toPx(),
+                                            cap = StrokeCap.Round
+                                        )
+                                    }
+
+                                    // 4. Smooth glowing progress arc along the bigger circle line
+                                    if (currentTrackProgress > 0.001f) {
+                                        val arcRect = androidx.compose.ui.geometry.Rect(
+                                            center = centerOffset,
+                                            radius = ringRadius
+                                        )
+                                        drawArc(
+                                            color = progressLineColor,
+                                            startAngle = -90f,
+                                            sweepAngle = currentTrackProgress * 360f,
+                                            useCenter = false,
+                                            topLeft = arcRect.topLeft,
+                                            size = arcRect.size,
+                                            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                                        )
+
+                                        // 5. Glowing orbital bead / needle tip at current playback position
+                                        val progressAngleRad = Math.toRadians((-90f + currentTrackProgress * 360f).toDouble())
+                                        val tipX = centerOffset.x + ringRadius * Math.cos(progressAngleRad).toFloat()
+                                        val tipY = centerOffset.y + ringRadius * Math.sin(progressAngleRad).toFloat()
+
+                                        // Soft aura around tip
+                                        drawCircle(
+                                            color = progressLineColor.copy(alpha = 0.35f),
+                                            radius = 5.5.dp.toPx(),
+                                            center = Offset(tipX, tipY)
+                                        )
+                                        // Crisp bead center
+                                        drawCircle(
+                                            color = accentDotColor,
+                                            radius = 3.dp.toPx(),
+                                            center = Offset(tipX, tipY)
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
                                     .size(maxArtworkSize)
                                     .aspectRatio(1f)
                                     .then(
@@ -1282,6 +1416,7 @@ fun FullPlayerModal(
                                         )
                                     }
                                 }
+                            }
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
