@@ -299,6 +299,9 @@ object NaviromStrings {
         "updates_retry_btn" to "Retry",
         "updates_repo_hint" to "Enter owner/repo or paste GitHub URL",
         "updates_up_to_date_badge" to "Up to date",
+        "updates_installing" to "Installing update...",
+        "updates_preparing_installer" to "Launching package installer...",
+        "updates_installed_badge" to "Latest Version Installed",
 
         // Sleep Timer
         "sleep_timer" to "Sleep Timer",
@@ -626,6 +629,9 @@ object NaviromStrings {
         "updates_retry_btn" to "Provo përsëri",
         "updates_repo_hint" to "Shkruani pronari/depoja ose vegëzën GitHub",
         "updates_up_to_date_badge" to "I përditësuar",
+        "updates_installing" to "Duke instaluar përditësimin...",
+        "updates_preparing_installer" to "Duke nisur instaluesin e paketës...",
+        "updates_installed_badge" to "Versioni më i fundit i instaluar",
 
         // Sleep Timer
         "sleep_timer" to "Kohëmatësi i gjumit",
@@ -954,6 +960,9 @@ object NaviromStrings {
         "updates_retry_btn" to "Wiederholen",
         "updates_repo_hint" to "Owner/Repo oder GitHub-URL eingeben",
         "updates_up_to_date_badge" to "Aktuell",
+        "updates_installing" to "Update wird installiert...",
+        "updates_preparing_installer" to "Paket-Installer wird gestartet...",
+        "updates_installed_badge" to "Neueste Version installiert",
 
         // Sleep Timer
         "sleep_timer" to "Sleep-Timer",

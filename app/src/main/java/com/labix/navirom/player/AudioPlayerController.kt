@@ -454,6 +454,7 @@ class AudioPlayerController(
     }
 
     private var lastTrackSwitchTime = 0L
+    private var lastPreviousPressTime = 0L
 
     private fun safelyReleasePlayer(player: MediaPlayer?) {
         if (player == null) return
@@ -783,25 +784,32 @@ class AudioPlayerController(
         val q = _queue.value
         if (q.isEmpty()) return
 
-        when (_playbackState.value.repeatMode) {
-            RepeatMode.ONE -> {
-                val currentTrack = _playbackState.value.currentTrack
-                if (currentTrack != null && _playbackState.value.unplayableTrackIds.contains(currentTrack.id)) {
-                    skipToNextPlayableOrStop()
-                } else {
-                    seekTo(0)
-                    resume()
-                }
+        // If automated crossfading with RepeatMode.ONE, loop the current track if playable
+        if (isCrossfading && _playbackState.value.repeatMode == RepeatMode.ONE) {
+            val currentTrack = _playbackState.value.currentTrack
+            if (currentTrack != null && !_playbackState.value.unplayableTrackIds.contains(currentTrack.id)) {
+                seekTo(0)
+                resume()
+                return
             }
-            RepeatMode.ALL, RepeatMode.OFF -> {
-                val nextIdx = findNextPlayableIndex(_currentIndex.value + 1)
-                if (nextIdx != null) {
-                    _currentIndex.value = nextIdx
-                    playCurrentTrack(isCrossfading)
-                } else {
-                    pause()
-                    seekTo(0)
-                }
+        }
+
+        // When skipping, look for the next playable track in the queue
+        val nextIdx = findNextPlayableIndex(_currentIndex.value + 1)
+            ?: if (_playbackState.value.repeatMode == RepeatMode.ALL) findNextPlayableIndex(0) else null
+
+        if (nextIdx != null) {
+            _currentIndex.value = nextIdx
+            playCurrentTrack(isCrossfading)
+        } else {
+            // Reached the end of the queue. If user explicitly pressed next, wrap around if multiple tracks exist
+            val wrapIdx = findNextPlayableIndex(0)
+            if (wrapIdx != null && wrapIdx != _currentIndex.value) {
+                _currentIndex.value = wrapIdx
+                playCurrentTrack(isCrossfading)
+            } else {
+                pause()
+                seekTo(0)
             }
         }
     }
@@ -811,7 +819,12 @@ class AudioPlayerController(
         if (now - lastTrackSwitchTime < 250L) return
         lastTrackSwitchTime = now
 
-        if (_playbackState.value.currentPositionMs > 3000L) {
+        val doublePressThresholdMs = 1800L
+        val isDoublePress = (now - lastPreviousPressTime) < doublePressThresholdMs
+        lastPreviousPressTime = now
+
+        // If more than 3 seconds in and not a quick double-press, seek to start of current track
+        if (!isDoublePress && _playbackState.value.currentPositionMs > 3000L) {
             seekTo(0)
             return
         }

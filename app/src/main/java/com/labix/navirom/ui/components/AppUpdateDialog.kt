@@ -3,7 +3,11 @@ package com.labix.navirom.ui.components
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +24,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -212,6 +224,7 @@ fun AppUpdateDialog(
             val progress = updateState.progress
             val downloadedMb = "%.1f".format(updateState.downloadedBytes / (1024f * 1024f))
             val totalMb = if (updateState.totalBytes > 0) "%.1f MB".format(updateState.totalBytes / (1024f * 1024f)) else "..."
+            val tag = updateState.updateInfo?.tagName ?: ""
 
             Dialog(
                 onDismissRequest = { /* Don't dismiss during download */ },
@@ -229,20 +242,11 @@ fun AppUpdateDialog(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(52.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CloudDownload,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
+                        VinylInstallationDeck(
+                            progress = progress,
+                            isInstalling = false,
+                            versionTag = tag
+                        )
 
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -273,6 +277,58 @@ fun AppUpdateDialog(
                             text = str("updates_ready_install"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        is UpdateState.Installing -> {
+            val tag = updateState.updateInfo.tagName
+
+            Dialog(
+                onDismissRequest = { /* Don't dismiss during installation */ },
+                properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    modifier = modifier
+                        .fillMaxWidth(0.9f)
+                        .padding(vertical = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        VinylInstallationDeck(
+                            progress = 1.0f,
+                            isInstalling = true,
+                            versionTag = tag
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = str("updates_installing"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = str("updates_preparing_installer"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
                         )
                     }
                 }
@@ -346,63 +402,75 @@ fun AppUpdateDialog(
                     Button(onClick = onDismiss) {
                         Text("OK")
                     }
-                },
-                dismissButton = if (latest != null) {
-                    {
-                        TextButton(onClick = {
-                            onDismiss()
-                            onDownloadAndInstall(latest)
-                        }) {
-                            Text(str("updates_reinstall_btn"), fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                } else null
+                }
             )
         }
 
         is UpdateState.ReadyToInstall -> {
             val apkFile = updateState.apkFile
             val info = updateState.updateInfo
-            AlertDialog(
+            Dialog(
                 onDismissRequest = onDismiss,
-                icon = {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                },
-                title = { Text(str("updates_ready_to_install_title"), fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true, usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    modifier = modifier
+                        .fillMaxWidth(0.9f)
+                        .padding(vertical = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        VinylInstallationDeck(
+                            progress = 1.0f,
+                            isInstalling = false,
+                            versionTag = info.tagName
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = str("updates_ready_to_install_title"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${info.title.ifBlank { info.tagName }} (${info.apkName})",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                        Text(
-                            text = str("updates_ready_install"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            val updateManager = com.labix.navirom.update.UpdateManager.getInstance(context)
-                            updateManager.installApk(context, apkFile)
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                val updateManager = com.labix.navirom.update.UpdateManager.getInstance(context)
+                                updateManager.installApk(context, apkFile, info)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(46.dp)
+                        ) {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(str("updates_install_now_btn"), fontWeight = FontWeight.Bold)
                         }
-                    ) {
-                        Text(str("updates_install_now_btn"), fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(str("updates_dismiss"))
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(str("updates_dismiss"))
+                        }
                     }
                 }
-            )
+            }
         }
 
         is UpdateState.Error -> {
@@ -691,6 +759,263 @@ fun RichChangelogView(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun VinylInstallationDeck(
+    progress: Float,
+    isInstalling: Boolean,
+    versionTag: String,
+    modifier: Modifier = Modifier
+) {
+    // 1. Rotation for the vinyl disc
+    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_transition")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = if (isInstalling) 1600 else 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "vinyl_rotation"
+    )
+
+    // 2. Sound ripple wave animations
+    val rippleScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.32f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple_scale"
+    )
+    val rippleAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.40f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple_alpha"
+    )
+
+    // 3. Tonearm needle tracking angle
+    // At progress 0%: ~16 deg (outer lead-in groove)
+    // At progress 100%: ~38 deg (inner lead-out groove)
+    val targetNeedleAngle = when {
+        isInstalling -> 36f
+        progress in 0f..1f -> 16f + (progress * 22f)
+        else -> 24f
+    }
+    val needleAngle by animateFloatAsState(
+        targetValue = targetNeedleAngle,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "needle_angle"
+    )
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+
+    Box(
+        modifier = modifier
+            .size(190.dp)
+            .padding(8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Acoustic wave pulse rings
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .scale(rippleScale)
+                .background(primaryColor.copy(alpha = rippleAlpha), CircleShape)
+        )
+
+        // Turntable Platter Base / Dark Chassis Rim
+        Box(
+            modifier = Modifier
+                .size(148.dp)
+                .background(Color(0xFF0F0F12), CircleShape)
+                .border(BorderStroke(2.dp, Color(0xFF2A2A32)), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            // Spinning Vinyl Disc with Micro-grooves and light reflection
+            Canvas(
+                modifier = Modifier
+                    .size(144.dp)
+                    .graphicsLayer { rotationZ = rotationAngle }
+            ) {
+                val radius = size.minDimension / 2f
+                val center = Offset(size.width / 2f, size.height / 2f)
+
+                // Vinyl body
+                drawCircle(
+                    color = Color(0xFF141418),
+                    radius = radius,
+                    center = center
+                )
+
+                // Concentric Micro-Grooves
+                val grooveSteps = listOf(0.92f, 0.86f, 0.80f, 0.74f, 0.68f, 0.62f, 0.56f, 0.50f, 0.44f, 0.38f)
+                grooveSteps.forEachIndexed { index, frac ->
+                    val grooveAlpha = if (index % 2 == 0) 0.12f else 0.06f
+                    drawCircle(
+                        color = Color.White.copy(alpha = grooveAlpha),
+                        radius = radius * frac,
+                        center = center,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+
+                // Dynamic Dual-Wedge Gloss / Specular Sheen
+                val sweepBrush = Brush.sweepGradient(
+                    0.0f to Color.Transparent,
+                    0.10f to Color.White.copy(alpha = 0.15f),
+                    0.20f to Color.Transparent,
+                    0.50f to Color.Transparent,
+                    0.60f to Color.White.copy(alpha = 0.15f),
+                    0.70f to Color.Transparent,
+                    1.0f to Color.Transparent,
+                    center = center
+                )
+                drawCircle(
+                    brush = sweepBrush,
+                    radius = radius * 0.94f,
+                    center = center
+                )
+
+                // Run-out groove near label
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.22f),
+                    radius = radius * 0.36f,
+                    center = center,
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
+
+            // Center Vinyl Label
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                primaryColor,
+                                primaryContainer
+                            )
+                        )
+                    )
+                    .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.85f)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = if (isInstalling) Icons.Filled.SystemUpdate else Icons.Filled.GraphicEq,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    if (versionTag.isNotBlank()) {
+                        Text(
+                            text = versionTag.take(8),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                // Spindle Hole
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(Color(0xFF0F0F12), CircleShape)
+                        .border(BorderStroke(1.2.dp, Color.White.copy(alpha = 0.9f)), CircleShape)
+                )
+            }
+        }
+
+        // Turntable Tonearm with Stylus
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-4).dp, y = 4.dp)
+        ) {
+            // Tonearm pivot base
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                Color(0xFFB0B4BC),
+                                Color(0xFF4A4E58)
+                            )
+                        ),
+                        CircleShape
+                    )
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(0xFF22242A), CircleShape)
+                )
+            }
+
+            // Rotating arm tube & cartridge
+            Canvas(
+                modifier = Modifier
+                    .size(88.dp)
+                    .graphicsLayer {
+                        this.rotationZ = needleAngle
+                        this.transformOrigin = TransformOrigin(0.14f, 0.14f)
+                    }
+            ) {
+                val startX = size.width * 0.14f
+                val startY = size.height * 0.14f
+                val midX = size.width * 0.55f
+                val midY = size.height * 0.65f
+                val endX = size.width * 0.72f
+                val endY = size.height * 0.85f
+
+                // Metallic Arm Tube
+                drawLine(
+                    color = Color(0xFFD8DCE4),
+                    start = Offset(startX, startY),
+                    end = Offset(midX, midY),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = Color(0xFFC0C4CC),
+                    start = Offset(midX, midY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+
+                // Cartridge head
+                drawCircle(
+                    color = Color(0xFF1E2026),
+                    radius = 4.5.dp.toPx(),
+                    center = Offset(endX, endY)
+                )
+
+                // Glowing stylus needle indicator
+                drawCircle(
+                    color = if (isInstalling) Color(0xFF4CAF50) else primaryColor,
+                    radius = 2.dp.toPx(),
+                    center = Offset(endX, endY)
+                )
             }
         }
     }

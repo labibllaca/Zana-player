@@ -37,7 +37,7 @@ data class AppUpdateInfo(
     val apkDownloadUrl: String,
     val apkName: String,
     val apkSize: Long,
-    val isNewer: Boolean,
+    val isNewer: Boolean = true,
     val assetUpdatedAt: String = "",
     val assetUpdatedAtMillis: Long = 0L,
     val assetDigest: String = ""
@@ -48,7 +48,13 @@ sealed class UpdateState {
     object Checking : UpdateState()
     data class Available(val updateInfo: AppUpdateInfo) : UpdateState()
     data class UpToDate(val latestInfo: AppUpdateInfo? = null) : UpdateState()
-    data class Downloading(val progress: Float, val downloadedBytes: Long, val totalBytes: Long) : UpdateState()
+    data class Downloading(
+        val progress: Float,
+        val downloadedBytes: Long,
+        val totalBytes: Long,
+        val updateInfo: AppUpdateInfo? = null
+    ) : UpdateState()
+    data class Installing(val updateInfo: AppUpdateInfo) : UpdateState()
     data class ReadyToInstall(val apkFile: File, val updateInfo: AppUpdateInfo) : UpdateState()
     data class Error(val message: String) : UpdateState()
 }
@@ -255,14 +261,19 @@ class UpdateManager(private val context: Context) {
             val assetUpdatedAtMillis = chosen.assetTimeMillis
             val assetDigest = latestApkAsset.optString("digest", "")
 
-            val isNewer = isRemoteVersionNewer(
-                tag = tagName,
-                title = title,
-                assetUpdatedAt = assetUpdatedAt,
-                assetDigest = assetDigest,
-                currentVersion = currentVersion,
-                isManual = isManual
-            )
+            val isNewer = if (higherSemverCandidates.isEmpty() && chosen.semver != null && compareSemver(chosen.semver, currentVersion) <= 0) {
+                Log.i(TAG, "No higher semver candidates found; chosen candidate semver ${chosen.semver} <= current $currentVersion. Marking up-to-date.")
+                false
+            } else {
+                isRemoteVersionNewer(
+                    tag = tagName,
+                    title = title,
+                    assetUpdatedAt = assetUpdatedAt,
+                    assetDigest = assetDigest,
+                    currentVersion = currentVersion,
+                    isManual = isManual
+                )
+            }
 
             val now = System.currentTimeMillis()
             prefs.edit().putLong(KEY_LAST_CHECKED, now).apply()
@@ -303,7 +314,7 @@ class UpdateManager(private val context: Context) {
     suspend fun downloadAndInstall(updateInfo: AppUpdateInfo) = withContext(Dispatchers.IO) {
         try {
             AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_DOWNLOAD_START_705, TAG, "Starting download of ${updateInfo.apkName}")
-            _updateState.value = UpdateState.Downloading(0f, 0L, updateInfo.apkSize)
+            _updateState.value = UpdateState.Downloading(0f, 0L, updateInfo.apkSize, updateInfo)
 
             val updateDir = File(context.cacheDir, "updates").apply { mkdirs() }
             // Clean up old apk files
@@ -347,7 +358,7 @@ class UpdateManager(private val context: Context) {
                         if (currentTime - lastReportTime > 200 || downloadedBytes == totalBytes) {
                             lastReportTime = currentTime
                             val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes.toFloat() else 0.5f
-                            _updateState.value = UpdateState.Downloading(progress.coerceIn(0f, 1f), downloadedBytes, totalBytes)
+                            _updateState.value = UpdateState.Downloading(progress.coerceIn(0f, 1f), downloadedBytes, totalBytes, updateInfo)
                         }
                     }
                     output.flush()
@@ -361,9 +372,12 @@ class UpdateManager(private val context: Context) {
                 .putLong(KEY_LAST_INSTALLED_TIME, System.currentTimeMillis())
                 .apply()
 
-            _updateState.value = UpdateState.ReadyToInstall(outputFile, updateInfo)
+            // Smooth UX transition with vinyl animation before invoking the package installer
+            _updateState.value = UpdateState.Installing(updateInfo)
+            kotlinx.coroutines.delay(1200L)
+
             withContext(Dispatchers.Main) {
-                installApk(context, outputFile)
+                installApk(context, outputFile, updateInfo)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed downloading update", e)
@@ -372,7 +386,7 @@ class UpdateManager(private val context: Context) {
         }
     }
 
-    fun installApk(context: Context, apkFile: File) {
+    fun installApk(context: Context, apkFile: File, updateInfo: AppUpdateInfo? = null) {
         try {
             AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_INSTALL_START_707, TAG, "Initiating package installer for ${apkFile.name}")
             if (!apkFile.exists() || apkFile.length() == 0L) {
@@ -387,6 +401,17 @@ class UpdateManager(private val context: Context) {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!context.packageManager.canRequestPackageInstalls()) {
+                    val info = updateInfo ?: AppUpdateInfo(
+                        tagName = "",
+                        title = "",
+                        body = "",
+                        publishedAt = "",
+                        htmlUrl = "",
+                        apkDownloadUrl = "",
+                        apkName = apkFile.name,
+                        apkSize = apkFile.length()
+                    )
+                    _updateState.value = UpdateState.ReadyToInstall(apkFile, info)
                     val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                         data = Uri.parse("package:${context.packageName}")
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -517,28 +542,36 @@ class UpdateManager(private val context: Context) {
             if (semverComparison > 0) {
                 Log.i(TAG, "Remote semver $cleanRemote is newer than $cleanCurrent")
                 return true
-            } else if (semverComparison < 0) {
-                Log.i(TAG, "Remote semver $cleanRemote is older than $cleanCurrent")
-                return false
-            }
-        }
-
-        // 2. Check if identical build digest was already downloaded/installed or matches currently installed APK
-        val lastInstalledDigest = prefs.getString(KEY_LAST_INSTALLED_DIGEST, "") ?: ""
-        val localApkDigest = getInstalledApkSha256(context)
-
-        if (assetDigest.isNotBlank() && localApkDigest.isNotBlank()) {
-            if (assetDigest.equals(localApkDigest, ignoreCase = true)) {
-                Log.i(TAG, "Asset digest matches currently installed APK: $assetDigest")
-                return false
             } else {
-                Log.i(TAG, "Asset digest differs from running APK ($assetDigest vs $localApkDigest)")
-                if (isManual) return true
+                Log.i(TAG, "Remote semver $cleanRemote is already installed or older than $cleanCurrent (comparison: $semverComparison)")
+                return false
             }
         }
 
+        // Direct tag/version equality check
+        val normalizedTag = tag.removePrefix("v").trim()
+        val normalizedCurrent = currentVersion.removePrefix("v").trim()
+        if (normalizedTag.equals(normalizedCurrent, ignoreCase = true) || title.removePrefix("v").trim().equals(normalizedCurrent, ignoreCase = true)) {
+            Log.i(TAG, "Remote tag or title matches current version: $tag == $currentVersion")
+            return false
+        }
+
+        // Check if identical build digest or tag was already downloaded/installed
+        val lastInstalledTag = prefs.getString(KEY_LAST_INSTALLED_TAG, "") ?: ""
+        if (lastInstalledTag.isNotBlank() && (tag.equals(lastInstalledTag, ignoreCase = true) || normalizedTag.equals(lastInstalledTag.removePrefix("v").trim(), ignoreCase = true))) {
+            Log.i(TAG, "Remote tag matches last installed tag: $lastInstalledTag")
+            return false
+        }
+
+        val lastInstalledDigest = prefs.getString(KEY_LAST_INSTALLED_DIGEST, "") ?: ""
         if (assetDigest.isNotBlank() && lastInstalledDigest.isNotBlank() && assetDigest.equals(lastInstalledDigest, ignoreCase = true)) {
             Log.i(TAG, "Identical asset digest already installed previously: $assetDigest")
+            return false
+        }
+
+        val localApkDigest = getInstalledApkSha256(context)
+        if (assetDigest.isNotBlank() && localApkDigest.isNotBlank() && assetDigest.equals(localApkDigest, ignoreCase = true)) {
+            Log.i(TAG, "Asset digest matches currently installed APK: $assetDigest")
             return false
         }
 

@@ -418,6 +418,16 @@ class NaviromPlaybackService : MediaBrowserService() {
                     .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                     .build()
             )
+
+            val mbrIntent = Intent(Intent.ACTION_MEDIA_BUTTON, null, this@NaviromPlaybackService, NaviromMediaButtonReceiver::class.java)
+            val mbrPendingIntent = PendingIntent.getBroadcast(
+                this@NaviromPlaybackService,
+                0,
+                mbrIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            setMediaButtonReceiver(mbrPendingIntent)
+
             setCallback(object : MediaSession.Callback() {
                 override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
                     val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -427,33 +437,8 @@ class NaviromPlaybackService : MediaBrowserService() {
                         mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
                     } ?: return super.onMediaButtonEvent(mediaButtonIntent)
 
-                    if (keyEvent.action == KeyEvent.ACTION_DOWN) {
-                        val player = getOrInitPlayerController()
-                        when (keyEvent.keyCode) {
-                            KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_NAVIGATE_NEXT -> {
-                                player.next()
-                                return true
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_NAVIGATE_PREVIOUS -> {
-                                player.previous()
-                                return true
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> {
-                                player.togglePlayPause()
-                                return true
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                                player.resume()
-                                return true
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> {
-                                player.pause()
-                                return true
-                            }
-                            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE -> {
-                                return false
-                            }
-                        }
+                    if (NaviromMediaButtonReceiver.handleMediaKeyEvent(this@NaviromPlaybackService, keyEvent)) {
+                        return true
                     }
                     return super.onMediaButtonEvent(mediaButtonIntent)
                 }
@@ -471,6 +456,14 @@ class NaviromPlaybackService : MediaBrowserService() {
                 }
 
                 override fun onSkipToPrevious() {
+                    getOrInitPlayerController().previous()
+                }
+
+                override fun onFastForward() {
+                    getOrInitPlayerController().next()
+                }
+
+                override fun onRewind() {
                     getOrInitPlayerController().previous()
                 }
 
@@ -698,20 +691,8 @@ class NaviromPlaybackService : MediaBrowserService() {
                     @Suppress("DEPRECATION")
                     intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
                 }
-                if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
-                    when (keyEvent.keyCode) {
-                        KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_NAVIGATE_NEXT -> player.next()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_NAVIGATE_PREVIOUS -> player.previous()
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> player.togglePlayPause()
-                        KeyEvent.KEYCODE_MEDIA_PLAY -> player.resume()
-                        KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> player.pause()
-                        KeyEvent.KEYCODE_VOLUME_UP -> {
-                            if (keyEvent.isLongPress || keyEvent.repeatCount == 1) player.next()
-                        }
-                        KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                            if (keyEvent.isLongPress || keyEvent.repeatCount == 1) player.previous()
-                        }
-                    }
+                if (keyEvent != null) {
+                    NaviromMediaButtonReceiver.handleMediaKeyEvent(this, keyEvent)
                 }
             }
             ACTION_PLAY -> player.resume()
@@ -827,6 +808,10 @@ class NaviromPlaybackService : MediaBrowserService() {
 
     private fun updateMediaSessionPlaybackState(state: PlaybackState) {
         val session = mediaSession ?: return
+        if (!session.isActive) {
+            session.isActive = true
+        }
+
         val androidState = when {
             state.isBuffering -> AndroidPlaybackState.STATE_BUFFERING
             state.isPlaying -> AndroidPlaybackState.STATE_PLAYING
@@ -839,6 +824,8 @@ class NaviromPlaybackService : MediaBrowserService() {
                 AndroidPlaybackState.ACTION_PLAY_PAUSE or
                 AndroidPlaybackState.ACTION_SKIP_TO_NEXT or
                 AndroidPlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                AndroidPlaybackState.ACTION_FAST_FORWARD or
+                AndroidPlaybackState.ACTION_REWIND or
                 AndroidPlaybackState.ACTION_SEEK_TO or
                 AndroidPlaybackState.ACTION_PLAY_FROM_MEDIA_ID or
                 AndroidPlaybackState.ACTION_PLAY_FROM_SEARCH or
@@ -993,7 +980,7 @@ class NaviromPlaybackService : MediaBrowserService() {
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(session.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 3)
+                    .setShowActionsInCompactView(0, 1, 2)
             )
 
         if (coverBitmap != null && !coverBitmap.isRecycled) {
