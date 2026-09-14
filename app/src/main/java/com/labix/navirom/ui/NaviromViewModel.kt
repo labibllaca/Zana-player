@@ -216,14 +216,35 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val localAudioRepository = LocalAudioRepository(application)
     private val _localTracks = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val localTracks: StateFlow<List<NaviromTrack>> = _localTracks.asStateFlow()
-    private val _localFolders = MutableStateFlow<List<LocalMusicFolder>>(emptyList())
-    val localFolders: StateFlow<List<LocalMusicFolder>> = _localFolders.asStateFlow()
+
+    // All folders discovered on the device
+    private val _allDiscoveredLocalFolders = MutableStateFlow<List<LocalMusicFolder>>(emptyList())
+    val allDiscoveredLocalFolders: StateFlow<List<LocalMusicFolder>> = _allDiscoveredLocalFolders.asStateFlow()
+
+    // Settings: Folders enabled by the user in Settings to be included in App and Sidebar
+    private val _settingsEnabledLocalFolderIds = MutableStateFlow<Set<String>>(
+        prefs.getStringSet("settings_enabled_local_folder_ids", null) ?: emptySet()
+    )
+    val settingsEnabledLocalFolderIds: StateFlow<Set<String>> = _settingsEnabledLocalFolderIds.asStateFlow()
+
+    // Folders that are activated in Settings -> shown in Sidebar and Library
+    val localFolders: StateFlow<List<LocalMusicFolder>> = combine(_allDiscoveredLocalFolders, _settingsEnabledLocalFolderIds) { allFolders, enabledInSettings ->
+        val hasExplicitSettings = prefs.contains("settings_enabled_local_folder_ids")
+        if (!hasExplicitSettings) {
+            allFolders
+        } else {
+            allFolders.filter { enabledInSettings.contains(it.id) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Playback active/inactive toggles for the sidebar and library
     private val _disabledLocalFolderIds = MutableStateFlow<Set<String>>(
         prefs.getStringSet("disabled_local_folder_ids", emptySet()) ?: emptySet()
     )
     val disabledLocalFolderIds: StateFlow<Set<String>> = _disabledLocalFolderIds.asStateFlow()
 
-    val activeLocalTracks: StateFlow<List<NaviromTrack>> = combine(_localFolders, _disabledLocalFolderIds) { folders, disabledIds ->
+    // Active tracks for playback: tracks from localFolders that are not disabled
+    val activeLocalTracks: StateFlow<List<NaviromTrack>> = combine(localFolders, _disabledLocalFolderIds) { folders, disabledIds ->
         folders.filter { !disabledIds.contains(it.id) }.flatMap { it.tracks }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -237,7 +258,13 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val scanned = localAudioRepository.getLocalAudioTracks()
                 val folders = localAudioRepository.groupTracksIntoFolders(scanned)
                 _localTracks.value = scanned
-                _localFolders.value = folders
+                _allDiscoveredLocalFolders.value = folders
+
+                if (!prefs.contains("settings_enabled_local_folder_ids")) {
+                    val allIds = folders.map { it.id }.toSet()
+                    _settingsEnabledLocalFolderIds.value = allIds
+                    prefs.edit().putStringSet("settings_enabled_local_folder_ids", allIds).apply()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -246,12 +273,47 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Settings local folder management
+    fun toggleSettingsLocalFolder(folderId: String) {
+        val current = _settingsEnabledLocalFolderIds.value.toMutableSet()
+        if (current.contains(folderId)) {
+            current.remove(folderId)
+        } else {
+            current.add(folderId)
+        }
+        _settingsEnabledLocalFolderIds.value = current
+        prefs.edit().putStringSet("settings_enabled_local_folder_ids", current).apply()
+    }
+
+    fun setSettingsLocalFolderEnabled(folderId: String, enabled: Boolean) {
+        val current = _settingsEnabledLocalFolderIds.value.toMutableSet()
+        if (enabled) {
+            current.add(folderId)
+        } else {
+            current.remove(folderId)
+        }
+        _settingsEnabledLocalFolderIds.value = current
+        prefs.edit().putStringSet("settings_enabled_local_folder_ids", current).apply()
+    }
+
+    fun selectAllSettingsLocalFolders() {
+        val allIds = _allDiscoveredLocalFolders.value.map { it.id }.toSet()
+        _settingsEnabledLocalFolderIds.value = allIds
+        prefs.edit().putStringSet("settings_enabled_local_folder_ids", allIds).apply()
+    }
+
+    fun deselectAllSettingsLocalFolders() {
+        _settingsEnabledLocalFolderIds.value = emptySet()
+        prefs.edit().putStringSet("settings_enabled_local_folder_ids", emptySet()).apply()
+    }
+
+    // Playback active/inactive toggling (Sidebar & Library)
     fun toggleLocalFolder(folderId: String) {
         val current = _disabledLocalFolderIds.value.toMutableSet()
         if (current.contains(folderId)) {
-            current.remove(folderId) // Enable folder
+            current.remove(folderId) // Enable folder for playback
         } else {
-            current.add(folderId) // Disable folder
+            current.add(folderId) // Disable folder for playback
         }
         _disabledLocalFolderIds.value = current
         prefs.edit().putStringSet("disabled_local_folder_ids", current).apply()
@@ -274,7 +336,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deselectAllLocalFolders() {
-        val allIds = _localFolders.value.map { it.id }.toSet()
+        val allIds = localFolders.value.map { it.id }.toSet()
         _disabledLocalFolderIds.value = allIds
         prefs.edit().putStringSet("disabled_local_folder_ids", allIds).apply()
     }

@@ -41,12 +41,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labix.R
+import com.labix.navirom.data.local.LocalMusicFolder
 import com.labix.navirom.data.stats.ListeningStatsSummary
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.AppThemeMode
 import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.ServerConnectionUiState
 import com.labix.ui.theme.AccentEmerald
+import androidx.compose.ui.text.style.TextOverflow
 
 import com.labix.navirom.player.SecureSettingsManager
 import com.labix.navirom.ui.components.SecureSettingsAssistantDialog
@@ -86,6 +88,14 @@ fun ServerSettingsScreen(
     onSelectMusicFolder: (String?) -> Unit = {},
     onToggleMusicFolder: (String) -> Unit = {},
     onSelectAllMusicFolders: () -> Unit = {},
+    allDiscoveredLocalFolders: List<LocalMusicFolder> = emptyList(),
+    settingsEnabledLocalFolderIds: Set<String> = emptySet(),
+    onToggleSettingsLocalFolder: (String) -> Unit = {},
+    onSetSettingsLocalFolderEnabled: (String, Boolean) -> Unit = { _, _ -> },
+    onSelectAllSettingsLocalFolders: () -> Unit = {},
+    onDeselectAllSettingsLocalFolders: () -> Unit = {},
+    isScanningLocalAudio: Boolean = false,
+    onScanLocalAudio: () -> Unit = {},
     focusUsernameTrigger: Long = 0L,
     updateState: UpdateState = UpdateState.Idle,
     autoCheckUpdates: Boolean = true,
@@ -812,7 +822,273 @@ fun ServerSettingsScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
 
+        // Local Audio Folders Settings Card (Device Folders Selection)
+        var isLocalFoldersCardExpanded by remember { mutableStateOf(true) }
+        val localEnabledCount = allDiscoveredLocalFolders.count { settingsEnabledLocalFolderIds.contains(it.id) }
+        val allLocalEnabled = allDiscoveredLocalFolders.isNotEmpty() && localEnabledCount == allDiscoveredLocalFolders.size
 
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("local_audio_folders_settings_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            haptics.click()
+                            isLocalFoldersCardExpanded = !isLocalFoldersCardExpanded
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.FolderSpecial,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = str("local_folders_settings_title"),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (allDiscoveredLocalFolders.isEmpty()) {
+                                    str("no_local_folders_found")
+                                } else {
+                                    String.format(str("local_folders_settings_enabled_count"), localEnabledCount, allDiscoveredLocalFolders.size)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                haptics.click()
+                                isLocalFoldersCardExpanded = !isLocalFoldersCardExpanded
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isLocalFoldersCardExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (isLocalFoldersCardExpanded) "Collapse" else "Expand",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = isLocalFoldersCardExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = str("local_folders_settings_desc"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // Top Action Bar: Rescan & Select/Deselect All
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    haptics.click()
+                                    onScanLocalAudio()
+                                },
+                                enabled = !isScanningLocalAudio,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                if (isScanningLocalAudio) {
+                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                } else {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(if (isScanningLocalAudio) "Scanning..." else str("rescan_device_folders"), style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            if (allDiscoveredLocalFolders.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(
+                                        onClick = {
+                                            haptics.click()
+                                            onSelectAllSettingsLocalFolders()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(str("select_all_local_folders"), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            haptics.click()
+                                            onDeselectAllSettingsLocalFolders()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(str("deselect_all_local_folders"), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
+
+                        if (allDiscoveredLocalFolders.isEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.FolderOff,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        str("no_local_folders_found"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            // Folders list
+                            allDiscoveredLocalFolders.forEach { folder ->
+                                val isEnabled = settingsEnabledLocalFolderIds.contains(folder.id)
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isEnabled) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isEnabled) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        haptics.tick()
+                                        onToggleSettingsLocalFolder(folder.id)
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (folder.path.contains("sdcard", ignoreCase = true) || (folder.path.contains("storage/", ignoreCase = true) && !folder.path.contains("emulated")))
+                                                    Icons.Filled.SdCard
+                                                else
+                                                    Icons.Filled.Folder,
+                                                contentDescription = null,
+                                                tint = if (isEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = folder.name,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = if (isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${folder.displayPath} • ${folder.trackCount} ${str("tracks_count")}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+
+                                        Switch(
+                                            checked = isEnabled,
+                                            onCheckedChange = { checked ->
+                                                haptics.tick()
+                                                onSetSettingsLocalFolderEnabled(folder.id, checked)
+                                            },
+                                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.tertiary, checkedTrackColor = MaterialTheme.colorScheme.tertiaryContainer),
+                                            modifier = Modifier.padding(start = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = str("local_folders_sidebar_info"),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Network Auto-Scan / Stop Auto-Scan Button
         Button(

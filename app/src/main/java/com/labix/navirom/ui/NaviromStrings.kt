@@ -350,7 +350,14 @@ object NaviromStrings {
         "local_folder_shuffle" to "Shuffle Folder",
         "select_all_local_folders" to "Select All",
         "deselect_all_local_folders" to "Deselect All",
-        "local_folders_header" to "On-Device Audio Folders"
+        "local_folders_header" to "On-Device Audio Folders",
+        "local_folders_settings_title" to "Local Audio Folders (Smartphone)",
+        "local_folders_settings_desc" to "Select which folders on your phone should be available in the app and sidebar.",
+        "local_folders_settings_enabled_count" to "%d of %d folders enabled in app",
+        "local_folders_sidebar_info" to "Enabled folders appear in the sidebar for quick playback selection.",
+        "no_local_folders_enabled_in_settings" to "No folders enabled in Settings",
+        "no_local_folders_sidebar_hint" to "Enable local folders in Settings to choose them here in the sidebar.",
+        "btn_open_settings_folders" to "Manage Folders in Settings"
     )
 
     private val albanianStrings = mapOf(
@@ -670,7 +677,14 @@ object NaviromStrings {
         "local_folder_shuffle" to "Përziej dosjen",
         "select_all_local_folders" to "Zgjidhi të gjitha",
         "deselect_all_local_folders" to "Çzgjidhi të gjitha",
-        "local_folders_header" to "Dosjet e Muzikës në Pajisje"
+        "local_folders_header" to "Dosjet e Muzikës në Pajisje",
+        "local_folders_settings_title" to "Dosjet Lokale të Muzikës (Pajisje)",
+        "local_folders_settings_desc" to "Zgjidhni cilat dosje të telefonit të jenë të disponueshme në aplikacion dhe në shiritin anësor.",
+        "local_folders_settings_enabled_count" to "%d nga %d dosje të aktivizuara në aplikacion",
+        "local_folders_sidebar_info" to "Dosjet e aktivizuara do të shfaqen në shiritin anësor për zgjedhje të shpejtë të luajtjes.",
+        "no_local_folders_enabled_in_settings" to "Asnjë dosje e aktivizuar në Cilësime",
+        "no_local_folders_sidebar_hint" to "Aktivizoni dosjet lokale në Cilësime që të shfaqen këtu në shiritin anësor.",
+        "btn_open_settings_folders" to "Menaxho Dosjet në Cilësime"
     )
 
     private val germanStrings = mapOf(
@@ -991,6 +1005,13 @@ object NaviromStrings {
         "local_folder_shuffle" to "Ordner mischen",
         "select_all_local_folders" to "Alle aktivieren",
         "deselect_all_local_folders" to "Alle deaktivieren",
-        "local_folders_header" to "Lokale Geräte-Ordner"
+        "local_folders_header" to "Lokale Geräte-Ordner",
+        "local_folders_settings_title" to "Lokale Musik-Ordner (Smartphone)",
+        "local_folders_settings_desc" to "Wähle aus, welche Ordner deines Smartphones in der App und der Seitenleiste zur Verfügung stehen sollen.",
+        "local_folders_settings_enabled_count" to "%d von %d Ordnern in App aktiviert",
+        "local_folders_sidebar_info" to "Aktivierte Ordner erscheinen in der Seitenleiste zur schnellen Auswahl für die Wiedergabe.",
+        "no_local_folders_enabled_in_settings" to "Keine Ordner in den Einstellungen aktiviert",
+        "no_local_folders_sidebar_hint" to "Aktiviere lokale Ordner in den Einstellungen, damit sie hier in der Seitenleiste zur Auswahl stehen.",
+        "btn_open_settings_folders" to "Ordner in Einstellungen verwalten"
     )
 }
