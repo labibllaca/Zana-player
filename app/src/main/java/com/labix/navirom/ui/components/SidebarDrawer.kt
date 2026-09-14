@@ -28,6 +28,7 @@ fun LibrariesSidebarContent(
     onSelectMusicFolder: (String?) -> Unit = {},
     onToggleMusicFolder: (String) -> Unit,
     onSelectAllMusicFolders: () -> Unit,
+    onDeselectAllMusicFolders: () -> Unit = {},
     localFolders: List<LocalMusicFolder> = emptyList(),
     disabledLocalFolderIds: Set<String> = emptySet(),
     onToggleLocalFolder: (String) -> Unit = {},
@@ -38,8 +39,19 @@ fun LibrariesSidebarContent(
     onCloseSidebar: () -> Unit,
     str: (String) -> String
 ) {
-    val isAllSelected = selectedMusicFolderIds.isEmpty() || (musicFolders.isNotEmpty() && selectedMusicFolderIds.size >= musicFolders.size)
+    val isAllServerSelected = selectedMusicFolderIds.contains("__ALL__") || (musicFolders.isNotEmpty() && selectedMusicFolderIds.size >= musicFolders.size)
+    val hasServerSelection = selectedMusicFolderIds.isNotEmpty()
     val allLocalSelected = disabledLocalFolderIds.isEmpty() && localFolders.isNotEmpty()
+    val activeLocalFolderCount = localFolders.count { !disabledLocalFolderIds.contains(it.id) }
+
+    val headerSubtitle = when {
+        isAllServerSelected && activeLocalFolderCount > 0 -> "${str("all_libraries_title")} + $activeLocalFolderCount ${str("local_folders_header")}"
+        isAllServerSelected -> str("all_libraries_title")
+        hasServerSelection && activeLocalFolderCount > 0 -> "${String.format(str("multi_libraries_selected"), selectedMusicFolderIds.size)} + $activeLocalFolderCount ${str("local_folders_header")}"
+        hasServerSelection -> String.format(str("multi_libraries_selected"), selectedMusicFolderIds.size)
+        activeLocalFolderCount > 0 -> "$activeLocalFolderCount ${str("local_folders_header")} (${str("local_music_folders_title")})"
+        else -> str("clear_library_selection")
+    }
 
     ModalDrawerSheet(
         modifier = Modifier.width(320.dp).testTag("libraries_sidebar_drawer"),
@@ -84,9 +96,11 @@ fun LibrariesSidebarContent(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isAllSelected) str("all_libraries_title") else String.format(str("multi_libraries_selected"), selectedMusicFolderIds.size),
+                            text = headerSubtitle,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -262,112 +276,150 @@ fun LibrariesSidebarContent(
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        if (!isAllSelected) {
-                            TextButton(
-                                onClick = onSelectAllMusicFolders,
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                modifier = Modifier.height(28.dp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (!isAllServerSelected && musicFolders.isNotEmpty()) {
+                                TextButton(
+                                    onClick = onSelectAllMusicFolders,
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = str("select_all_libraries"),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                            }
+                            if (hasServerSelection) {
+                                TextButton(
+                                    onClick = onDeselectAllMusicFolders,
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = str("clear_library_selection"),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (musicFolders.isNotEmpty()) {
+                    // "All Libraries" master option
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isAllServerSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            onClick = {
+                                if (isAllServerSelected) onDeselectAllMusicFolders() else onSelectAllMusicFolders()
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("sidebar_all_libraries_item")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.AllInclusive,
+                                        contentDescription = null,
+                                        tint = if (isAllServerSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = str("all_libraries_title"),
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = if (isAllServerSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = str("all_libraries_combined"),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isAllServerSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Checkbox(
+                                    checked = isAllServerSelected,
+                                    onCheckedChange = {
+                                        if (isAllServerSelected) onDeselectAllMusicFolders() else onSelectAllMusicFolders()
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Specific Music Folders with multi-select support
+                    items(musicFolders, key = { it.id }) { folder ->
+                        val isChecked = !isAllServerSelected && selectedMusicFolderIds.contains(folder.id)
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            onClick = {
+                                onToggleMusicFolder(folder.id)
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("sidebar_folder_${folder.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Folder,
+                                        contentDescription = null,
+                                        tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = folder.name,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = if (isChecked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "Folder ID: ${folder.id}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isChecked) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { onToggleMusicFolder(folder.id) }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalAlignment = Alignment.Start
                             ) {
                                 Text(
-                                    text = str("select_all_libraries"),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                    text = if (localFolders.isNotEmpty()) "Keine Server-Bibliotheken verbunden. Deine lokalen Musik-Ordner sind oben ausgewählt und einsatzbereit." else str("empty_library_desc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
-                    }
-                }
-
-                // "All Libraries" master option
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isAllSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        onClick = {
-                            onSelectAllMusicFolders()
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("sidebar_all_libraries_item")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.AllInclusive,
-                                    contentDescription = null,
-                                    tint = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = str("all_libraries_title"),
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = if (isAllSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = str("all_libraries_combined"),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isAllSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Checkbox(
-                                checked = isAllSelected,
-                                onCheckedChange = { onSelectAllMusicFolders() }
-                            )
-                        }
-                    }
-                }
-
-                // Specific Music Folders with multi-select support
-                items(musicFolders, key = { it.id }) { folder ->
-                    val isChecked = !isAllSelected && selectedMusicFolderIds.contains(folder.id)
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isChecked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        onClick = {
-                            onSelectMusicFolder(folder.id)
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("sidebar_folder_${folder.id}")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Folder,
-                                    contentDescription = null,
-                                    tint = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = folder.name,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = if (isChecked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Folder ID: ${folder.id}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isChecked) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Checkbox(
-                                checked = isChecked,
-                                onCheckedChange = { onToggleMusicFolder(folder.id) }
-                            )
                         }
                     }
                 }

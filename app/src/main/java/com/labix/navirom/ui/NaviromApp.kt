@@ -213,6 +213,7 @@ fun NaviromApp(
                 onSelectMusicFolder = { viewModel.selectMusicFolder(it) },
                 onToggleMusicFolder = { viewModel.toggleMusicFolder(it) },
                 onSelectAllMusicFolders = { viewModel.selectAllMusicFolders() },
+                onDeselectAllMusicFolders = { viewModel.deselectAllMusicFolders() },
                 localFolders = localFolders,
                 disabledLocalFolderIds = disabledLocalFolderIds,
                 onToggleLocalFolder = { viewModel.toggleLocalFolder(it) },

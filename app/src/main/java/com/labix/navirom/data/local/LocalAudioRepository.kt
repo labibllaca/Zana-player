@@ -66,18 +66,33 @@ class LocalAudioRepository(private val context: Context) {
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
-                    val title = cursor.getString(titleColumn) ?: "Unknown Track"
+                    val rawTitle = cursor.getString(titleColumn)
                     val artistRaw = cursor.getString(artistColumn)
-                    val artist = if (artistRaw.isNullOrBlank() || artistRaw == "<unknown>") "Unknown Artist" else artistRaw
                     val artistId = cursor.getLong(artistIdColumn).toString()
-                    val albumRaw = cursor.getString(albumColumn)
-                    val album = if (albumRaw.isNullOrBlank() || albumRaw == "<unknown>") "Unknown Album" else albumRaw
-                    val albumId = cursor.getLong(albumIdColumn)
                     val durationMs = cursor.getLong(durationColumn)
                     val year = cursor.getInt(yearColumn)
                     val trackNum = cursor.getInt(trackColumn)
                     val filePath = cursor.getString(dataColumn) ?: ""
                     val size = cursor.getLong(sizeColumn)
+                    val albumId = cursor.getLong(albumIdColumn)
+
+                    val file = try { if (filePath.isNotBlank()) File(filePath) else null } catch (e: Exception) { null }
+                    val fileNameWithoutExt = file?.nameWithoutExtension ?: ""
+                    val folderName = file?.parentFile?.name ?: "Musik"
+
+                    val title = when {
+                        !rawTitle.isNullOrBlank() && rawTitle != "<unknown>" && !rawTitle.startsWith("track_", ignoreCase = true) -> rawTitle
+                        fileNameWithoutExt.isNotBlank() -> fileNameWithoutExt
+                        else -> "Track $id"
+                    }
+
+                    val artist = when {
+                        !artistRaw.isNullOrBlank() && artistRaw != "<unknown>" && artistRaw != "Unknown Artist" -> artistRaw
+                        else -> folderName
+                    }
+
+                    // For local audio files, group/display strictly based on folder
+                    val album = folderName
 
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
                     val albumArtUri = ContentUris.withAppendedId(albumArtBaseUri, albumId)
@@ -91,9 +106,9 @@ class LocalAudioRepository(private val context: Context) {
                             id = "local_$id",
                             title = title,
                             artist = artist,
-                            artistId = "local_artist_$artistId",
+                            artistId = "local_folder_${folderName.hashCode()}",
                             album = album,
-                            albumId = "local_album_$albumId",
+                            albumId = "local_folder_${folderName.hashCode()}",
                             durationSeconds = (durationMs / 1000).toInt(),
                             coverArtId = albumId.toString(),
                             coverArtUrl = albumArtUri.toString(),

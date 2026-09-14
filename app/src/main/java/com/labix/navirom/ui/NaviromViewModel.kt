@@ -802,7 +802,11 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val parts = stripped.split(":")
                 val parsedHost = parts[0].substringBefore("/")
                 val parsedPort = if (parts.size > 1) parts[1].substringBefore("/") else ""
-                val savedFolderIds = saved.activeMusicFolderId?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                val savedFolderIds = when (val savedStr = saved.activeMusicFolderId) {
+                    null, "__ALL__" -> setOf("__ALL__")
+                    "__NONE__", "" -> emptySet()
+                    else -> savedStr.split(",").filter { it.isNotBlank() }.toSet()
+                }
 
                 _serverState.value = ServerConnectionUiState(
                     serverUrl = saved.serverUrl,
@@ -823,7 +827,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                     useTokenAuth = saved.useTokenAuth,
                     alternativeServerUrl = buildAlternativeUrl(parsedProto, saved.alternativeHost, parsedPort)
                 )
-                subsonicClient.activeMusicFolderId = if (savedFolderIds.size == 1) savedFolderIds.first() else null
+                subsonicClient.activeMusicFolderId = if (savedFolderIds.size == 1 && !savedFolderIds.contains("__ALL__")) savedFolderIds.first() else null
                 connectServer()
             }
         }
@@ -935,7 +939,11 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         val parsedHost = parts[0].substringBefore("/")
         val parsedPort = if (parts.size > 1) parts[1].substringBefore("/") else ""
 
-        val savedFolderIds = server.activeMusicFolderId?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+        val savedFolderIds = when (val savedStr = server.activeMusicFolderId) {
+            null, "__ALL__" -> setOf("__ALL__")
+            "__NONE__", "" -> emptySet()
+            else -> server.activeMusicFolderId.split(",").filter { it.isNotBlank() }.toSet()
+        }
 
         _serverState.value = ServerConnectionUiState(
             serverUrl = server.serverUrl,
@@ -990,38 +998,49 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         val current = _serverState.value.selectedMusicFolderIds.toMutableSet()
         val allFolderIds = _serverState.value.musicFolders.map { it.id }.toSet()
 
-        // If currently in 'All' (empty), and user taps one, we start selection with just that one
-        val newSelection = if (current.isEmpty()) {
-            setOf(folderId)
-        } else if (current.contains(folderId)) {
+        if (current.contains("__ALL__")) {
+            current.clear()
+            current.addAll(allFolderIds)
+        }
+
+        if (current.contains(folderId)) {
             current.remove(folderId)
-            if (current.isEmpty() || (allFolderIds.isNotEmpty() && current.size == allFolderIds.size)) {
-                emptySet()
-            } else {
-                current
-            }
         } else {
             current.add(folderId)
-            if (allFolderIds.isNotEmpty() && current.size == allFolderIds.size) {
-                emptySet() // all selected means no filter
-            } else {
-                current
-            }
+        }
+
+        val newSelection = if (allFolderIds.isNotEmpty() && current.size == allFolderIds.size) {
+            setOf("__ALL__")
+        } else {
+            current
         }
         setMusicFoldersSelection(newSelection)
     }
 
     fun selectAllMusicFolders() {
+        setMusicFoldersSelection(setOf("__ALL__"))
+    }
+
+    fun deselectAllMusicFolders() {
         setMusicFoldersSelection(emptySet())
     }
 
     fun setMusicFoldersSelection(folderIds: Set<String>) {
         _serverState.update { it.copy(selectedMusicFolderIds = folderIds) }
-        subsonicClient.activeMusicFolderId = if (folderIds.size == 1) folderIds.first() else null
+        subsonicClient.activeMusicFolderId = when {
+            folderIds.isEmpty() -> null
+            folderIds.contains("__ALL__") -> null
+            folderIds.size == 1 -> folderIds.first()
+            else -> null
+        }
         viewModelScope.launch {
             val active = serverConfigDao.getActiveServer()
             if (active != null) {
-                val folderString = if (folderIds.isEmpty()) null else folderIds.joinToString(",")
+                val folderString = when {
+                    folderIds.isEmpty() -> "__NONE__"
+                    folderIds.contains("__ALL__") -> "__ALL__"
+                    else -> folderIds.joinToString(",")
+                }
                 serverConfigDao.updateServer(
                     active.copy(
                         activeMusicFolderId = folderString
@@ -1029,7 +1048,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
-        syncLibrary()
+        if (_serverState.value.isConnected) {
+            syncLibrary()
+        }
     }
 
     
@@ -1612,7 +1633,22 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
             val selectedIds = _serverState.value.selectedMusicFolderIds
 
-            if (selectedIds.isEmpty() || (folders.isNotEmpty() && selectedIds.size >= folders.size)) {
+            if (selectedIds.isEmpty()) {
+                // NO server folders selected: clear server catalog so only local files are used
+                subsonicClient.activeMusicFolderId = null
+                _albums.value = emptyList()
+                _newestAlbums.value = emptyList()
+                _mostPlayedAlbums.value = emptyList()
+                _randomAlbums.value = emptyList()
+                _artists.value = emptyList()
+                _playlists.value = emptyList()
+                _rawLibrarySongs.value = emptyList()
+                _quickMixTracks.value = emptyList()
+                _newestTracks.value = emptyList()
+                return@launch
+            }
+
+            if (selectedIds.contains("__ALL__") || (folders.isNotEmpty() && selectedIds.size >= folders.size)) {
                 // Unified catalog (all folders)
                 subsonicClient.activeMusicFolderId = null
 
