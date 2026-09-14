@@ -254,7 +254,7 @@ fun FullPlayerModal(
     val textOnCard = if (isDark) Color.White else Color.Black
     val textMutedOnCard = if (isDark) Color.LightGray else Color.Gray
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(backgroundColor)
@@ -917,8 +917,16 @@ fun FullPlayerModal(
             )
         }
 
-        AnimatedContent(
-            targetState = viewMode,
+        val maxArtworkSize = (maxHeight * 0.38f).coerceIn(140.dp, 360.dp)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 680.dp)
+                .align(Alignment.Center)
+        ) {
+            AnimatedContent(
+                targetState = viewMode,
             transitionSpec = {
                 if (targetState == PlayerViewMode.LYRICS) {
                     (slideInVertically(
@@ -1065,7 +1073,7 @@ fun FullPlayerModal(
 
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .size(maxArtworkSize)
                                     .aspectRatio(1f)
                                     .then(
                                         if (isVinylEffectEnabled) {
@@ -2261,6 +2269,7 @@ fun FullPlayerModal(
                     }
                 }
             }
+        }
         }
     }
 }

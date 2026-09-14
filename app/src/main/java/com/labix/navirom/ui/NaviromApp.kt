@@ -227,7 +227,7 @@ fun NaviromApp(
         }
     ) {
         BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val isWideScreen = maxWidth >= 600.dp
+        val isWideScreen = maxWidth >= 600.dp || (maxWidth >= 480.dp && maxHeight < 520.dp)
 
         if (isWideScreen) {
             // Big Screen / Tablet Layout: Side Navigation Rail + Content Area

@@ -188,6 +188,7 @@ fun LyricsView(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = 760.dp)
             .nestedScroll(lyricsNestedScrollConnection)
             .then(noLyricsDragModifier)
             .testTag("lyrics_view"),

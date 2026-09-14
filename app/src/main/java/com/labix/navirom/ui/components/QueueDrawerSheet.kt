@@ -45,6 +45,8 @@ fun QueueDrawerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .widthIn(max = 640.dp)
+                .align(Alignment.CenterHorizontally)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .navigationBarsPadding()
         ) {
