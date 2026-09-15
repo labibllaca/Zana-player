@@ -2,6 +2,7 @@ package com.labix.navirom.ui
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -526,7 +527,11 @@ fun NaviromApp(
                     )
                 },
                 bottomBar = {
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                    ) {
                         // Floating Mini Player
                         AnimatedVisibility(
                             visible = playbackState.currentTrack != null,
@@ -557,11 +562,21 @@ fun NaviromApp(
                             )
                         }
 
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 3.dp,
-                            modifier = Modifier.testTag("bottom_nav_bar")
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 2.dp,
+                            shadowElevation = 4.dp,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                         ) {
+                            NavigationBar(
+                                containerColor = Color.Transparent,
+                                tonalElevation = 0.dp,
+                                modifier = Modifier.testTag("bottom_nav_bar")
+                            ) {
                             NavigationBarItem(
                                 selected = currentTab == NaviromTab.LIBRARY,
                                 onClick = {
@@ -654,6 +669,7 @@ fun NaviromApp(
                         }
                     }
                 }
+            }
             ) { paddingValues ->
                 Box(
                     modifier = Modifier

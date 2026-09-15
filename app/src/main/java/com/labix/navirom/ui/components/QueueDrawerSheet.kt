@@ -1,5 +1,6 @@
 package com.labix.navirom.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -111,107 +112,126 @@ fun QueueDrawerSheet(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .padding(horizontal = 4.dp, vertical = 3.dp)
+                                .clip(RoundedCornerShape(18.dp))
                                 .clickable {
                                     haptics.click()
                                     onSelectIndex(index)
                                 }
                                 .testTag("queue_item_$index"),
+                            shape = RoundedCornerShape(18.dp),
                             color = when {
                                 isUnplayable -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
-                                isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                else -> Color.Transparent
-                            }
+                                isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                else -> MaterialTheme.colorScheme.surface
+                            },
+                            tonalElevation = if (isPlaying) 3.dp else 1.5.dp,
+                            shadowElevation = if (isPlaying) 2.dp else 1.dp,
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                            )
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier.width(28.dp),
-                                    contentAlignment = Alignment.Center
+                            Column {
+                                if (isPlaying) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (isUnplayable) {
-                                        Icon(
-                                            imageVector = Icons.Filled.ErrorOutline,
-                                            contentDescription = "Unplayable",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    } else if (isPlaying) {
-                                        Icon(
-                                            imageVector = Icons.Filled.GraphicEq,
-                                            contentDescription = "Playing",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "%02d".format(index + 1),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Box(
+                                        modifier = Modifier.width(28.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isUnplayable) {
+                                            Icon(
+                                                imageVector = Icons.Filled.ErrorOutline,
+                                                contentDescription = "Unplayable",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        } else if (isPlaying) {
+                                            Icon(
+                                                imageVector = Icons.Filled.GraphicEq,
+                                                contentDescription = "Playing",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "%02d".format(index + 1),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        SongAlbumCover(
+                                            coverArtUrl = track.coverArtUrl,
+                                            contentDescription = track.title,
+                                            isAlbum = false,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxSize()
                                         )
                                     }
-                                }
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
 
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    SongAlbumCover(
-                                        coverArtUrl = track.coverArtUrl,
-                                        contentDescription = track.title,
-                                        isAlbum = false,
-                                        shape = RoundedCornerShape(6.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = track.title,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = if (isPlaying || isUnplayable) FontWeight.SemiBold else FontWeight.Normal
+                                            ),
+                                            color = when {
+                                                isUnplayable -> MaterialTheme.colorScheme.error
+                                                isPlaying -> MaterialTheme.colorScheme.primary
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            },
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (isUnplayable) "${track.artist} • Unplayable" else "${track.artist} • ${track.durationFormatted}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (isUnplayable) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
 
-                                Spacer(modifier = Modifier.width(10.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = track.title,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = if (isPlaying || isUnplayable) FontWeight.SemiBold else FontWeight.Normal
-                                        ),
-                                        color = when {
-                                            isUnplayable -> MaterialTheme.colorScheme.error
-                                            isPlaying -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.onSurface
+                                    IconButton(
+                                        onClick = {
+                                            haptics.tick()
+                                            onRemoveIndex(index)
                                         },
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = if (isUnplayable) "${track.artist} • Unplayable" else "${track.artist} • ${track.durationFormatted}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (isUnplayable) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        haptics.tick()
-                                        onRemoveIndex(index)
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Close,
-                                        contentDescription = "Remove from Queue",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Remove from Queue",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

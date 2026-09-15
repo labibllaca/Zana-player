@@ -1,6 +1,7 @@
 package com.labix.navirom.ui.components
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -254,22 +255,50 @@ private fun TrackListItemContent(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 3.dp)
             .graphicsLayer {
                 scaleX = itemScale
                 scaleY = itemScale
             }
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onTrackClick() }
             .animateContentSize()
             .testTag("track_item_${track.id}"),
-        color = if (isCurrentTrack) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else Color.Transparent
+        shape = RoundedCornerShape(20.dp),
+        color = if (isCurrentTrack) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        tonalElevation = if (isCurrentTrack) 3.dp else 1.5.dp,
+        shadowElevation = if (isCurrentTrack) 3.dp else 1.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+            }
+        )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
+            // Linear progress accent line matching MiniPlayerBar
+            if (isCurrentTrack && isPlaying) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.5.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             // Track index or playing indicator
             if (trackIndex != null && !showCoverArt) {
                 Box(
@@ -471,6 +500,7 @@ private fun TrackListItemContent(
         }
     }
 }
+}
 
 @Composable
 fun AlbumCard(
@@ -493,11 +523,13 @@ fun AlbumCard(
                 scaleX = cardScale
                 scaleY = cardScale
             }
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("album_card_${album.id}"),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             // Album Artwork Aspect 1:1
@@ -580,11 +612,13 @@ fun ArtistCard(
                 scaleX = cardScale
                 scaleY = cardScale
             }
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("artist_card_${artist.id}"),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -656,11 +690,13 @@ fun PlaylistCard(
                 scaleX = cardScale
                 scaleY = cardScale
             }
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .testTag("playlist_card_${playlist.id}"),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Row(
             modifier = Modifier
@@ -781,10 +817,12 @@ fun SleekFeatureCard(
                 scaleX = cardScale
                 scaleY = cardScale
             }
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Column(
             modifier = Modifier
