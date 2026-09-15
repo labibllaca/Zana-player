@@ -107,6 +107,7 @@ fun FullPlayerModal(
     playbackState: PlaybackState,
     isFavorite: Boolean,
     downloadStatus: DownloadStatus,
+    downloadProgress: Float? = null,
     queueIndex: Int = 0,
     queueSize: Int = 0,
     lyricsData: LyricsData = LyricsData(),
@@ -140,6 +141,7 @@ fun FullPlayerModal(
     var viewMode by remember { mutableStateOf(PlayerViewMode.ARTWORK) }
     var showMenu by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showCoverQuickActionsSheet by remember { mutableStateOf(false) }
     var showSecureSettingsAssistant by remember { mutableStateOf(false) }
     var showArtistsDialog by remember { mutableStateOf(false) }
     var showTeksteShqipDialog by remember { mutableStateOf(false) }
@@ -333,6 +335,35 @@ fun FullPlayerModal(
                 )
             }
     ) {
+        if (showCoverQuickActionsSheet) {
+            val currentOptions = SleepTimerOptions(
+                disableBluetooth = disableBt,
+                disableWifi = disableWifi,
+                disableMobileData = disableData
+            )
+
+            CoverQuickActionsSheet(
+                track = track,
+                playbackState = playbackState,
+                downloadStatus = downloadStatus,
+                downloadProgress = downloadProgress,
+                sleepTimerOptions = currentOptions,
+                appLanguage = appLanguage,
+                onDismiss = { showCoverQuickActionsSheet = false },
+                onSeekTo = onSeekTo,
+                onSetSleepTimer = { mins, opts ->
+                    onUpdateSleepTimerOptions?.invoke(opts)
+                    onSetSleepTimer(mins, opts)
+                },
+                onUpdateSleepTimerOptions = onUpdateSleepTimerOptions,
+                onOpenSleepTimerDialog = { showSleepTimerDialog = true },
+                onDownloadTrack = onDownloadTrack,
+                onOpenLyrics = {
+                    viewMode = PlayerViewMode.LYRICS
+                }
+            )
+        }
+
         if (showSleepTimerDialog) {
             val currentOptions = SleepTimerOptions(
                 disableBluetooth = disableBt,
@@ -1282,8 +1313,8 @@ fun FullPlayerModal(
                                                                 haptics.click()
                                                                 onAlbumClick.invoke(track.albumId)
                                                             } else {
-                                                                haptics.toggle()
-                                                                viewMode = PlayerViewMode.LYRICS
+                                                                haptics.click()
+                                                                showCoverQuickActionsSheet = true
                                                             }
                                                         }
                                                     }
@@ -1358,8 +1389,8 @@ fun FullPlayerModal(
                                                     }
                                                     .combinedClickable(
                                                         onClick = {
-                                                            haptics.toggle()
-                                                            viewMode = PlayerViewMode.LYRICS
+                                                            haptics.click()
+                                                            showCoverQuickActionsSheet = true
                                                         },
                                                         onLongClick = { onAlbumClick?.invoke(track.albumId) }
                                                     )

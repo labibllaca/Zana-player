@@ -360,7 +360,32 @@ object NaviromStrings {
         "local_folders_sidebar_info" to "Enabled folders appear in the sidebar for quick playback selection.",
         "no_local_folders_enabled_in_settings" to "No folders enabled in Settings",
         "no_local_folders_sidebar_hint" to "Enable local folders in Settings to choose them here in the sidebar.",
-        "btn_open_settings_folders" to "Manage Folders in Settings"
+        "btn_open_settings_folders" to "Manage Folders in Settings",
+
+        // Cover Quick Actions Sheet
+        "cover_quick_actions_title" to "Track Options",
+        "cover_quick_actions_desc" to "Countdown timer, song jump and download",
+        "countdown_timer_title" to "Countdown Timer",
+        "countdown_timer_active" to "Timer running",
+        "countdown_timer_stop" to "Stop Timer",
+        "countdown_timer_start" to "Start Timer",
+        "countdown_end_of_track" to "End of Song",
+        "countdown_more_options" to "More Timer Options",
+        "jump_to_time_title" to "Jump to Time",
+        "jump_to_time_hint" to "e.g. 1:45 or 90s",
+        "jump_to_time_btn" to "Jump",
+        "jump_to_time_invalid" to "Please enter a valid time (e.g. 1:30)",
+        "jump_quick_rewind" to "-30s",
+        "jump_quick_forward" to "+30s",
+        "jump_quick_start" to "Start (0:00)",
+        "jump_quick_middle" to "Middle (50%)",
+        "download_this_song_btn" to "Download This Song",
+        "download_this_song_desc" to "Save for offline playback without data usage",
+        "download_status_downloaded" to "Song is available offline",
+        "download_status_downloading" to "Downloading song...",
+        "download_status_redownload" to "Re-download",
+        "download_status_failed" to "Download failed - tap to retry",
+        "cover_open_lyrics" to "Open Lyrics View"
     )
 
     private val albanianStrings = mapOf(
@@ -690,7 +715,32 @@ object NaviromStrings {
         "local_folders_sidebar_info" to "Dosjet e aktivizuara do të shfaqen në shiritin anësor për zgjedhje të shpejtë të luajtjes.",
         "no_local_folders_enabled_in_settings" to "Asnjë dosje e aktivizuar në Cilësime",
         "no_local_folders_sidebar_hint" to "Aktivizoni dosjet lokale në Cilësime që të shfaqen këtu në shiritin anësor.",
-        "btn_open_settings_folders" to "Menaxho Dosjet në Cilësime"
+        "btn_open_settings_folders" to "Menaxho Dosjet në Cilësime",
+
+        // Cover Quick Actions Sheet
+        "cover_quick_actions_title" to "Opsionet e Shpejta",
+        "cover_quick_actions_desc" to "Kohëmatësi, kërcimi në kohë dhe shkarkimi",
+        "countdown_timer_title" to "Kohëmatësi i Numërimit Mbrapsht",
+        "countdown_timer_active" to "Kohëmatësi aktiv",
+        "countdown_timer_stop" to "Ndalo Kohëmatësin",
+        "countdown_timer_start" to "Fillo Kohëmatësin",
+        "countdown_end_of_track" to "Fundi i këngës",
+        "countdown_more_options" to "Më shumë opsione të kohëmatësit",
+        "jump_to_time_title" to "Kërce në Kohë",
+        "jump_to_time_hint" to "psh. 1:45 ose 90s",
+        "jump_to_time_btn" to "Kërce",
+        "jump_to_time_invalid" to "Ju lutem shkruani një kohë të vlefshme (psh. 1:30)",
+        "jump_quick_rewind" to "-30s",
+        "jump_quick_forward" to "+30s",
+        "jump_quick_start" to "Fillim (0:00)",
+        "jump_quick_middle" to "Mes (50%)",
+        "download_this_song_btn" to "Shkarko këtë këngë",
+        "download_this_song_desc" to "Ruaje për dëgjim pa internet",
+        "download_status_downloaded" to "E shkarkuar dhe e gatshme offline",
+        "download_status_downloading" to "Duke shkarkuar këngën...",
+        "download_status_redownload" to "Rishkarko",
+        "download_status_failed" to "Shkarkimi dështoi - prek për të riprovuar",
+        "cover_open_lyrics" to "Hap Pamjen e Tekstit"
     )
 
     private val germanStrings = mapOf(
@@ -1021,6 +1071,31 @@ object NaviromStrings {
         "local_folders_sidebar_info" to "Aktivierte Ordner erscheinen in der Seitenleiste zur schnellen Auswahl für die Wiedergabe.",
         "no_local_folders_enabled_in_settings" to "Keine Ordner in den Einstellungen aktiviert",
         "no_local_folders_sidebar_hint" to "Aktiviere lokale Ordner in den Einstellungen, damit sie hier in der Seitenleiste zur Auswahl stehen.",
-        "btn_open_settings_folders" to "Ordner in Einstellungen verwalten"
+        "btn_open_settings_folders" to "Ordner in Einstellungen verwalten",
+
+        // Cover Quick Actions Sheet
+        "cover_quick_actions_title" to "Schnellaktionen",
+        "cover_quick_actions_desc" to "Countdown-Timer, Zeitsprung und Download",
+        "countdown_timer_title" to "Countdown-Timer",
+        "countdown_timer_active" to "Timer läuft",
+        "countdown_timer_stop" to "Timer stoppen",
+        "countdown_timer_start" to "Timer starten",
+        "countdown_end_of_track" to "Song-Ende",
+        "countdown_more_options" to "Weitere Timer-Optionen",
+        "jump_to_time_title" to "Zu Zeit im Song springen",
+        "jump_to_time_hint" to "z.B. 1:45 oder 90s",
+        "jump_to_time_btn" to "Springen",
+        "jump_to_time_invalid" to "Bitte gültige Zeit eingeben (z.B. 1:30)",
+        "jump_quick_rewind" to "-30s",
+        "jump_quick_forward" to "+30s",
+        "jump_quick_start" to "Anfang (0:00)",
+        "jump_quick_middle" to "Mitte (50%)",
+        "download_this_song_btn" to "Diesen Song herunterladen",
+        "download_this_song_desc" to "Für Offline-Wiedergabe ohne Internet speichern",
+        "download_status_downloaded" to "Song ist offline verfügbar",
+        "download_status_downloading" to "Song wird heruntergeladen...",
+        "download_status_redownload" to "Erneut herunterladen",
+        "download_status_failed" to "Download fehlgeschlagen - erneut tippen",
+        "cover_open_lyrics" to "Songtext anzeigen"
     )
 }
