@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.NaviromPlaylist
@@ -112,15 +113,26 @@ fun PlaylistsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "${str("playlists_title")} (${playlists.size})",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column {
+                        Text(
+                            text = str("playlists_title"),
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                fontWeight = FontWeight.Normal,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${playlists.size} curated collections",
+                            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
                     Button(
                         onClick = { showCreateDialog = true },
@@ -128,9 +140,12 @@ fun PlaylistsScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         modifier = Modifier.testTag("create_playlist_btn")
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(str("btn_create_playlist"))
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = str("btn_create_playlist"),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+                        )
                     }
                 }
 
@@ -364,13 +379,17 @@ fun PlaylistDetailView(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = playlist?.name ?: "Playlist",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                            fontWeight = FontWeight.Normal,
+                            letterSpacing = 0.3.sp
+                        ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${tracks.size} tracks",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (playlist?.id == "favorites_dynamic_playlist_id") {

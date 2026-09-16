@@ -223,6 +223,10 @@ fun NaviromApp(
                 onGoToSettings = { viewModel.setTab(NaviromTab.SETTINGS) },
                 onSyncLibrary = { viewModel.syncLibrary() },
                 onCloseSidebar = { scope.launch { drawerState.close() } },
+                profileName = serverState.username,
+                serverConnected = serverState.isConnected,
+                onNavigateToTab = { tab -> viewModel.setTab(tab) },
+                currentTab = currentTab,
                 str = ::str
             )
         }
@@ -380,6 +384,10 @@ fun NaviromApp(
                         onCloseApp = {
                             haptics.click()
                             onCloseApp()
+                        },
+                        onOpenSidebar = {
+                            haptics.tick()
+                            scope.launch { drawerState.open() }
                         }
                     )
 
@@ -523,6 +531,10 @@ fun NaviromApp(
                         onCloseApp = {
                             haptics.click()
                             onCloseApp()
+                        },
+                        onOpenSidebar = {
+                            haptics.tick()
+                            scope.launch { drawerState.open() }
                         }
                     )
                 },
@@ -922,63 +934,65 @@ private fun AppTopBar(
     serverConnected: Boolean,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
-    onCloseApp: () -> Unit
+    onCloseApp: () -> Unit,
+    onOpenSidebar: (() -> Unit)? = null
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_app_logo),
-                    contentDescription = "Zana Logo",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+                if (onOpenSidebar != null) {
+                    IconButton(
+                        onClick = onOpenSidebar,
+                        modifier = Modifier.size(40.dp).testTag("open_sidebar_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.size(40.dp))
+                }
 
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Zana",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
+                Text(
+                    text = "ZANA",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        fontWeight = FontWeight.Normal,
+                        letterSpacing = 4.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("app_brand_title")
+                )
+
+                IconButton(
+                    onClick = onCloseApp,
+                    modifier = Modifier.size(40.dp).testTag("close_app_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
-        }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onCloseApp,
-                modifier = Modifier.size(44.dp).testTag("close_app_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close App",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
         }
     }
 }

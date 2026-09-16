@@ -1343,62 +1343,110 @@ fun FullPlayerModal(
                                         .then(
                                             if (!isVinylEffectEnabled) {
                                                 Modifier
-                                                    .pointerInput(Unit) {
-                                                        var totalX = 0f
-                                                        var totalY = 0f
-                                                        var handled = false
-                                                        detectDragGestures(
-                                                            onDragStart = { totalX = 0f; totalY = 0f; handled = false },
-                                                            onDragEnd = { totalX = 0f; totalY = 0f; handled = false },
-                                                            onDragCancel = { totalX = 0f; totalY = 0f; handled = false },
-                                                            onDrag = { change, dragAmount ->
-                                                                if (!handled) {
-                                                                    totalX += dragAmount.x
-                                                                    totalY += dragAmount.y
-                                                                    val th = 50f
-                                                                    if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.2f && kotlin.math.abs(totalX) > th) {
-                                                                        change.consume()
-                                                                        handled = true
-                                                                        if (totalX < -th) {
-                                                                            // Swipe Left -> Next
-                                                                            haptics.click()
-                                                                            onNext()
-                                                                        } else if (totalX > th) {
-                                                                            // Swipe Right -> Previous
-                                                                            haptics.click()
-                                                                            onPrevious()
-                                                                        }
-                                                                    } else if (kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.2f && kotlin.math.abs(totalY) > th) {
-                                                                        if (totalY < -th) {
-                                                                            // Swipe Up -> Lyrics View
+                                                    .testTag("full_player_cover_click")
+                                                    .pointerInput(track.id) {
+                                                        awaitEachGesture {
+                                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                                            val downTime = SystemClock.uptimeMillis()
+                                                            val startX = down.position.x
+                                                            val startY = down.position.y
+                                                            var totalX = 0f
+                                                            var totalY = 0f
+                                                            var isDrag = false
+                                                            var handledSwipe = false
+
+                                                            do {
+                                                                val event = awaitPointerEvent()
+                                                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                                                if (change.pressed) {
+                                                                    totalX = change.position.x - startX
+                                                                    totalY = change.position.y - startY
+                                                                    val dist = kotlin.math.sqrt(totalX * totalX + totalY * totalY)
+                                                                    if (dist > 18f) {
+                                                                        isDrag = true
+                                                                    }
+                                                                    if (isDrag && !handledSwipe) {
+                                                                        val th = 70f
+                                                                        if (kotlin.math.abs(totalX) > kotlin.math.abs(totalY) * 1.3f && kotlin.math.abs(totalX) > th) {
                                                                             change.consume()
-                                                                            handled = true
-                                                                            haptics.toggle()
-                                                                            viewMode = PlayerViewMode.LYRICS
-                                                                        } else if (totalY > th) {
-                                                                            // Swipe Down -> Minimize
+                                                                            handledSwipe = true
+                                                                            if (totalX < -th) {
+                                                                                haptics.click()
+                                                                                onNext()
+                                                                            } else if (totalX > th) {
+                                                                                haptics.click()
+                                                                                onPrevious()
+                                                                            }
+                                                                        } else if (kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.3f && kotlin.math.abs(totalY) > th) {
                                                                             change.consume()
-                                                                            handled = true
-                                                                            haptics.click()
-                                                                            onDismiss()
+                                                                            handledSwipe = true
+                                                                            if (totalY < -th) {
+                                                                                haptics.toggle()
+                                                                                viewMode = PlayerViewMode.LYRICS
+                                                                            } else if (totalY > th) {
+                                                                                haptics.click()
+                                                                                onDismiss()
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
+                                                            } while (event.changes.any { it.pressed })
+
+                                                            val durationMs = SystemClock.uptimeMillis() - downTime
+                                                            if (!isDrag && !handledSwipe) {
+                                                                if (durationMs > 500L && onAlbumClick != null) {
+                                                                    haptics.click()
+                                                                    onAlbumClick.invoke(track.albumId)
+                                                                } else {
+                                                                    haptics.click()
+                                                                    showCoverQuickActionsSheet = true
+                                                                }
                                                             }
-                                                        )
+                                                        }
                                                     }
-                                                    .combinedClickable(
-                                                        onClick = {
-                                                            haptics.click()
-                                                            showCoverQuickActionsSheet = true
-                                                        },
-                                                        onLongClick = { onAlbumClick?.invoke(track.albumId) }
-                                                    )
                                             } else {
                                                 Modifier
                                             }
                                         )
                                 )
+
+                                // Subtle Countdown Timer Badge on cover if timer is running
+                                if (isTimerActive) {
+                                    val secsLeft = playbackState.sleepTimerSecondsLeft ?: ((playbackState.sleepTimerMinutesLeft ?: 0) * 60)
+                                    val formattedLeft = if (secsLeft > 0) "%02d:%02d".format(secsLeft / 60, secsLeft % 60) else ""
+                                    if (formattedLeft.isNotEmpty()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(10.dp)
+                                                .clickable {
+                                                    haptics.click()
+                                                    showCoverQuickActionsSheet = true
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.HourglassTop,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Text(
+                                                    text = formattedLeft,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
 
                                 if (isVinylEffectEnabled) {
                                     // Concentric micro-groove ring 1

@@ -305,10 +305,11 @@ fun LibraryScreen(
                 onOpenSidebar = onOpenSidebar
             )
 
-            // 2. Library Labels & Active Folder Switcher
+            // 2. Editorial Library Active Folder Bar (Clean, serene layout)
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
                 onClick = { onOpenSidebar() },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -316,262 +317,116 @@ fun LibraryScreen(
                     .testTag("library_folder_switcher")
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        IconButton(
-                            onClick = { onOpenSidebar() },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .testTag("open_libraries_sidebar_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Menu,
-                                contentDescription = str("subtab_libraries"),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = str("switch_library_prompt"),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = activeFolderName,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = str("switch_library_prompt").uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = activeFolderName,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.clickable { onOpenSidebar() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.FolderSpecial,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(14.dp)
-                            )
                             Text(
-                                text = if (musicFolders.isNotEmpty()) "${musicFolders.size} ${str("subtab_libraries").lowercase()}" else str("subtab_libraries"),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Icon(
-                                imageVector = Icons.Filled.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(14.dp)
+                                text = if (musicFolders.isNotEmpty()) "${musicFolders.size} ${str("subtab_libraries").lowercase()} +" else "${str("subtab_libraries")} +",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
                 }
             }
 
-            // Library Filter Chips / Labels
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 3. Editorial Minimalist SubTabs (Inspired by ELOME navigation)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // OVERVIEW subtab chip (Default Home View)
-                FilterChip(
-                    selected = subTab == LibrarySubTab.OVERVIEW,
+                EditorialSubTabItem(
+                    title = str("subtab_overview"),
+                    isSelected = subTab == LibrarySubTab.OVERVIEW,
                     onClick = { onSubTabSelected(LibrarySubTab.OVERVIEW) },
-                    label = { Text(str("subtab_overview")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.OVERVIEW) Icons.Filled.Dashboard else Icons.Outlined.Dashboard,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_overview")
+                    testTag = "tab_overview"
                 )
-
-                // SONGS subtab chip (List view for songs of a library)
-                FilterChip(
-                    selected = subTab == LibrarySubTab.SONGS,
+                EditorialSubTabItem(
+                    title = if (librarySongs.isNotEmpty()) "${str("subtab_songs")} (${librarySongs.size})" else str("subtab_songs"),
+                    isSelected = subTab == LibrarySubTab.SONGS,
                     onClick = { onSubTabSelected(LibrarySubTab.SONGS) },
-                    label = { Text(if (librarySongs.isNotEmpty()) "${str("subtab_songs")} (${librarySongs.size})" else str("subtab_songs")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.SONGS) Icons.Filled.Audiotrack else Icons.Outlined.Audiotrack,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_songs")
+                    testTag = "tab_songs"
                 )
-
-                // ALBUMS subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.ALBUMS,
+                EditorialSubTabItem(
+                    title = "${str("subtab_albums")} (${albums.size})",
+                    isSelected = subTab == LibrarySubTab.ALBUMS,
                     onClick = { onSubTabSelected(LibrarySubTab.ALBUMS) },
-                    label = { Text("${str("subtab_albums")} (${albums.size})") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.ALBUMS) Icons.Filled.Album else Icons.Outlined.Album,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_albums")
+                    testTag = "tab_albums"
                 )
-
-                // ARTISTS subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.ARTISTS,
+                EditorialSubTabItem(
+                    title = "${str("subtab_artists")} (${artists.size})",
+                    isSelected = subTab == LibrarySubTab.ARTISTS,
                     onClick = { onSubTabSelected(LibrarySubTab.ARTISTS) },
-                    label = { Text("${str("subtab_artists")} (${artists.size})") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.ARTISTS) Icons.Filled.Person else Icons.Outlined.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_artists")
+                    testTag = "tab_artists"
                 )
-
-                // LOCAL FILES / FOLDERS subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.LIBRARIES,
+                val totalFolderCount = musicFolders.size + localFolders.size
+                val countSuffix = if (totalFolderCount > 0) " ($totalFolderCount)" else ""
+                EditorialSubTabItem(
+                    title = "${str("subtab_local_folders")}$countSuffix",
+                    isSelected = subTab == LibrarySubTab.LIBRARIES,
                     onClick = { onSubTabSelected(LibrarySubTab.LIBRARIES) },
-                    label = {
-                        val totalFolderCount = musicFolders.size + localFolders.size
-                        val countSuffix = if (totalFolderCount > 0) " ($totalFolderCount)" else ""
-                        Text("${str("subtab_local_folders")}$countSuffix")
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.LIBRARIES) Icons.Filled.FolderSpecial else Icons.Outlined.FolderSpecial,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_local_files")
+                    testTag = "tab_local_files"
                 )
-
-                // NEWEST subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.NEWEST,
+                EditorialSubTabItem(
+                    title = str("newly_added_title"),
+                    isSelected = subTab == LibrarySubTab.NEWEST,
                     onClick = { onSubTabSelected(LibrarySubTab.NEWEST) },
-                    label = { Text(str("newly_added_title")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.NEWEST) Icons.Filled.FiberNew else Icons.Outlined.FiberNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_newest")
+                    testTag = "tab_newest"
                 )
-
-                // QUICK MIX subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.QUICK_MIX,
+                EditorialSubTabItem(
+                    title = str("subtab_quick_mix"),
+                    isSelected = subTab == LibrarySubTab.QUICK_MIX,
                     onClick = { onSubTabSelected(LibrarySubTab.QUICK_MIX) },
-                    label = { Text(str("subtab_quick_mix")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.QUICK_MIX) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_quick_mix")
+                    testTag = "tab_quick_mix"
                 )
-
-                // RECENT subtab chip
-                FilterChip(
-                    selected = subTab == LibrarySubTab.RECENT,
+                EditorialSubTabItem(
+                    title = if (recentlyPlayedTracks.isNotEmpty()) "${str("subtab_recent")} (${recentlyPlayedTracks.size})" else str("subtab_recent"),
+                    isSelected = subTab == LibrarySubTab.RECENT,
                     onClick = { onSubTabSelected(LibrarySubTab.RECENT) },
-                    label = { Text(if (recentlyPlayedTracks.isNotEmpty()) "${str("subtab_recent")} (${recentlyPlayedTracks.size})" else str("subtab_recent")) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (subTab == LibrarySubTab.RECENT) Icons.Filled.History else Icons.Outlined.History,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.testTag("tab_recent")
+                    testTag = "tab_recent"
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             AnimatedContent(
                 targetState = subTab,
@@ -2567,11 +2422,11 @@ private fun GreetingHeader(
     fun str(key: String): String = NaviromStrings.get(key, appLanguage)
 
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val (greetingKey, icon, iconColor) = when (currentHour) {
-        in 5..11 -> Triple("greeting_morning", Icons.Filled.WbSunny, Color(0xFFFFA000))
-        in 12..17 -> Triple("greeting_afternoon", Icons.Filled.WbSunny, Color(0xFFFFB300))
-        in 18..22 -> Triple("greeting_evening", Icons.Filled.WbTwilight, Color(0xFFFF7043))
-        else -> Triple("greeting_night", Icons.Filled.NightsStay, Color(0xFF7E57C2))
+    val greetingKey = when (currentHour) {
+        in 5..11 -> "greeting_morning"
+        in 12..17 -> "greeting_afternoon"
+        in 18..22 -> "greeting_evening"
+        else -> "greeting_night"
     }
 
     val greetingPrefix = str(greetingKey)
@@ -2579,10 +2434,10 @@ private fun GreetingHeader(
     val greetingText = "$greetingPrefix, $displayName"
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp)
             .testTag("library_greeting_header")
     ) {
         Row(
@@ -2591,53 +2446,87 @@ private fun GreetingHeader(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = greetingText,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = greetingText,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        fontWeight = FontWeight.Normal,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = str("greeting_subtitle"),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.4.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // User Profile avatar badge
+            // User Profile avatar badge (Inspired by MenuMobile.jpg profile circular avatar)
             Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 onClick = onOpenSidebar,
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .testTag("greeting_profile_avatar")
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = displayName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun EditorialSubTabItem(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+            .testTag(testTag),
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = title,
+            style = if (isSelected) {
+                MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.3.sp
+                )
+            } else {
+                MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.2.sp
+                )
+            },
+            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .height(1.5.dp)
+                .width(28.dp)
+                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent)
+        )
+    }
+}
+
 

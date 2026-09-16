@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.labix.navirom.data.model.*
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
@@ -77,32 +78,38 @@ fun SearchScreen(
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text(str("search_hint")) },
+            placeholder = { 
+                Text(
+                    str("search_hint"),
+                    style = MaterialTheme.typography.bodyMedium.copy(letterSpacing = 0.3.sp)
+                ) 
+            },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.Search,
                     contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
                 )
             },
             trailingIcon = {
                 if (query.isNotBlank()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear search")
+                        Icon(imageVector = Icons.Filled.Clear, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
                     }
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .focusRequester(focusRequester)
                 .testTag("search_input_field")
         )
@@ -269,12 +276,16 @@ fun SearchScreen(
                             item {
                                 Text(
                                     text = str("search_artists"),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = 0.4.sp
+                                    ),
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                                 )
                                 LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     items(artists, key = { it.id }) { artist ->
@@ -291,15 +302,19 @@ fun SearchScreen(
                         // Albums Section
                         if (albums.isNotEmpty()) {
                             item {
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
                                 Text(
                                     text = str("search_albums"),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = 0.4.sp
+                                    ),
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                                 )
                                 LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     items(albums, key = { it.id }) { album ->
@@ -316,12 +331,16 @@ fun SearchScreen(
                         // Tracks Section
                         if (tracks.isNotEmpty()) {
                             item {
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
                                 Text(
                                     text = "${str("search_tracks")} (${tracks.size})",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = 0.4.sp
+                                    ),
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                                 )
                             }
 
