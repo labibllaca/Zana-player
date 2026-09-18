@@ -144,6 +144,23 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _currentTab = MutableStateFlow(NaviromTab.LIBRARY)
     val currentTab: StateFlow<NaviromTab> = _currentTab.asStateFlow()
 
+    // Initial Setup & Onboarding State
+    private val _hasCompletedInitialSetup = MutableStateFlow(
+        prefs.getBoolean("has_completed_initial_setup", false)
+    )
+    val hasCompletedInitialSetup: StateFlow<Boolean> = _hasCompletedInitialSetup.asStateFlow()
+
+    fun completeInitialSetup() {
+        _hasCompletedInitialSetup.value = true
+        prefs.edit().putBoolean("has_completed_initial_setup", true).apply()
+        // Automatically scan local storage after initial setup completion
+        scanLocalAudio()
+    }
+
+    fun resetInitialSetupForReplay() {
+        _hasCompletedInitialSetup.value = false
+    }
+
     private val _librarySubTab = MutableStateFlow(LibrarySubTab.OVERVIEW)
     val librarySubTab: StateFlow<LibrarySubTab> = _librarySubTab.asStateFlow()
 

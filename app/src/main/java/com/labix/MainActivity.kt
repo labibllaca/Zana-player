@@ -30,6 +30,7 @@ import com.labix.navirom.ui.AppThemeMode
 import com.labix.navirom.ui.NaviromApp
 import com.labix.navirom.ui.NaviromViewModel
 import com.labix.navirom.ui.components.AppSplashScreen
+import com.labix.navirom.ui.screens.InitialSetupScreen
 import com.labix.ui.theme.MyApplicationTheme
 
 import android.app.Activity
@@ -70,12 +71,6 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: NaviromViewModel by viewModels()
 
-    private val requestNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Permission result handled
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instanceRef = WeakReference(this)
@@ -109,14 +104,11 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
         setContent {
             val themeMode by viewModel.appThemeMode.collectAsStateWithLifecycle()
+            val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
+            val hasCompletedInitialSetup by viewModel.hasCompletedInitialSetup.collectAsStateWithLifecycle()
+
             val isSystemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
                 AppThemeMode.DARK -> true
@@ -129,14 +121,23 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(darkTheme = isDark) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        NaviromApp(
-                            viewModel = viewModel,
-                            onCloseApp = {
-                                NaviromPlaybackService.stopService(this@MainActivity)
-                                finishAndRemoveTask()
-                                finishAffinity()
-                            }
-                        )
+                        if (!hasCompletedInitialSetup && !showSplash) {
+                            InitialSetupScreen(
+                                appLanguage = appLanguage,
+                                onFinished = {
+                                    viewModel.completeInitialSetup()
+                                }
+                            )
+                        } else {
+                            NaviromApp(
+                                viewModel = viewModel,
+                                onCloseApp = {
+                                    NaviromPlaybackService.stopService(this@MainActivity)
+                                    finishAndRemoveTask()
+                                    finishAffinity()
+                                }
+                            )
+                        }
 
                         AnimatedVisibility(
                             visible = showSplash,
