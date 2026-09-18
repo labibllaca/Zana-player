@@ -140,6 +140,7 @@ fun NaviromApp(
     val settingsEnabledLocalFolderIds by viewModel.settingsEnabledLocalFolderIds.collectAsStateWithLifecycle()
     val disabledLocalFolderIds by viewModel.disabledLocalFolderIds.collectAsStateWithLifecycle()
     val isScanningLocalAudio by viewModel.isScanningLocalAudio.collectAsStateWithLifecycle()
+    val currentMusicFolderPath by viewModel.currentMusicFolderPath.collectAsStateWithLifecycle()
 
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val queue by viewModel.currentQueue.collectAsStateWithLifecycle()
@@ -317,14 +318,14 @@ fun NaviromApp(
                         )
                     )
                     NavigationRailItem(
-                        selected = currentTab == NaviromTab.OFFLINE,
+                        selected = currentTab == NaviromTab.FOLDERS,
                         onClick = {
                             haptics.tick()
-                            viewModel.setTab(NaviromTab.OFFLINE)
+                            viewModel.setTab(NaviromTab.FOLDERS)
                         },
-                        icon = { Icon(if (currentTab == NaviromTab.OFFLINE) Icons.Filled.CloudDone else Icons.Outlined.CloudDone, contentDescription = str("tab_offline")) },
-                        label = { Text(str("tab_offline")) },
-                        modifier = Modifier.testTag("rail_item_offline"),
+                        icon = { Icon(if (currentTab == NaviromTab.FOLDERS) Icons.Filled.Folder else Icons.Outlined.Folder, contentDescription = str("tab_music")) },
+                        label = { Text(str("tab_music")) },
+                        modifier = Modifier.testTag("rail_item_folders"),
                         colors = NavigationRailItemDefaults.colors(
                             indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
                             selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -624,14 +625,14 @@ fun NaviromApp(
                                 )
                             )
                             NavigationBarItem(
-                                selected = currentTab == NaviromTab.OFFLINE,
+                                selected = currentTab == NaviromTab.FOLDERS,
                                 onClick = {
                                     haptics.tick()
-                                    viewModel.setTab(NaviromTab.OFFLINE)
+                                    viewModel.setTab(NaviromTab.FOLDERS)
                                 },
-                                icon = { Icon(if (currentTab == NaviromTab.OFFLINE) Icons.Filled.CloudDone else Icons.Outlined.CloudDone, contentDescription = str("tab_offline")) },
-                                label = { Text(str("tab_offline"), fontWeight = if (currentTab == NaviromTab.OFFLINE) FontWeight.Bold else FontWeight.Medium) },
-                                modifier = Modifier.testTag("nav_item_offline"),
+                                icon = { Icon(if (currentTab == NaviromTab.FOLDERS) Icons.Filled.Folder else Icons.Outlined.Folder, contentDescription = str("tab_music")) },
+                                label = { Text(str("tab_music"), fontWeight = if (currentTab == NaviromTab.FOLDERS) FontWeight.Bold else FontWeight.Medium) },
+                                modifier = Modifier.testTag("nav_item_folders"),
                                 colors = NavigationBarItemDefaults.colors(
                                     indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -798,7 +799,11 @@ fun NaviromApp(
                         onSelectAllSettingsLocalFolders = { viewModel.selectAllSettingsLocalFolders() },
                         onDeselectAllSettingsLocalFolders = { viewModel.deselectAllSettingsLocalFolders() },
                         isScanningLocalAudio = isScanningLocalAudio,
-                        onScanLocalAudio = { viewModel.scanLocalAudio() }
+                        onScanLocalAudio = { viewModel.scanLocalAudio() },
+                        currentMusicFolderPath = currentMusicFolderPath,
+                        onNavigateToMusicFolder = { viewModel.navigateToMusicFolder(it) },
+                        onNavigateUpMusicFolder = { viewModel.navigateUpMusicFolder() },
+                        onPlayFolder = { path, shuffle -> viewModel.playFolder(path, shuffle) }
                     )
                 }
             }
@@ -1105,7 +1110,11 @@ private fun TabContent(
     onSelectAllSettingsLocalFolders: () -> Unit = {},
     onDeselectAllSettingsLocalFolders: () -> Unit = {},
     isScanningLocalAudio: Boolean = false,
-    onScanLocalAudio: () -> Unit = {}
+    onScanLocalAudio: () -> Unit = {},
+    currentMusicFolderPath: String = "",
+    onNavigateToMusicFolder: (String) -> Unit = {},
+    onNavigateUpMusicFolder: () -> Boolean = { false },
+    onPlayFolder: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     AnimatedContent(
         targetState = currentTab,
@@ -1231,23 +1240,23 @@ private fun TabContent(
                 searchFocusTrigger = searchFocusTrigger
             )
         }
-        NaviromTab.OFFLINE -> {
-            OfflineCacheScreen(
-                cachedTracks = cachedTracks,
-                totalCacheSizeBytes = totalCacheSizeBytes,
-                isOfflineOnlyMode = isOfflineOnlyMode,
-                onToggleOfflineOnly = onToggleOfflineOnly,
-                currentTrack = playbackState.currentTrack,
-                isPlaying = playbackState.isPlaying,
-                favoriteIds = favoriteIds,
+        NaviromTab.FOLDERS -> {
+            MusicFoldersScreen(
+                currentFolderPath = currentMusicFolderPath,
+                allLocalTracks = localTracks,
+                allDiscoveredFolders = allDiscoveredLocalFolders,
+                isScanning = isScanningLocalAudio,
+                playbackState = playbackState,
                 appLanguage = appLanguage,
-                onPlayAll = onPlayAll,
-                onTrackClick = onTrackClick,
-                onToggleFavorite = onToggleFavorite,
-                onDeleteCachedTrack = onDeleteCachedTrack,
-                onClearAllCache = onClearAllCache,
+                onNavigateToFolder = onNavigateToMusicFolder,
+                onNavigateUp = onNavigateUpMusicFolder,
+                onRescanStorage = onScanLocalAudio,
+                onPlayTrack = onTrackClick,
+                onPlayFolder = onPlayFolder,
                 onPlayNext = onPlayNext,
-                onAddToQueue = onAddToQueue
+                onAddToQueue = onAddToQueue,
+                onToggleFavorite = { track -> onToggleFavorite(track.id) },
+                favoriteIds = favoriteIds.toSet()
             )
         }
         NaviromTab.SETTINGS -> {

@@ -42,8 +42,8 @@ import java.util.UUID
 enum class NaviromTab {
     LIBRARY,
     PLAYLISTS,
+    FOLDERS,
     SEARCH,
-    OFFLINE,
     SETTINGS
 }
 
@@ -221,21 +221,64 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _allDiscoveredLocalFolders = MutableStateFlow<List<LocalMusicFolder>>(emptyList())
     val allDiscoveredLocalFolders: StateFlow<List<LocalMusicFolder>> = _allDiscoveredLocalFolders.asStateFlow()
 
-    // Settings: Folders enabled by the user in Settings to be included in App and Sidebar
-    private val _settingsEnabledLocalFolderIds = MutableStateFlow<Set<String>>(
-        prefs.getStringSet("settings_enabled_local_folder_ids", null) ?: emptySet()
-    )
+    // Settings: Folders enabled by the user in Settings (legacy compatibility)
+    private val _settingsEnabledLocalFolderIds = MutableStateFlow<Set<String>>(emptySet())
     val settingsEnabledLocalFolderIds: StateFlow<Set<String>> = _settingsEnabledLocalFolderIds.asStateFlow()
 
-    // Folders that are activated in Settings -> shown in Sidebar and Library
-    val localFolders: StateFlow<List<LocalMusicFolder>> = combine(_allDiscoveredLocalFolders, _settingsEnabledLocalFolderIds) { allFolders, enabledInSettings ->
-        val hasExplicitSettings = prefs.contains("settings_enabled_local_folder_ids")
-        if (!hasExplicitSettings) {
-            allFolders
-        } else {
-            allFolders.filter { enabledInSettings.contains(it.id) }
+    // Local folders: directly uses all discovered folders, decoupled from settings
+    val localFolders: StateFlow<List<LocalMusicFolder>> = _allDiscoveredLocalFolders.asStateFlow()
+
+    // Folder view navigation state
+    val defaultMusicPath: String = localAudioRepository.getDefaultMusicDirectoryPath()
+    private val _currentMusicFolderPath = MutableStateFlow<String>(defaultMusicPath)
+    val currentMusicFolderPath: StateFlow<String> = _currentMusicFolderPath.asStateFlow()
+
+    fun navigateToMusicFolder(path: String) {
+        _currentMusicFolderPath.value = path
+    }
+
+    fun navigateUpMusicFolder(): Boolean {
+        val current = _currentMusicFolderPath.value
+        val defaultNorm = defaultMusicPath.trimEnd('/')
+        val currentNorm = current.trimEnd('/')
+        if (currentNorm == defaultNorm) {
+            return false
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        val parent = try { java.io.File(currentNorm).parentFile?.absolutePath } catch (_: Exception) { null }
+        return if (parent != null && parent.length >= "/storage/emulated/0".length) {
+            _currentMusicFolderPath.value = parent
+            true
+        } else {
+            _currentMusicFolderPath.value = defaultMusicPath
+            true
+        }
+    }
+
+    fun playFolder(folderPath: String, shuffle: Boolean = false) {
+        val tracksInFolder = getTracksUnderFolder(folderPath)
+        if (tracksInFolder.isNotEmpty()) {
+            if (shuffle) {
+                shuffleAll(tracksInFolder)
+            } else {
+                playAll(tracksInFolder, 0)
+            }
+        }
+    }
+
+    fun getTracksUnderFolder(folderPath: String): List<NaviromTrack> {
+        val normPath = folderPath.trimEnd('/')
+        return _localTracks.value.filter { track ->
+            val trackPath = track.path.trimEnd('/')
+            if (trackPath.isBlank()) false else {
+                trackPath.startsWith("$normPath/") || trackPath == normPath ||
+                    (try { java.io.File(trackPath).parentFile?.absolutePath?.trimEnd('/') == normPath } catch (_: Exception) { false })
+            }
+        }.sortedBy { it.title.lowercase() }
+    }
+
+    fun getFolderViewContent(path: String = _currentMusicFolderPath.value): FolderViewContent {
+        return localAudioRepository.getFolderViewContent(path, _localTracks.value)
+    }
 
     // Playback active/inactive toggles for the sidebar and library
     private val _disabledLocalFolderIds = MutableStateFlow<Set<String>>(
@@ -259,12 +302,6 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                 val folders = localAudioRepository.groupTracksIntoFolders(scanned)
                 _localTracks.value = scanned
                 _allDiscoveredLocalFolders.value = folders
-
-                if (!prefs.contains("settings_enabled_local_folder_ids")) {
-                    val allIds = folders.map { it.id }.toSet()
-                    _settingsEnabledLocalFolderIds.value = allIds
-                    prefs.edit().putStringSet("settings_enabled_local_folder_ids", allIds).apply()
-                }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {

@@ -20,6 +20,24 @@ data class LocalMusicFolder(
     val tracks: List<NaviromTrack> = emptyList()
 )
 
+data class SubFolderEntry(
+    val name: String,
+    val path: String,
+    val totalTracksCount: Int,
+    val directTracksCount: Int,
+    val subfoldersCount: Int
+)
+
+data class FolderViewContent(
+    val currentPath: String,
+    val currentName: String,
+    val parentPath: String?,
+    val breadcrumbs: List<Pair<String, String>>, // (Label, AbsolutePath)
+    val subfolders: List<SubFolderEntry>,
+    val directTracks: List<NaviromTrack>,
+    val totalTracksInTree: List<NaviromTrack>
+)
+
 class LocalAudioRepository(private val context: Context) {
 
     suspend fun getLocalAudioTracks(): List<NaviromTrack> = withContext(Dispatchers.IO) {
@@ -128,7 +146,186 @@ class LocalAudioRepository(private val context: Context) {
             e.printStackTrace()
         }
 
+        // Direct scan fallback for the public Music directory
+        try {
+            val scannedPaths = tracks.map { it.path }.filter { it.isNotBlank() }.toSet()
+            val musicDir = File(getDefaultMusicDirectoryPath())
+            if (musicDir.exists() && musicDir.canRead()) {
+                val audioExtensions = setOf("mp3", "flac", "m4a", "wav", "aac", "ogg", "opus", "wma", "alac", "aiff")
+                musicDir.walkTopDown()
+                    .maxDepth(6)
+                    .filter { file ->
+                        file.isFile && file.length() > 0 && audioExtensions.contains(file.extension.lowercase())
+                    }
+                    .forEach { audioFile ->
+                        if (!scannedPaths.contains(audioFile.absolutePath)) {
+                            val suffix = audioFile.extension.lowercase()
+                            val folderName = audioFile.parentFile?.name ?: "Music"
+                            tracks.add(
+                                NaviromTrack(
+                                    id = "local_file_${audioFile.absolutePath.hashCode()}",
+                                    title = audioFile.nameWithoutExtension,
+                                    artist = folderName,
+                                    artistId = "local_folder_${folderName.hashCode()}",
+                                    album = folderName,
+                                    albumId = "local_folder_${folderName.hashCode()}",
+                                    durationSeconds = 0,
+                                    coverArtId = "",
+                                    coverArtUrl = "",
+                                    streamUrl = Uri.fromFile(audioFile).toString(),
+                                    localFilePath = Uri.fromFile(audioFile).toString(),
+                                    path = audioFile.absolutePath,
+                                    suffix = suffix,
+                                    isCached = true,
+                                    sizeBytes = audioFile.length()
+                                )
+                            )
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         tracks
+    }
+
+    fun getDefaultMusicDirectoryPath(): String {
+        return try {
+            val pub = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC)
+            if (pub != null && pub.exists()) {
+                pub.absolutePath
+            } else {
+                "/storage/emulated/0/Music"
+            }
+        } catch (_: Exception) {
+            "/storage/emulated/0/Music"
+        }
+    }
+
+    fun getFolderViewContent(currentPath: String, allTracks: List<NaviromTrack>): FolderViewContent {
+        val normPath = currentPath.trimEnd('/')
+        val curFile = File(normPath)
+        val defaultMusic = getDefaultMusicDirectoryPath().trimEnd('/')
+
+        val currentName = when {
+            normPath == defaultMusic -> "Music"
+            normPath == "/storage/emulated/0" -> "Internal Storage"
+            normPath.endsWith("/Music") -> "Music"
+            else -> curFile.name.ifBlank { "Music" }
+        }
+
+        val parentPath = if (normPath == defaultMusic) {
+            null
+        } else {
+            curFile.parentFile?.absolutePath
+        }
+
+        // Breadcrumbs: hierarchical path items
+        val breadcrumbs = mutableListOf<Pair<String, String>>()
+        if (normPath.startsWith(defaultMusic)) {
+            breadcrumbs.add(Pair("Music", defaultMusic))
+            val rel = normPath.removePrefix(defaultMusic).trimStart('/')
+            if (rel.isNotBlank()) {
+                val parts = rel.split('/').filter { it.isNotBlank() }
+                var accum = defaultMusic
+                for (part in parts) {
+                    accum = "$accum/$part"
+                    breadcrumbs.add(Pair(part, accum))
+                }
+            }
+        } else {
+            val emulatedPrefix = "/storage/emulated/0"
+            if (normPath.startsWith(emulatedPrefix)) {
+                breadcrumbs.add(Pair("Storage", emulatedPrefix))
+                val rel = normPath.removePrefix(emulatedPrefix).trimStart('/')
+                if (rel.isNotBlank()) {
+                    val parts = rel.split('/').filter { it.isNotBlank() }
+                    var accum = emulatedPrefix
+                    for (part in parts) {
+                        accum = "$accum/$part"
+                        breadcrumbs.add(Pair(part, accum))
+                    }
+                }
+            } else {
+                val parts = normPath.trim('/').split('/').filter { it.isNotBlank() }
+                var accum = ""
+                for (part in parts) {
+                    accum = "$accum/$part"
+                    breadcrumbs.add(Pair(part, accum))
+                }
+            }
+        }
+
+        // Direct tracks in this folder
+        val directTracks = allTracks.filter { track ->
+            val tp = track.path.trimEnd('/')
+            if (tp.isBlank()) false else {
+                val trackParent = try { File(tp).parentFile?.absolutePath?.trimEnd('/') } catch (_: Exception) { null }
+                trackParent == normPath
+            }
+        }.sortedWith(compareBy({ it.trackNumber ?: 999 }, { it.title.lowercase() }))
+
+        // All tracks recursively under normPath
+        val totalTracksInTree = allTracks.filter { track ->
+            val tp = track.path.trimEnd('/')
+            if (tp.isBlank()) false else {
+                tp.startsWith("$normPath/") || tp == normPath ||
+                    (try { File(tp).parentFile?.absolutePath?.trimEnd('/') == normPath } catch (_: Exception) { false })
+            }
+        }.sortedBy { it.title.lowercase() }
+
+        // Subfolders under this directory
+        val subfolderPaths = mutableSetOf<String>()
+        allTracks.forEach { track ->
+            val tp = track.path.trimEnd('/')
+            if (tp.startsWith("$normPath/")) {
+                val rel = tp.removePrefix("$normPath/").trimStart('/')
+                if (rel.contains('/')) {
+                    val subName = rel.substringBefore('/')
+                    subfolderPaths.add("$normPath/$subName")
+                }
+            }
+        }
+
+        if (curFile.exists() && curFile.isDirectory) {
+            try {
+                curFile.listFiles()?.filter { it.isDirectory }?.forEach { sub ->
+                    subfolderPaths.add(sub.absolutePath.trimEnd('/'))
+                }
+            } catch (_: Exception) {}
+        }
+
+        val subfolderEntries = subfolderPaths.map { subPath ->
+            val subNorm = subPath.trimEnd('/')
+            val subName = File(subNorm).name
+            val subDirect = allTracks.count {
+                val p = it.path.trimEnd('/')
+                p.isNotBlank() && try { File(p).parentFile?.absolutePath?.trimEnd('/') == subNorm } catch (_: Exception) { false }
+            }
+            val subTotal = allTracks.count {
+                val p = it.path.trimEnd('/')
+                p.isNotBlank() && (p.startsWith("$subNorm/") || p == subNorm)
+            }
+            val subSubCount = try { File(subNorm).listFiles()?.count { it.isDirectory } ?: 0 } catch (_: Exception) { 0 }
+            SubFolderEntry(
+                name = subName,
+                path = subNorm,
+                totalTracksCount = subTotal,
+                directTracksCount = subDirect,
+                subfoldersCount = subSubCount
+            )
+        }.sortedBy { it.name.lowercase() }
+
+        return FolderViewContent(
+            currentPath = normPath,
+            currentName = currentName,
+            parentPath = parentPath,
+            breadcrumbs = breadcrumbs,
+            subfolders = subfolderEntries,
+            directTracks = directTracks,
+            totalTracksInTree = totalTracksInTree
+        )
     }
 
     suspend fun getLocalAudioFolders(): List<LocalMusicFolder> = withContext(Dispatchers.IO) {
