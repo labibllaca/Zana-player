@@ -37,6 +37,7 @@ import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.components.PlaylistCard
 import com.labix.navirom.ui.components.TrackListItem
 import com.labix.navirom.ui.util.rememberNaviromHaptics
+import com.labix.ui.theme.AccentEmerald
 import com.labix.ui.theme.AccentRose
 
 @Composable
@@ -134,18 +135,37 @@ fun PlaylistsScreen(
                         )
                     }
 
-                    Button(
-                        onClick = { showCreateDialog = true },
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        modifier = Modifier.testTag("create_playlist_btn")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = str("btn_create_playlist"),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
-                        )
+                        FilledTonalButton(
+                            onClick = { onSelectPlaylist("downloaded_dynamic_playlist_id") },
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("open_downloaded_playlist_btn")
+                        ) {
+                            Icon(Icons.Filled.DownloadDone, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Downloaded",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+                            )
+                        }
+
+                        Button(
+                            onClick = { showCreateDialog = true },
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("create_playlist_btn")
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Create",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+                            )
+                        }
                     }
                 }
 
@@ -314,7 +334,7 @@ fun PlaylistDetailView(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (playlist?.id != "favorites_dynamic_playlist_id") {
+                if (playlist?.id != "favorites_dynamic_playlist_id" && playlist?.id != "downloaded_dynamic_playlist_id") {
                     IconButton(
                         onClick = { showDeleteConfirm = true }
                     ) {
@@ -344,6 +364,8 @@ fun PlaylistDetailView(
                         .background(
                             if (playlist?.id == "favorites_dynamic_playlist_id") {
                                 AccentRose.copy(alpha = 0.15f)
+                            } else if (playlist?.id == "downloaded_dynamic_playlist_id") {
+                                AccentEmerald.copy(alpha = 0.15f)
                             } else {
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                             }
@@ -355,6 +377,13 @@ fun PlaylistDetailView(
                             imageVector = Icons.Filled.Favorite,
                             contentDescription = null,
                             tint = AccentRose,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    } else if (playlist?.id == "downloaded_dynamic_playlist_id") {
+                        Icon(
+                            imageVector = Icons.Filled.DownloadDone,
+                            contentDescription = null,
+                            tint = AccentEmerald,
                             modifier = Modifier.size(48.dp)
                         )
                     } else if (playlist?.coverArt?.isNotBlank() == true) {
@@ -398,6 +427,12 @@ fun PlaylistDetailView(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
+                    } else if (playlist?.id == "downloaded_dynamic_playlist_id") {
+                        Text(
+                            text = "All downloaded tracks for offline playback",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
                     } else if (playlist?.comment?.isNotBlank() == true) {
                         Text(
                             text = playlist.comment,
@@ -423,7 +458,7 @@ fun PlaylistDetailView(
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(str("btn_play_all"))
+                    Text("Play")
                 }
 
                 FilledTonalButton(
@@ -433,7 +468,7 @@ fun PlaylistDetailView(
                 ) {
                     Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(str("btn_shuffle"))
+                    Text("Shuffle")
                 }
 
                 OutlinedButton(

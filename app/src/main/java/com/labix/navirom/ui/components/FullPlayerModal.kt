@@ -119,6 +119,7 @@ fun FullPlayerModal(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    onSeekRelative: ((Long) -> Unit)? = null,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -1587,8 +1588,29 @@ fun FullPlayerModal(
                                         tint = if (playbackState.repeatMode == RepeatMode.OFF) textMutedOnCard else textOnCard
                                     )
                                 }
-                                IconButton(onClick = onPrevious) {
-                                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", tint = textOnCard, modifier = Modifier.size(32.dp))
+                                HoldablePlaybackButton(
+                                    onClick = onPrevious,
+                                    onHoldTick = {
+                                        haptics.tick()
+                                        if (onSeekRelative != null) {
+                                            onSeekRelative(-5000L)
+                                        } else {
+                                            onSeekTo((playbackState.currentPositionMs - 5000L).coerceAtLeast(0L))
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) { isHolding ->
+                                    Icon(
+                                        imageVector = if (isHolding) Icons.Filled.FastRewind else Icons.Filled.SkipPrevious,
+                                        contentDescription = "Previous",
+                                        tint = if (isHolding) MaterialTheme.colorScheme.primary else textOnCard,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .graphicsLayer {
+                                                scaleX = if (isHolding) 1.25f else 1.0f
+                                                scaleY = if (isHolding) 1.25f else 1.0f
+                                            }
+                                    )
                                 }
                                 
                                 // Play/Pause Button (Circle outline)
@@ -1617,8 +1639,29 @@ fun FullPlayerModal(
                                     }
                                 }
 
-                                IconButton(onClick = onNext) {
-                                    Icon(Icons.Filled.SkipNext, contentDescription = "Next", tint = textOnCard, modifier = Modifier.size(32.dp))
+                                HoldablePlaybackButton(
+                                    onClick = onNext,
+                                    onHoldTick = {
+                                        haptics.tick()
+                                        if (onSeekRelative != null) {
+                                            onSeekRelative(5000L)
+                                        } else {
+                                            onSeekTo((playbackState.currentPositionMs + 5000L).coerceAtMost(playbackState.durationMs))
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) { isHolding ->
+                                    Icon(
+                                        imageVector = if (isHolding) Icons.Filled.FastForward else Icons.Filled.SkipNext,
+                                        contentDescription = "Next",
+                                        tint = if (isHolding) MaterialTheme.colorScheme.primary else textOnCard,
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .graphicsLayer {
+                                                scaleX = if (isHolding) 1.25f else 1.0f
+                                                scaleY = if (isHolding) 1.25f else 1.0f
+                                            }
+                                    )
                                 }
                                 IconButton(onClick = onToggleShuffle) {
                                     Icon(
@@ -2032,17 +2075,25 @@ fun FullPlayerModal(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    IconButton(
+                                    HoldablePlaybackButton(
                                         onClick = {
                                             haptics.click()
                                             onPrevious()
                                         },
+                                        onHoldTick = {
+                                            haptics.tick()
+                                            if (onSeekRelative != null) {
+                                                onSeekRelative(-5000L)
+                                            } else {
+                                                onSeekTo((playbackState.currentPositionMs - 5000L).coerceAtLeast(0L))
+                                            }
+                                        },
                                         modifier = Modifier.size(36.dp)
-                                    ) {
+                                    ) { isHolding ->
                                         Icon(
-                                            imageVector = Icons.Filled.SkipPrevious,
+                                            imageVector = if (isHolding) Icons.Filled.FastRewind else Icons.Filled.SkipPrevious,
                                             contentDescription = "Previous",
-                                            tint = textOnCard,
+                                            tint = if (isHolding) MaterialTheme.colorScheme.primary else textOnCard,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -2068,17 +2119,25 @@ fun FullPlayerModal(
                                         }
                                     }
 
-                                    IconButton(
+                                    HoldablePlaybackButton(
                                         onClick = {
                                             haptics.click()
                                             onNext()
                                         },
+                                        onHoldTick = {
+                                            haptics.tick()
+                                            if (onSeekRelative != null) {
+                                                onSeekRelative(5000L)
+                                            } else {
+                                                onSeekTo((playbackState.currentPositionMs + 5000L).coerceAtMost(playbackState.durationMs))
+                                            }
+                                        },
                                         modifier = Modifier.size(36.dp)
-                                    ) {
+                                    ) { isHolding ->
                                         Icon(
-                                            imageVector = Icons.Filled.SkipNext,
+                                            imageVector = if (isHolding) Icons.Filled.FastForward else Icons.Filled.SkipNext,
                                             contentDescription = "Next",
-                                            tint = textOnCard,
+                                            tint = if (isHolding) MaterialTheme.colorScheme.primary else textOnCard,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }

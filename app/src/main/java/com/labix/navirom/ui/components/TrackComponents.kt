@@ -2,8 +2,10 @@ package com.labix.navirom.ui.components
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,6 +128,8 @@ fun TrackListItem(
     enableSwipeToQueue: Boolean = true,
     showCoverArt: Boolean = true,
     trackIndex: Int? = null,
+    onAddToQueueBeginning: (() -> Unit)? = null,
+    onAddToQueueEnd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -200,6 +204,8 @@ fun TrackListItem(
                 trackIndex = trackIndex,
                 showMenu = showMenu,
                 onShowMenuChange = { showMenu = it },
+                onAddToQueueBeginning = onAddToQueueBeginning,
+                onAddToQueueEnd = onAddToQueueEnd,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -220,11 +226,14 @@ fun TrackListItem(
             trackIndex = trackIndex,
             showMenu = showMenu,
             onShowMenuChange = { showMenu = it },
+            onAddToQueueBeginning = onAddToQueueBeginning,
+            onAddToQueueEnd = onAddToQueueEnd,
             modifier = modifier
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TrackListItemContent(
     track: NaviromTrack,
@@ -242,8 +251,110 @@ private fun TrackListItemContent(
     trackIndex: Int?,
     showMenu: Boolean,
     onShowMenuChange: (Boolean) -> Unit,
+    onAddToQueueBeginning: (() -> Unit)? = null,
+    onAddToQueueEnd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val haptics = rememberNaviromHaptics()
+    var showQueueOptionDialog by remember { mutableStateOf(false) }
+
+    val handleBeginning = {
+        haptics.success()
+        if (onAddToQueueBeginning != null) {
+            onAddToQueueBeginning()
+        } else {
+            onPlayNext()
+        }
+        Toast.makeText(context, "Added to beginning", Toast.LENGTH_SHORT).show()
+    }
+
+    val handleEnd = {
+        haptics.success()
+        if (onAddToQueueEnd != null) {
+            onAddToQueueEnd()
+        } else {
+            onAddToQueue()
+        }
+        Toast.makeText(context, "Added to end", Toast.LENGTH_SHORT).show()
+    }
+
+    if (showQueueOptionDialog) {
+        AlertDialog(
+            onDismissRequest = { showQueueOptionDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.QueueMusic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Queue",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "${track.title} • ${track.artist}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showQueueOptionDialog = false
+                                handleBeginning()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("queue_beginning_btn"),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text("Beginning")
+                        }
+
+                        Button(
+                            onClick = {
+                                showQueueOptionDialog = false
+                                handleEnd()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("queue_end_btn"),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text("End")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { showQueueOptionDialog = false },
+                    modifier = Modifier.testTag("queue_cancel_btn")
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val itemScale by animateFloatAsState(
@@ -261,7 +372,15 @@ private fun TrackListItemContent(
                 scaleY = itemScale
             }
             .clip(RoundedCornerShape(20.dp))
-            .clickable(interactionSource = interactionSource, indication = null) { onTrackClick() }
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { onTrackClick() },
+                onLongClick = {
+                    haptics.longPress()
+                    showQueueOptionDialog = true
+                }
+            )
             .animateContentSize()
             .testTag("track_item_${track.id}"),
         shape = RoundedCornerShape(20.dp),
@@ -470,24 +589,24 @@ private fun TrackListItemContent(
                     onDismissRequest = { onShowMenuChange(false) }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Play Next") },
+                        text = { Text("Beginning") },
                         leadingIcon = { Icon(Icons.Filled.QueueMusic, contentDescription = null) },
                         onClick = {
                             onShowMenuChange(false)
-                            onPlayNext()
+                            handleBeginning()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Add to Queue") },
+                        text = { Text("End") },
                         leadingIcon = { Icon(Icons.Filled.PlaylistAdd, contentDescription = null) },
                         onClick = {
                             onShowMenuChange(false)
-                            onAddToQueue()
+                            handleEnd()
                         }
                     )
                     if (downloadStatus != DownloadStatus.DOWNLOADED) {
                         DropdownMenuItem(
-                            text = { Text("Download Offline") },
+                            text = { Text("Download") },
                             leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
                             onClick = {
                                 onShowMenuChange(false)

@@ -499,7 +499,12 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val playlists: StateFlow<List<NaviromPlaylist>> = combine(_playlists, favoriteTracks) { plist, favs ->
+    val playlists: StateFlow<List<NaviromPlaylist>> = combine(
+        _playlists,
+        favoriteTracks,
+        cachedTracks,
+        playlistDao.getAllLocalPlaylists()
+    ) { serverList, favs, cached, localList ->
         val favoritePlaylist = NaviromPlaylist(
             id = "favorites_dynamic_playlist_id",
             name = "Favorite Songs",
@@ -509,7 +514,28 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             coverArt = "",
             isLocal = true
         )
-        listOf(favoritePlaylist) + plist
+        val downloadedPlaylist = NaviromPlaylist(
+            id = "downloaded_dynamic_playlist_id",
+            name = "Downloaded Songs",
+            comment = "All downloaded offline tracks",
+            songCount = cached.size,
+            durationSeconds = cached.sumOf { it.durationSeconds },
+            coverArt = cached.firstOrNull()?.coverArtUrl ?: "",
+            isLocal = true
+        )
+        val localMapped = localList.map { local ->
+            NaviromPlaylist(
+                id = local.id,
+                name = local.name,
+                comment = local.comment,
+                songCount = local.songCount,
+                durationSeconds = local.durationSeconds,
+                coverArt = local.coverArtUrl,
+                isLocal = true
+            )
+        }
+        val customLocals = localMapped.filter { lp -> serverList.none { it.id == lp.id } }
+        listOf(favoritePlaylist, downloadedPlaylist) + customLocals + serverList
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val downloadStatuses = downloadManager.downloadStatusMap
@@ -576,13 +602,32 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             android.util.Log.w("NaviromViewModel", "Failed to register NetworkCallback", e)
         }
 
-        // Sync favorite tracks in real-time when the dynamic Favorites playlist is active
+        // Sync favorite tracks and downloaded tracks in real-time when dynamic playlists are active
         viewModelScope.launch {
-            combine(_selectedPlaylistId, favoriteTracks) { selectedId, favList ->
-                if (selectedId == "favorites_dynamic_playlist_id") {
-                    favList
-                } else {
-                    null
+            combine(_selectedPlaylistId, favoriteTracks, cachedTracks) { selectedId, favList, cached ->
+                when (selectedId) {
+                    "favorites_dynamic_playlist_id" -> favList
+                    "downloaded_dynamic_playlist_id" -> cached.map { entity ->
+                        NaviromTrack(
+                            id = entity.id,
+                            title = entity.title,
+                            artist = entity.artist,
+                            artistId = entity.artistId,
+                            album = entity.album,
+                            albumId = entity.albumId,
+                            durationSeconds = entity.durationSeconds,
+                            coverArtUrl = entity.coverArtUrl,
+                            streamUrl = "",
+                            localFilePath = entity.localFilePath,
+                            year = entity.year,
+                            genre = entity.genre,
+                            bitRate = entity.bitRate,
+                            suffix = entity.format,
+                            isCached = true,
+                            sizeBytes = entity.fileSizeBytes
+                        )
+                    }
+                    else -> null
                 }
             }.collect { matchedTracks ->
                 if (matchedTracks != null) {
@@ -2004,10 +2049,47 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             if (playlistId == "favorites_dynamic_playlist_id") {
                 _currentPlaylistTracks.value = favoriteTracks.value
+            } else if (playlistId == "downloaded_dynamic_playlist_id") {
+                _currentPlaylistTracks.value = cachedTracks.value.map { entity ->
+                    NaviromTrack(
+                        id = entity.id,
+                        title = entity.title,
+                        artist = entity.artist,
+                        artistId = entity.artistId,
+                        album = entity.album,
+                        albumId = entity.albumId,
+                        durationSeconds = entity.durationSeconds,
+                        coverArtUrl = entity.coverArtUrl,
+                        streamUrl = "",
+                        localFilePath = entity.localFilePath,
+                        year = entity.year,
+                        genre = entity.genre,
+                        bitRate = entity.bitRate,
+                        suffix = entity.format,
+                        isCached = true,
+                        sizeBytes = entity.fileSizeBytes
+                    )
+                }
             } else {
-                val res = subsonicClient.getPlaylistDetails(playlistId)
-                res.onSuccess { (_, tracks) ->
-                    _currentPlaylistTracks.value = tracks
+                val localItems = playlistDao.getPlaylistItems(playlistId).firstOrNull()
+                if (!localItems.isNullOrEmpty()) {
+                    _currentPlaylistTracks.value = localItems.map { item ->
+                        NaviromTrack(
+                            id = item.trackId,
+                            title = item.title,
+                            artist = item.artist,
+                            album = item.album,
+                            durationSeconds = item.durationSeconds,
+                            coverArtUrl = item.coverArtUrl,
+                            streamUrl = item.streamUrl,
+                            localFilePath = item.localFilePath
+                        )
+                    }
+                } else {
+                    val res = subsonicClient.getPlaylistDetails(playlistId)
+                    res.onSuccess { (_, tracks) ->
+                        _currentPlaylistTracks.value = tracks
+                    }
                 }
             }
         }
@@ -2132,8 +2214,17 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deletePlaylist(playlistId: String) {
+        if (playlistId == "favorites_dynamic_playlist_id" || playlistId == "downloaded_dynamic_playlist_id") {
+            return
+        }
         viewModelScope.launch {
-            subsonicClient.deletePlaylist(playlistId)
+            try {
+                playlistDao.deletePlaylist(playlistId)
+                playlistDao.clearPlaylistItems(playlistId)
+            } catch (_: Exception) {}
+            try {
+                subsonicClient.deletePlaylist(playlistId)
+            } catch (_: Exception) {}
             syncLibrary()
             if (_selectedPlaylistId.value == playlistId) {
                 _selectedPlaylistId.value = null
@@ -2281,6 +2372,62 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun addToQueue(track: NaviromTrack) {
         playerController.addToQueue(track)
+    }
+
+    fun addToQueueBeginning(track: NaviromTrack) {
+        playerController.addToQueueBeginning(track)
+    }
+
+    fun addToQueueEnd(track: NaviromTrack) {
+        playerController.addToQueueEnd(track)
+    }
+
+    fun seekRelative(offsetMs: Long) {
+        playerController.seekRelative(offsetMs)
+    }
+
+    fun generateDownloadedSongsPlaylist(name: String = "Downloaded Songs"): String {
+        val downloaded = cachedTracks.value
+        val playlistId = "downloaded_playlist_${System.currentTimeMillis()}"
+        val playlistName = if (name.isBlank()) "Downloaded Songs" else name.trim()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val totalSecs = downloaded.sumOf { it.durationSeconds }
+            val localEntity = com.labix.navirom.data.local.LocalPlaylistEntity(
+                id = playlistId,
+                name = playlistName,
+                comment = "Generated from downloaded songs",
+                songCount = downloaded.size,
+                durationSeconds = totalSecs,
+                coverArtUrl = downloaded.firstOrNull()?.coverArtUrl ?: "",
+                createdAt = System.currentTimeMillis()
+            )
+            playlistDao.insertPlaylist(localEntity)
+
+            val items = downloaded.mapIndexed { index: Int, track: com.labix.navirom.data.local.CachedTrackEntity ->
+                com.labix.navirom.data.local.PlaylistItemEntity(
+                    playlistId = playlistId,
+                    trackId = track.id,
+                    position = index,
+                    title = track.title,
+                    artist = track.artist,
+                    album = track.album,
+                    durationSeconds = track.durationSeconds,
+                    coverArtUrl = track.coverArtUrl,
+                    streamUrl = "",
+                    localFilePath = track.localFilePath
+                )
+            }
+            playlistDao.insertPlaylistItems(items)
+
+            val songIds = downloaded.map { it.id }
+            if (songIds.isNotEmpty()) {
+                try {
+                    subsonicClient.createPlaylist(playlistName, songIds)
+                } catch (_: Exception) {}
+            }
+        }
+        return playlistId
     }
 
     fun removeFromQueue(index: Int) {

@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +39,7 @@ fun MiniPlayerBar(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     modifier: Modifier = Modifier,
+    onSeekRelative: ((Long) -> Unit)? = null,
     onClose: () -> Unit = {}
 ) {
     val track = playbackState.currentTrack ?: return
@@ -176,6 +180,28 @@ fun MiniPlayerBar(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                // Previous Button (hold to rewind)
+                HoldablePlaybackButton(
+                    onClick = {
+                        haptics.click()
+                        onPrevious()
+                    },
+                    onHoldTick = {
+                        haptics.tick()
+                        onSeekRelative?.invoke(-5000L)
+                    },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .testTag("mini_player_prev")
+                ) { isHolding ->
+                    Icon(
+                        imageVector = if (isHolding) Icons.Filled.FastRewind else Icons.Filled.SkipPrevious,
+                        contentDescription = "Previous Track",
+                        tint = if (isHolding) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
                 // Controls
                 if (playbackState.isBuffering) {
                     CircularProgressIndicator(
@@ -210,16 +236,24 @@ fun MiniPlayerBar(
                     }
                 }
 
-                IconButton(
-                    onClick = onNext,
+                // Next Button (hold to fast-forward)
+                HoldablePlaybackButton(
+                    onClick = {
+                        haptics.click()
+                        onNext()
+                    },
+                    onHoldTick = {
+                        haptics.tick()
+                        onSeekRelative?.invoke(5000L)
+                    },
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .testTag("mini_player_next")
-                ) {
+                ) { isHolding ->
                     Icon(
-                        imageVector = Icons.Filled.SkipNext,
+                        imageVector = if (isHolding) Icons.Filled.FastForward else Icons.Filled.SkipNext,
                         contentDescription = "Next Track",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (isHolding) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }

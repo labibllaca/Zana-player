@@ -509,6 +509,7 @@ fun NaviromApp(
                             onTogglePlayPause = { viewModel.togglePlayPause() },
                             onNext = { viewModel.next() },
                             onPrevious = { viewModel.previous() },
+                            onSeekRelative = { viewModel.seekRelative(it) },
                             onClose = { viewModel.clearQueue() }
                         )
                     }
@@ -569,6 +570,7 @@ fun NaviromApp(
                                     haptics.click()
                                     viewModel.previous()
                                 },
+                                onSeekRelative = { viewModel.seekRelative(it) },
                                 onClose = {
                                     viewModel.clearQueue()
                                 }
@@ -827,6 +829,7 @@ fun NaviromApp(
                 onNext = { viewModel.next() },
                 onPrevious = { viewModel.previous() },
                 onSeekTo = { viewModel.seekTo(it) },
+                onSeekRelative = { viewModel.seekRelative(it) },
                 onToggleShuffle = { viewModel.toggleShuffle() },
                 onCycleRepeat = { viewModel.cycleRepeatMode() },
                 onToggleFavorite = { playbackState.currentTrack?.let { viewModel.toggleFavorite(it.id) } },
