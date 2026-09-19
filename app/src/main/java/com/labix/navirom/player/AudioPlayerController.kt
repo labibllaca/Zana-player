@@ -294,7 +294,11 @@ class AudioPlayerController(
         if (track.id.isBlank()) return false
         if (_playbackState.value.unplayableTrackIds.contains(track.id)) return false
 
-        // 1. Check local/cached files
+        // 1. Any local or cached track is ALWAYS playable offline without network!
+        if (track.id.startsWith("local_")) return true
+        if (track.localFilePath?.startsWith("content://") == true) return true
+        if (track.streamUrl.startsWith("content://")) return true
+
         val cachedEntity = try { cachedTrackDao.getCachedTrack(track.id) } catch (_: Exception) { null }
         val cachedFilePath = cachedEntity?.localFilePath
         if (!cachedFilePath.isNullOrBlank() && File(cachedFilePath).exists()) return true
@@ -303,6 +307,7 @@ class AudioPlayerController(
         if (downloadFile.exists() && downloadFile.length() > 0) return true
 
         if (!track.localFilePath.isNullOrBlank() && File(track.localFilePath).exists()) return true
+        if (!track.path.isNullOrBlank() && File(track.path).exists()) return true
 
         // 2. Check stream URL
         if (track.streamUrl.isBlank()) return false
@@ -659,16 +664,35 @@ class AudioPlayerController(
             val downloadFile = downloadManager.getLocalFileForTrack(track.id)
             val isDownloadFileValid = downloadFile.exists() && downloadFile.length() > 0
 
+            val isLocalContentUri = track.localFilePath?.startsWith("content://") == true || track.streamUrl.startsWith("content://")
+            val isLocalTrack = track.id.startsWith("local_") || isLocalContentUri
+
+            val isLocalFileDirect = !track.localFilePath.isNullOrBlank() && !track.localFilePath.startsWith("content://") && File(track.localFilePath).exists()
+            val isPathFileDirect = !track.path.isNullOrBlank() && File(track.path).exists()
+
+            val resolvedLocalUri: Uri? = when {
+                isCachedFileValid -> Uri.fromFile(File(cachedFilePath!!))
+                isDownloadFileValid -> Uri.fromFile(downloadFile)
+                isLocalFileDirect -> Uri.fromFile(File(track.localFilePath!!))
+                isPathFileDirect -> Uri.fromFile(File(track.path))
+                track.localFilePath?.startsWith("content://") == true -> Uri.parse(track.localFilePath)
+                track.streamUrl.startsWith("content://") -> Uri.parse(track.streamUrl)
+                isLocalTrack && track.streamUrl.isNotBlank() -> Uri.parse(track.streamUrl)
+                else -> null
+            }
+
             val resolvedLocalPath = when {
                 isCachedFileValid -> cachedFilePath
                 isDownloadFileValid -> downloadFile.absolutePath
-                !track.localFilePath.isNullOrBlank() && File(track.localFilePath).exists() -> track.localFilePath
+                isLocalFileDirect -> track.localFilePath
+                isPathFileDirect -> track.path
+                resolvedLocalUri != null -> resolvedLocalUri.toString()
                 else -> null
             }
 
             val updatedTrack = track.copy(
-                localFilePath = resolvedLocalPath,
-                isCached = resolvedLocalPath != null
+                localFilePath = resolvedLocalPath ?: track.localFilePath,
+                isCached = resolvedLocalUri != null || isLocalTrack
             )
 
             _playbackState.update { it.copy(currentTrack = updatedTrack) }
@@ -687,8 +711,11 @@ class AudioPlayerController(
                 
                 mediaPlayer = createMediaPlayer()
 
-                if (resolvedLocalPath != null) {
-                    mediaPlayer?.setDataSource(resolvedLocalPath)
+                if (resolvedLocalUri != null) {
+                    mediaPlayer?.setDataSource(context, resolvedLocalUri)
+                    mediaPlayer?.prepareAsync()
+                } else if (resolvedLocalPath != null) {
+                    mediaPlayer?.setDataSource(context, Uri.parse(resolvedLocalPath))
                     mediaPlayer?.prepareAsync()
                 } else if (updatedTrack.streamUrl.isNotBlank()) {
                     mediaPlayer?.setDataSource(context, Uri.parse((urlResolver?.invoke(updatedTrack.streamUrl) ?: updatedTrack.streamUrl)))

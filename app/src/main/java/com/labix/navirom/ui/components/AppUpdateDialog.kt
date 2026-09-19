@@ -118,8 +118,9 @@ fun AppUpdateDialog(
                             }
 
                             Column(modifier = Modifier.weight(1f)) {
+                                val versionDisplay = if (info.tagName.startsWith("v", ignoreCase = true)) info.tagName else "v${info.tagName}"
                                 Text(
-                                    text = str("updates_new_available_title"),
+                                    text = "${str("updates_new_available_title")} • $versionDisplay",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -366,8 +367,9 @@ fun AppUpdateDialog(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val versionTag = if (tag.isNotBlank()) " • $tag" else ""
                         Text(
-                            text = str("updates_downloading"),
+                            text = "${str("updates_downloading")}$versionTag",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -437,8 +439,9 @@ fun AppUpdateDialog(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val versionTag = if (tag.isNotBlank()) " • $tag" else ""
                         Text(
-                            text = str("updates_installing"),
+                            text = "${str("updates_installing")}$versionTag",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -577,8 +580,9 @@ fun AppUpdateDialog(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val versionTag = if (info.tagName.isNotBlank()) " • ${info.tagName}" else ""
                         Text(
-                            text = str("updates_ready_to_install_title"),
+                            text = "${str("updates_ready_to_install_title")}$versionTag",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )

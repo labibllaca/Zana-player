@@ -297,6 +297,7 @@ class UpdateManager(private val context: Context) {
             if (isNewer) {
                 AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "New update found: $tagName (current: $currentVersion)")
                 _updateState.value = UpdateState.Available(updateInfo)
+                showUpdateNotification(updateInfo)
                 updateInfo
             } else {
                 AppDiagnostics.logInfo(DiagnosticCodes.UPDATE_CHECK_SUCCESS_702, TAG, "App is up-to-date (current: $currentVersion, server: $tagName)")
@@ -625,6 +626,48 @@ class UpdateManager(private val context: Context) {
         }
 
         return false
+    }
+
+    private fun showUpdateNotification(updateInfo: AppUpdateInfo) {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager ?: return
+            val channelId = "app_updates_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    channelId,
+                    "App Updates",
+                    android.app.NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifications about new application updates and releases"
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val launchIntent = Intent(context, com.labix.MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                context,
+                701,
+                launchIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) android.app.PendingIntent.FLAG_IMMUTABLE else 0)
+            )
+
+            val versionDisplay = if (updateInfo.tagName.startsWith("v", ignoreCase = true)) updateInfo.tagName else "v${updateInfo.tagName}"
+            val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(com.labix.R.drawable.ic_notif_music)
+                .setContentTitle("Update Available • $versionDisplay")
+                .setContentText("Version $versionDisplay is now available. Tap to view and install.")
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText("Version $versionDisplay is ready to download and install. Current installed version is v${BuildConfig.VERSION_NAME}."))
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+
+            notificationManager.notify(7001, notification)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to post update notification: ${e.message}")
+        }
     }
 
     companion object {

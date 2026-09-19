@@ -217,7 +217,10 @@ fun LibraryScreen(
         return
     }
 
-    if (albums.isEmpty() && artists.isEmpty() && quickMixTracks.isEmpty() && musicFolders.isEmpty()) {
+    val hasLocalMusic = localTracks.isNotEmpty() || librarySongs.isNotEmpty() || localFolders.isNotEmpty()
+    val hasServerMusic = albums.isNotEmpty() || artists.isNotEmpty() || quickMixTracks.isNotEmpty() || musicFolders.isNotEmpty()
+
+    if (!hasLocalMusic && !hasServerMusic) {
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -255,6 +258,16 @@ fun LibraryScreen(
                     )
                     Spacer(modifier = Modifier.height(20.dp))
                     Button(
+                        onClick = onScanLocalAudio,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(str("scan_local_audio"))
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
                         onClick = onGoToSettings,
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -262,19 +275,6 @@ fun LibraryScreen(
                         Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(str("btn_connect_server"))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            onScanNetwork()
-                            onGoToSettings()
-                        },
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                    ) {
-                        Icon(Icons.Filled.WifiFind, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(str("btn_scan_network"))
                     }
                 }
             }
@@ -811,6 +811,132 @@ fun LibraryScreen(
                                                     album = album,
                                                     onClick = { onSelectAlbum(album.id) }
                                                 )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Local Songs in Overview
+                        if (localTracks.isNotEmpty()) {
+                            item {
+                                Column {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.FolderOpen,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = str("local_music_tab"),
+                                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "${localTracks.size} ${str("songs_count_suffix")}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            FilledTonalButton(
+                                                onClick = { onPlayAll(localTracks) },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(str("btn_play_all"), style = MaterialTheme.typography.labelSmall)
+                                            }
+                                            IconButton(
+                                                onClick = { onShuffleAll(localTracks) },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(Icons.Filled.Shuffle, contentDescription = str("btn_shuffle_all"), tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(localTracks.take(15), key = { "overview_local_${it.id}" }) { track ->
+                                            val isThisPlaying = currentTrack?.id == track.id
+                                            Surface(
+                                                onClick = { onTrackClick(track, localTracks) },
+                                                shape = RoundedCornerShape(16.dp),
+                                                color = if (isThisPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                                modifier = Modifier.width(135.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp)) {
+                                                    Box {
+                                                        SongAlbumCover(
+                                                            coverArtUrl = track.coverArtUrl,
+                                                            contentDescription = track.title,
+                                                            isAlbum = false,
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(115.dp)
+                                                        )
+                                                        if (isThisPlaying && isPlaying) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .matchParentSize()
+                                                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Filled.PlayArrow,
+                                                                    contentDescription = null,
+                                                                    tint = Color.White,
+                                                                    modifier = Modifier.size(28.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Text(
+                                                        text = track.title,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = track.artist,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = if (isThisPlaying) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
                                             }
                                         }
                                     }

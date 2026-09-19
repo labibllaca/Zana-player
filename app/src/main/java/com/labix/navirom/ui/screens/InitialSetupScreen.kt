@@ -388,9 +388,7 @@ private fun PermissionItemCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -398,6 +396,8 @@ private fun PermissionItemCard(
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Surface(
                         color = if (isGranted) AccentEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
