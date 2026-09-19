@@ -996,11 +996,21 @@ fun FullPlayerModal(
                 }
                 val lyricPreviewPair = remember(currentPosMs, validSyncedLines, lyricsData.plainLyrics) {
                     if (validSyncedLines.isNotEmpty()) {
-                        val idx = validSyncedLines.indexOfLast { (it.timeMs - 500L) <= currentPosMs }
-                        val activeIdx = if (idx >= 0) idx else 0
-                        val l1 = validSyncedLines.getOrNull(activeIdx)?.text.orEmpty()
-                        val l2 = validSyncedLines.getOrNull(activeIdx + 1)?.text.orEmpty()
-                        Pair(l1, l2)
+                        val idx = validSyncedLines.indexOfLast { (it.timeMs - 400L) <= currentPosMs }
+                        if (idx >= 0) {
+                            val l1 = validSyncedLines.getOrNull(idx)?.text.orEmpty()
+                            val l2 = validSyncedLines.getOrNull(idx + 1)?.text.orEmpty()
+                            Pair(l1, l2)
+                        } else {
+                            val firstLine = validSyncedLines.firstOrNull()?.text.orEmpty()
+                            val firstTime = validSyncedLines.firstOrNull()?.timeMs ?: 0L
+                            if (firstTime - currentPosMs > 2500L) {
+                                Pair("♪ ♪ ♪", firstLine)
+                            } else {
+                                val secondLine = validSyncedLines.getOrNull(1)?.text.orEmpty()
+                                Pair(firstLine, secondLine)
+                            }
+                        }
                     } else if (lyricsData.plainLyrics.isNotBlank()) {
                         val nonBlank = lyricsData.plainLyrics.lines().map { it.trim() }.filter { it.isNotBlank() }
                         val l1 = nonBlank.getOrNull(0).orEmpty()

@@ -211,6 +211,16 @@ class AudioPlayerController(
     private var hasCheckedQueueForCurrentTrack = false
     private var midSongCheckJob: Job? = null
 
+    // Seek synchronization & state stabilization for ffw/rev
+    @Volatile
+    private var isSeeking = false
+    @Volatile
+    private var pendingSeekPos = -1L
+    @Volatile
+    private var lastSeekTime = 0L
+    @Volatile
+    private var targetSeekPositionMs = 0L
+
     fun markTrackUnplayable(trackId: String) {
         if (trackId.isBlank()) return
         _playbackState.update { state ->
@@ -506,6 +516,27 @@ class AudioPlayerController(
                     safelyReleasePlayer(mp)
                 }
             }
+            setOnSeekCompleteListener { mp ->
+                if (mp == mediaPlayer) {
+                    val nextSeek = pendingSeekPos
+                    if (nextSeek >= 0L) {
+                        pendingSeekPos = -1L
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                mp.seekTo(nextSeek, MediaPlayer.SEEK_CLOSEST)
+                            } else {
+                                mp.seekTo(nextSeek.toInt())
+                            }
+                        } catch (_: Exception) {
+                            isSeeking = false
+                        }
+                    } else {
+                        isSeeking = false
+                        val finalPos = try { mp.currentPosition.toLong() } catch (_: Exception) { targetSeekPositionMs }
+                        _playbackState.update { it.copy(currentPositionMs = finalPos) }
+                    }
+                }
+            }
             setOnErrorListener { mp, what, extra ->
                 if (mp == mediaPlayer) {
                     val current = _playbackState.value.currentTrack
@@ -783,10 +814,31 @@ class AudioPlayerController(
 
     fun seekTo(positionMs: Long) {
         mediaPlayer?.let { mp ->
-            val safePos = positionMs.coerceIn(0L, _playbackState.value.durationMs.coerceAtLeast(0L))
-            mp.seekTo(safePos.toInt())
+            val duration = _playbackState.value.durationMs.coerceAtLeast(0L)
+            val safePos = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs.coerceAtLeast(0L)
+            targetSeekPositionMs = safePos
+            lastSeekTime = System.currentTimeMillis()
+            
+            // Immediate state update ensures lyrics preview and slider reflect seek immediately without flickering
             _playbackState.update { it.copy(currentPositionMs = safePos) }
             NaviromPlaybackService.notifySeek(context, safePos)
+            
+            if (isSeeking) {
+                // Queue the latest seek position so MediaPlayer processes it when the current seek completes
+                pendingSeekPos = safePos
+            } else {
+                isSeeking = true
+                pendingSeekPos = -1L
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        mp.seekTo(safePos, MediaPlayer.SEEK_CLOSEST)
+                    } else {
+                        mp.seekTo(safePos.toInt())
+                    }
+                } catch (_: Exception) {
+                    isSeeking = false
+                }
+            }
             
             // If user seeks during crossfade or away from fade zone, cancel crossfade and restore full volume
             if (fadingOutPlayer != null) {
@@ -799,8 +851,13 @@ class AudioPlayerController(
     }
 
     fun seekRelative(offsetMs: Long) {
-        val current = _playbackState.value.currentPositionMs
-        seekTo(current + offsetMs)
+        val now = System.currentTimeMillis()
+        val basePos = if (isSeeking || (now - lastSeekTime < 500L)) {
+            targetSeekPositionMs
+        } else {
+            _playbackState.value.currentPositionMs
+        }
+        seekTo(basePos + offsetMs)
     }
 
     fun next(isCrossfading: Boolean = false) {
@@ -1065,7 +1122,9 @@ class AudioPlayerController(
                     try {
                         val isPlay = try { mp.isPlaying } catch (_: Exception) { false }
                         if (isPlay) {
-                            val pos = mp.currentPosition.toLong()
+                            val now = System.currentTimeMillis()
+                            val isStabilizingSeek = isSeeking || (now - lastSeekTime < 600L)
+                            val pos = if (isStabilizingSeek) targetSeekPositionMs else mp.currentPosition.toLong()
                             val dur = mp.duration.toLong().coerceAtLeast(0L)
                             _playbackState.update {
                                 it.copy(
@@ -1096,7 +1155,7 @@ class AudioPlayerController(
                         // ignore state changes
                     }
                 }
-                delay(400)
+                delay(250)
             }
         }
     }
