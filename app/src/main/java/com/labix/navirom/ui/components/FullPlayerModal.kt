@@ -90,6 +90,7 @@ import com.labix.navirom.data.lyrics.LyricsSource
 import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.RepeatMode
+import com.labix.navirom.data.model.SecondaryPlaybackState
 import com.labix.navirom.data.model.SleepTimerOptions
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
@@ -132,6 +133,13 @@ fun FullPlayerModal(
     onFetchTeksteShqipLyrics: ((String?) -> Unit)? = null,
     onArtistClick: ((String) -> Unit)? = null,
     onAlbumClick: ((String) -> Unit)? = null,
+    isDualAudioEnabled: Boolean = false,
+    secondaryPlaybackState: SecondaryPlaybackState = SecondaryPlaybackState(),
+    onToggleSecondaryPlayPause: (() -> Unit)? = null,
+    onSeekSecondaryTo: ((Long) -> Unit)? = null,
+    onSeekSecondaryRelative: ((Long) -> Unit)? = null,
+    onSetSecondaryVolume: ((Float) -> Unit)? = null,
+    onStopSecondaryTrack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val track = playbackState.currentTrack ?: return
@@ -1682,8 +1690,22 @@ fun FullPlayerModal(
                                 }
                             }
 
-                            // 2-Line Lyric Preview below control buttons (retaining exact spacing of surrounding elements)
-                            if (lyricPreviewPair.first.isNotBlank()) {
+                            // Dual Audio Deck B (when enabled) OR 2-Line Lyric Preview below control buttons
+                            if (isDualAudioEnabled) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SecondaryPlayerDeckView(
+                                    state = secondaryPlaybackState,
+                                    isDark = isDark,
+                                    textOnCard = textOnCard,
+                                    textMutedOnCard = textMutedOnCard,
+                                    appLanguage = appLanguage,
+                                    onTogglePlayPause = { onToggleSecondaryPlayPause?.invoke() },
+                                    onSeekTo = { onSeekSecondaryTo?.invoke(it) },
+                                    onSeekRelative = { onSeekSecondaryRelative?.invoke(it) },
+                                    onSetVolume = { onSetSecondaryVolume?.invoke(it) },
+                                    onStopTrack = { onStopSecondaryTrack?.invoke() }
+                                )
+                            } else if (lyricPreviewPair.first.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
@@ -2594,4 +2616,272 @@ private fun AutoResizingSingleLineLyric(
         },
         modifier = modifier.fillMaxWidth()
     )
+}
+
+@Composable
+private fun SecondaryPlayerDeckView(
+    state: SecondaryPlaybackState,
+    isDark: Boolean,
+    textOnCard: Color,
+    textMutedOnCard: Color,
+    appLanguage: AppLanguage,
+    onTogglePlayPause: () -> Unit,
+    onSeekTo: (Long) -> Unit,
+    onSeekRelative: (Long) -> Unit,
+    onSetVolume: (Float) -> Unit,
+    onStopTrack: () -> Unit
+) {
+    val haptics = rememberNaviromHaptics()
+    val track = state.currentTrack
+
+    val formatTime: (Long) -> String = { ms ->
+        val totalSec = (ms / 1000).coerceAtLeast(0)
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        "%d:%02d".format(min, sec)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isDark) Color(0xFF141414) else Color(0xFFF3F4F6),
+        border = BorderStroke(1.dp, if (isDark) Color(0xFF2E2E2E) else Color(0xFFE5E7EB)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("secondary_player_deck")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            // Header Row: Deck Badge + Title/Artist + Stop Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (state.isPlaying) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "PLAYER 2",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = if (state.isPlaying) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    if (track != null) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = track.title,
+                                color = textOnCard,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = track.artist,
+                                color = textMutedOnCard,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = NaviromStrings.get("dual_audio_deck_empty", appLanguage),
+                            color = textMutedOnCard,
+                            style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (track != null) {
+                    IconButton(
+                        onClick = {
+                            haptics.toggle()
+                            onStopTrack()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Stop Player 2",
+                            tint = textMutedOnCard,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            if (track != null) {
+                val totalDurationMs = if (state.durationMs > 0) state.durationMs else (track.durationSeconds * 1000L)
+                val currentPosMs = state.currentPositionMs.coerceIn(0L, totalDurationMs.coerceAtLeast(1L))
+                val progress = if (totalDurationMs > 0) (currentPosMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f) else 0f
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Progress scrub bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = formatTime(currentPosMs),
+                        color = textMutedOnCard,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+                    )
+
+                    var isDraggingDeck2Slider by remember { mutableStateOf(false) }
+                    var dragDeck2PositionMs by remember { mutableLongStateOf(0L) }
+                    val sliderVal = if (isDraggingDeck2Slider) {
+                        if (totalDurationMs > 0) (dragDeck2PositionMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                    } else {
+                        progress
+                    }
+
+                    Slider(
+                        value = sliderVal,
+                        onValueChange = {
+                            isDraggingDeck2Slider = true
+                            dragDeck2PositionMs = (it * totalDurationMs).toLong()
+                        },
+                        onValueChangeFinished = {
+                            isDraggingDeck2Slider = false
+                            onSeekTo(dragDeck2PositionMs)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .testTag("deck2_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.secondary,
+                            activeTrackColor = MaterialTheme.colorScheme.secondary,
+                            inactiveTrackColor = if (isDark) Color(0xFF333333) else Color(0xFFE5E7EB)
+                        )
+                    )
+
+                    Text(
+                        text = formatTime(totalDurationMs),
+                        color = textMutedOnCard,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Controls: Rewind 10s | Play/Pause | Fast Forward 10s | Volume Balance
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
+                                haptics.click()
+                                onSeekRelative(-10000L)
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Replay10,
+                                contentDescription = "Rewind 10s",
+                                tint = textOnCard,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                haptics.toggle()
+                                onTogglePlayPause()
+                            },
+                            modifier = Modifier.size(36.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            if (state.isBuffering) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (state.isPlaying) "Pause Deck 2" else "Play Deck 2",
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                haptics.click()
+                                onSeekRelative(10000L)
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Forward10,
+                                contentDescription = "Forward 10s",
+                                tint = textOnCard,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Independent Volume slider for Player 2
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.widthIn(max = 130.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (state.volume <= 0.01f) Icons.Filled.VolumeMute else Icons.Filled.VolumeUp,
+                            contentDescription = "Player 2 Volume",
+                            tint = textMutedOnCard,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Slider(
+                            value = state.volume,
+                            onValueChange = { onSetVolume(it) },
+                            valueRange = 0f..1f,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(20.dp)
+                                .testTag("deck2_volume_slider"),
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.secondary,
+                                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                                inactiveTrackColor = if (isDark) Color(0xFF333333) else Color(0xFFE5E7EB)
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

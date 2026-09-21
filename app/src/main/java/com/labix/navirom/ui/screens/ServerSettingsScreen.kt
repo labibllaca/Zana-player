@@ -74,9 +74,11 @@ fun ServerSettingsScreen(
     isCrossfadeEnabled: Boolean = false,
     crossfadeDurationSeconds: Int = 5,
     isVinylEffectEnabled: Boolean = false,
+    isDualAudioEnabled: Boolean = false,
     onSetCrossfadeEnabled: (Boolean) -> Unit = {},
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
     onSetVinylEffectEnabled: (Boolean) -> Unit = {},
+    onSetDualAudioEnabled: (Boolean) -> Unit = {},
     statsSummary: ListeningStatsSummary = ListeningStatsSummary(),
     onViewStats: () -> Unit = {},
     onSetLanguage: (AppLanguage) -> Unit,
@@ -676,6 +678,34 @@ fun ServerSettingsScreen(
                     Switch(
                         checked = isVinylEffectEnabled,
                         onCheckedChange = { onSetVinylEffectEnabled(it) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Dual Audio Mode (Simultaneous 2 Players)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = str("settings_dual_audio"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = str("settings_dual_audio_desc"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isDualAudioEnabled,
+                        onCheckedChange = { onSetDualAudioEnabled(it) }
                     )
                 }
             }

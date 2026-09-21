@@ -43,6 +43,14 @@ import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.ui.util.rememberNaviromHaptics
 import com.labix.ui.theme.*
 
+data class DualAudioContext(
+    val isDualAudioEnabled: Boolean = false,
+    val onPlayPlayer1: (NaviromTrack) -> Unit = {},
+    val onPlayPlayer2: (NaviromTrack) -> Unit = {}
+)
+
+val LocalDualAudioContext = staticCompositionLocalOf { DualAudioContext() }
+
 @Composable
 fun AnimatedEqualizerBars(
     isPlaying: Boolean,
@@ -257,6 +265,7 @@ private fun TrackListItemContent(
 ) {
     val context = LocalContext.current
     val haptics = rememberNaviromHaptics()
+    val dualAudioContext = LocalDualAudioContext.current
     var showQueueOptionDialog by remember { mutableStateOf(false) }
 
     val handleBeginning = {
@@ -284,7 +293,7 @@ private fun TrackListItemContent(
             onDismissRequest = { showQueueOptionDialog = false },
             icon = {
                 Icon(
-                    imageVector = Icons.Filled.QueueMusic,
+                    imageVector = if (dualAudioContext.isDualAudioEnabled) Icons.Filled.Audiotrack else Icons.Filled.QueueMusic,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
@@ -292,14 +301,14 @@ private fun TrackListItemContent(
             },
             title = {
                 Text(
-                    text = "Queue",
+                    text = if (dualAudioContext.isDualAudioEnabled) "Play / Queue Track" else "Queue",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -310,11 +319,87 @@ private fun TrackListItemContent(
                         overflow = TextOverflow.Ellipsis
                     )
 
+                    if (dualAudioContext.isDualAudioEnabled) {
+                        Text(
+                            text = "Select Audio Deck / Player:",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    showQueueOptionDialog = false
+                                    haptics.click()
+                                    if (dualAudioContext.onPlayPlayer1 != {}) {
+                                        dualAudioContext.onPlayPlayer1(track)
+                                    } else {
+                                        onTrackClick()
+                                    }
+                                    Toast.makeText(context, "Playing on Player 1", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("play_deck_1_btn"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Text("Player 1", maxLines = 1)
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    showQueueOptionDialog = false
+                                    haptics.click()
+                                    dualAudioContext.onPlayPlayer2(track)
+                                    Toast.makeText(context, "Playing on Player 2", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("play_deck_2_btn"),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Text("Player 2", maxLines = 1)
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        Text(
+                            text = "Or Add to Queue:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = {
                                 showQueueOptionDialog = false
                                 handleBeginning()
@@ -324,10 +409,10 @@ private fun TrackListItemContent(
                                 .testTag("queue_beginning_btn"),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text("Beginning")
+                            Text("Play Next")
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = {
                                 showQueueOptionDialog = false
                                 handleEnd()
@@ -337,7 +422,7 @@ private fun TrackListItemContent(
                                 .testTag("queue_end_btn"),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text("End")
+                            Text("Add to End")
                         }
                     }
                 }

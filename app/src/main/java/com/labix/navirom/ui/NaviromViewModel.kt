@@ -569,6 +569,11 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     private val _isVinylEffectEnabled = MutableStateFlow(prefs.getBoolean("vinyl_effect_enabled", true))
     val isVinylEffectEnabled: StateFlow<Boolean> = _isVinylEffectEnabled.asStateFlow()
 
+    private val _isDualAudioEnabled = MutableStateFlow(prefs.getBoolean("dual_audio_enabled", false))
+    val isDualAudioEnabled: StateFlow<Boolean> = _isDualAudioEnabled.asStateFlow()
+
+    val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = playerController.secondaryPlaybackState
+
     init {
         playerController.isCrossfadeEnabled = _isCrossfadeEnabled.value
         playerController.crossfadeDurationMs = _crossfadeDurationSeconds.value * 1000L
@@ -880,6 +885,14 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     fun setVinylEffectEnabled(enabled: Boolean) {
         _isVinylEffectEnabled.value = enabled
         prefs.edit().putBoolean("vinyl_effect_enabled", enabled).apply()
+    }
+
+    fun setDualAudioEnabled(enabled: Boolean) {
+        _isDualAudioEnabled.value = enabled
+        prefs.edit().putBoolean("dual_audio_enabled", enabled).apply()
+        if (!enabled) {
+            playerController.stopSecondaryTrack()
+        }
     }
 
     fun setThemeMode(themeMode: AppThemeMode) {
@@ -2384,6 +2397,38 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun seekRelative(offsetMs: Long) {
         playerController.seekRelative(offsetMs)
+    }
+
+    fun playSecondaryTrack(track: NaviromTrack) {
+        playerController.playSecondaryTrack(track)
+    }
+
+    fun toggleSecondaryPlayPause() {
+        playerController.toggleSecondaryPlayPause()
+    }
+
+    fun playSecondary() {
+        playerController.playSecondary()
+    }
+
+    fun pauseSecondary() {
+        playerController.pauseSecondary()
+    }
+
+    fun seekSecondaryTo(positionMs: Long) {
+        playerController.seekSecondaryTo(positionMs)
+    }
+
+    fun seekSecondaryRelative(offsetMs: Long) {
+        playerController.seekSecondaryRelative(offsetMs)
+    }
+
+    fun setSecondaryVolume(volume: Float) {
+        playerController.setSecondaryVolume(volume)
+    }
+
+    fun stopSecondaryTrack() {
+        playerController.stopSecondaryTrack()
     }
 
     fun generateDownloadedSongsPlaylist(name: String = "Downloaded Songs"): String {

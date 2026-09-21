@@ -22,6 +22,7 @@ import com.labix.navirom.data.local.PlaybackQueueDao
 import com.labix.navirom.data.local.PlaybackQueueEntity
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.data.model.PlaybackState
+import com.labix.navirom.data.model.SecondaryPlaybackState
 import com.labix.navirom.data.model.RepeatMode
 import com.labix.navirom.data.model.SleepTimerOptions
 import kotlinx.coroutines.*
@@ -194,6 +195,10 @@ class AudioPlayerController(
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+
+    private var secondaryMediaPlayer: MediaPlayer? = null
+    private val _secondaryPlaybackState = MutableStateFlow(SecondaryPlaybackState())
+    val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = _secondaryPlaybackState.asStateFlow()
 
     private val _queue = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val queue: StateFlow<List<NaviromTrack>> = _queue.asStateFlow()
@@ -574,6 +579,118 @@ class AudioPlayerController(
         }
     }
 
+    private fun createSecondaryMediaPlayer(): MediaPlayer {
+        return MediaPlayer().apply {
+            setWakeMode(context, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                setAudioStreamType(AudioManager.STREAM_MUSIC)
+            }
+            val currentVol = _secondaryPlaybackState.value.volume
+            setVolume(currentVol, currentVol)
+
+            setOnPreparedListener { mp ->
+                if (mp == secondaryMediaPlayer) {
+                    acquireWifiLock()
+                    val dur = try { mp.duration.toLong() } catch (_: Exception) { 0L }
+                    _secondaryPlaybackState.update {
+                        it.copy(
+                            isBuffering = false,
+                            isPlaying = true,
+                            durationMs = if (dur > 0) dur else it.durationMs
+                        )
+                    }
+                    mp.start()
+                    startTicker()
+                }
+            }
+
+            setOnCompletionListener { mp ->
+                if (mp == secondaryMediaPlayer) {
+                    _secondaryPlaybackState.update {
+                        it.copy(isPlaying = false, currentPositionMs = 0L)
+                    }
+                } else {
+                    safelyReleasePlayer(mp)
+                }
+            }
+
+            setOnErrorListener { mp, what, extra ->
+                if (mp == secondaryMediaPlayer) {
+                    val current = _secondaryPlaybackState.value.currentTrack
+                    val errMsg = "Secondary MediaPlayer error: what=$what, extra=$extra"
+                    Log.e("AudioPlayer", errMsg)
+                    
+                    if (what == -38 || extra == -38) {
+                        return@setOnErrorListener true
+                    }
+
+                    _secondaryPlaybackState.update {
+                        it.copy(
+                            isPlaying = false,
+                            isBuffering = false,
+                            errorMessage = "Playback error ($what, $extra)"
+                        )
+                    }
+                    safelyReleasePlayer(mp)
+                    if (secondaryMediaPlayer == mp) secondaryMediaPlayer = null
+                }
+                true
+            }
+        }
+    }
+
+    private suspend fun resolveTrackMediaSource(track: NaviromTrack): Pair<Uri?, String?> {
+        val cachedEntity = withContext(Dispatchers.IO) {
+            try {
+                cachedTrackDao.getCachedTrack(track.id)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        val cachedFilePath = cachedEntity?.localFilePath
+        val isCachedFileValid = !cachedFilePath.isNullOrBlank() && File(cachedFilePath).exists()
+
+        val downloadFile = downloadManager.getLocalFileForTrack(track.id)
+        val isDownloadFileValid = downloadFile.exists() && downloadFile.length() > 0
+
+        val isLocalContentUri = track.localFilePath?.startsWith("content://") == true || track.streamUrl.startsWith("content://")
+        val isLocalTrack = track.id.startsWith("local_") || isLocalContentUri
+
+        val isLocalFileDirect = !track.localFilePath.isNullOrBlank() && !track.localFilePath.startsWith("content://") && File(track.localFilePath).exists()
+        val isPathFileDirect = !track.path.isNullOrBlank() && File(track.path).exists()
+
+        val resolvedLocalUri: Uri? = when {
+            isCachedFileValid -> Uri.fromFile(File(cachedFilePath!!))
+            isDownloadFileValid -> Uri.fromFile(downloadFile)
+            isLocalFileDirect -> Uri.fromFile(File(track.localFilePath!!))
+            isPathFileDirect -> Uri.fromFile(File(track.path))
+            track.localFilePath?.startsWith("content://") == true -> Uri.parse(track.localFilePath)
+            track.streamUrl.startsWith("content://") -> Uri.parse(track.streamUrl)
+            isLocalTrack && track.streamUrl.isNotBlank() -> Uri.parse(track.streamUrl)
+            else -> null
+        }
+
+        val resolvedLocalPath = when {
+            isCachedFileValid -> cachedFilePath
+            isDownloadFileValid -> downloadFile.absolutePath
+            isLocalFileDirect -> track.localFilePath
+            isPathFileDirect -> track.path
+            resolvedLocalUri != null -> resolvedLocalUri.toString()
+            else -> null
+        }
+
+        return Pair(resolvedLocalUri, resolvedLocalPath)
+    }
+
     private fun handlePrepared(mp: MediaPlayer) {
         if (mp != mediaPlayer) return
         
@@ -680,50 +797,10 @@ class AudioPlayerController(
         acquireWifiLock() // Keep CPU and Wi-Fi awake during async preparation phase
 
         scope.launch(Dispatchers.Default) {
-            // Check Room CachedTrackDao for persistent offline track metadata and cache path
-            val cachedEntity = withContext(Dispatchers.IO) {
-                try {
-                    cachedTrackDao.getCachedTrack(track.id)
-                } catch (e: Exception) {
-                    null
-                }
-            }
-
-            val cachedFilePath = cachedEntity?.localFilePath
-            val isCachedFileValid = !cachedFilePath.isNullOrBlank() && File(cachedFilePath).exists()
-
-            val downloadFile = downloadManager.getLocalFileForTrack(track.id)
-            val isDownloadFileValid = downloadFile.exists() && downloadFile.length() > 0
-
-            val isLocalContentUri = track.localFilePath?.startsWith("content://") == true || track.streamUrl.startsWith("content://")
-            val isLocalTrack = track.id.startsWith("local_") || isLocalContentUri
-
-            val isLocalFileDirect = !track.localFilePath.isNullOrBlank() && !track.localFilePath.startsWith("content://") && File(track.localFilePath).exists()
-            val isPathFileDirect = !track.path.isNullOrBlank() && File(track.path).exists()
-
-            val resolvedLocalUri: Uri? = when {
-                isCachedFileValid -> Uri.fromFile(File(cachedFilePath!!))
-                isDownloadFileValid -> Uri.fromFile(downloadFile)
-                isLocalFileDirect -> Uri.fromFile(File(track.localFilePath!!))
-                isPathFileDirect -> Uri.fromFile(File(track.path))
-                track.localFilePath?.startsWith("content://") == true -> Uri.parse(track.localFilePath)
-                track.streamUrl.startsWith("content://") -> Uri.parse(track.streamUrl)
-                isLocalTrack && track.streamUrl.isNotBlank() -> Uri.parse(track.streamUrl)
-                else -> null
-            }
-
-            val resolvedLocalPath = when {
-                isCachedFileValid -> cachedFilePath
-                isDownloadFileValid -> downloadFile.absolutePath
-                isLocalFileDirect -> track.localFilePath
-                isPathFileDirect -> track.path
-                resolvedLocalUri != null -> resolvedLocalUri.toString()
-                else -> null
-            }
-
+            val (resolvedLocalUri, resolvedLocalPath) = resolveTrackMediaSource(track)
             val updatedTrack = track.copy(
                 localFilePath = resolvedLocalPath ?: track.localFilePath,
-                isCached = resolvedLocalUri != null || isLocalTrack
+                isCached = resolvedLocalUri != null || track.id.startsWith("local_")
             )
 
             _playbackState.update { it.copy(currentTrack = updatedTrack) }
@@ -769,6 +846,130 @@ class AudioPlayerController(
                 releaseWifiLock()
             }
         }
+    }
+
+    fun playSecondaryTrack(track: NaviromTrack) {
+        _secondaryPlaybackState.update {
+            it.copy(
+                currentTrack = track,
+                isBuffering = true,
+                isPlaying = false,
+                currentPositionMs = 0L,
+                durationMs = if (track.durationSeconds > 0) track.durationSeconds * 1000L else 0L,
+                errorMessage = null
+            )
+        }
+
+        acquireWifiLock()
+
+        scope.launch(Dispatchers.Default) {
+            val (resolvedLocalUri, resolvedLocalPath) = resolveTrackMediaSource(track)
+            val updatedTrack = track.copy(
+                localFilePath = resolvedLocalPath ?: track.localFilePath,
+                isCached = resolvedLocalUri != null || track.id.startsWith("local_")
+            )
+            _secondaryPlaybackState.update { it.copy(currentTrack = updatedTrack) }
+
+            try {
+                safelyReleasePlayer(secondaryMediaPlayer)
+                secondaryMediaPlayer = createSecondaryMediaPlayer()
+                val mp = secondaryMediaPlayer ?: return@launch
+
+                if (resolvedLocalUri != null) {
+                    mp.setDataSource(context, resolvedLocalUri)
+                    mp.prepareAsync()
+                } else if (resolvedLocalPath != null) {
+                    mp.setDataSource(context, Uri.parse(resolvedLocalPath))
+                    mp.prepareAsync()
+                } else if (updatedTrack.streamUrl.isNotBlank()) {
+                    val stream = urlResolver?.invoke(updatedTrack.streamUrl) ?: updatedTrack.streamUrl
+                    mp.setDataSource(context, Uri.parse(stream))
+                    mp.prepareAsync()
+                } else {
+                    _secondaryPlaybackState.update {
+                        it.copy(isBuffering = false, isPlaying = false, errorMessage = "Cannot resolve audio source")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AudioPlayer", "Error preparing secondary track ${track.title}", e)
+                _secondaryPlaybackState.update {
+                    it.copy(isBuffering = false, isPlaying = false, errorMessage = e.message)
+                }
+            }
+        }
+    }
+
+    fun toggleSecondaryPlayPause() {
+        if (_secondaryPlaybackState.value.isPlaying) {
+            pauseSecondary()
+        } else {
+            if (_secondaryPlaybackState.value.currentTrack != null) {
+                playSecondary()
+            }
+        }
+    }
+
+    fun pauseSecondary() {
+        secondaryMediaPlayer?.let {
+            try {
+                if (it.isPlaying) {
+                    it.pause()
+                }
+            } catch (_: Exception) {}
+            _secondaryPlaybackState.update { state -> state.copy(isPlaying = false) }
+        }
+    }
+
+    fun playSecondary() {
+        val mp = secondaryMediaPlayer
+        if (mp != null) {
+            try {
+                mp.start()
+                _secondaryPlaybackState.update { state -> state.copy(isPlaying = true) }
+                startTicker()
+            } catch (_: Exception) {}
+        } else {
+            val current = _secondaryPlaybackState.value.currentTrack
+            if (current != null) {
+                playSecondaryTrack(current)
+            }
+        }
+    }
+
+    fun seekSecondaryTo(positionMs: Long) {
+        val mp = secondaryMediaPlayer ?: return
+        try {
+            val duration = _secondaryPlaybackState.value.durationMs.coerceAtLeast(0L)
+            val safePos = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs.coerceAtLeast(0L)
+            _secondaryPlaybackState.update { it.copy(currentPositionMs = safePos) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                mp.seekTo(safePos, MediaPlayer.SEEK_CLOSEST)
+            } else {
+                mp.seekTo(safePos.toInt())
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun seekSecondaryRelative(offsetMs: Long) {
+        val current = _secondaryPlaybackState.value.currentPositionMs
+        seekSecondaryTo(current + offsetMs)
+    }
+
+    fun setSecondaryVolume(volume: Float) {
+        val clamped = volume.coerceIn(0f, 1f)
+        _secondaryPlaybackState.update { it.copy(volume = clamped) }
+        try {
+            secondaryMediaPlayer?.setVolume(clamped, clamped)
+        } catch (_: Exception) {}
+    }
+
+    fun stopSecondaryTrack() {
+        try {
+            secondaryMediaPlayer?.stop()
+            safelyReleasePlayer(secondaryMediaPlayer)
+            secondaryMediaPlayer = null
+        } catch (_: Exception) {}
+        _secondaryPlaybackState.update { SecondaryPlaybackState() }
     }
 
     fun togglePlayPause() {
@@ -1155,17 +1356,40 @@ class AudioPlayerController(
                         // ignore state changes
                     }
                 }
+
+                secondaryMediaPlayer?.let { mp ->
+                    try {
+                        val isPlay = try { mp.isPlaying } catch (_: Exception) { false }
+                        if (isPlay) {
+                            val pos = mp.currentPosition.toLong()
+                            val dur = mp.duration.toLong().coerceAtLeast(0L)
+                            _secondaryPlaybackState.update {
+                                it.copy(
+                                    currentPositionMs = pos,
+                                    durationMs = if (dur > 0) dur else it.durationMs
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // ignore state changes
+                    }
+                }
+
                 delay(250)
             }
         }
     }
 
     private fun stopTicker() {
-        tickerJob?.cancel()
+        val p1Playing = try { mediaPlayer?.isPlaying == true } catch (_: Exception) { false }
+        val p2Playing = try { secondaryMediaPlayer?.isPlaying == true } catch (_: Exception) { false }
+        if (!p1Playing && !p2Playing) {
+            tickerJob?.cancel()
+        }
     }
 
     fun release() {
-        stopTicker()
+        tickerJob?.cancel()
         sleepTimerJob?.cancel()
         crossfadeJob?.cancel()
         unregisterNoisyReceiver()
@@ -1173,6 +1397,8 @@ class AudioPlayerController(
         abandonAudioFocus()
         safelyReleasePlayer(mediaPlayer)
         mediaPlayer = null
+        safelyReleasePlayer(secondaryMediaPlayer)
+        secondaryMediaPlayer = null
         safelyReleasePlayer(fadingOutPlayer)
         fadingOutPlayer = null
     }

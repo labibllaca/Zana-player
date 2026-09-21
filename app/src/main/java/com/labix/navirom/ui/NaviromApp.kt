@@ -151,6 +151,8 @@ fun NaviromApp(
     val isFullPlayerVisible by viewModel.isFullPlayerVisible.collectAsStateWithLifecycle()
     val isQueueSheetVisible by viewModel.isQueueSheetVisible.collectAsStateWithLifecycle()
     val sleepTimerOptions by viewModel.sleepTimerOptions.collectAsStateWithLifecycle()
+    val isDualAudioEnabled by viewModel.isDualAudioEnabled.collectAsStateWithLifecycle()
+    val secondaryPlaybackState by viewModel.secondaryPlaybackState.collectAsStateWithLifecycle()
 
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsStateWithLifecycle()
@@ -205,7 +207,14 @@ fun NaviromApp(
         }
     }
 
-    ModalNavigationDrawer(
+    CompositionLocalProvider(
+        LocalDualAudioContext provides DualAudioContext(
+            isDualAudioEnabled = isDualAudioEnabled,
+            onPlayPlayer1 = { viewModel.playTrack(it) },
+            onPlayPlayer2 = { viewModel.playSecondaryTrack(it) }
+        )
+    ) {
+        ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = !isFullPlayerVisible && !isQueueSheetVisible && !isStatsScreenVisible,
         drawerContent = {
@@ -742,9 +751,11 @@ fun NaviromApp(
                         isCrossfadeEnabled = isCrossfadeEnabled,
                         crossfadeDurationSeconds = crossfadeDurationSeconds,
                         isVinylEffectEnabled = isVinylEffectEnabled,
+                        isDualAudioEnabled = isDualAudioEnabled,
                         onSetCrossfadeEnabled = { viewModel.setCrossfadeEnabled(it) },
                         onSetCrossfadeDurationSeconds = { viewModel.setCrossfadeDurationSeconds(it) },
                         onSetVinylEffectEnabled = { viewModel.setVinylEffectEnabled(it) },
+                        onSetDualAudioEnabled = { viewModel.setDualAudioEnabled(it) },
                         onViewStats = { viewModel.setStatsScreenVisible(true) },
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetThemeMode = { viewModel.setThemeMode(it) },
@@ -824,6 +835,13 @@ fun NaviromApp(
                 appLanguage = appLanguage,
                 isVinylEffectEnabled = isVinylEffectEnabled,
                 sleepTimerOptions = sleepTimerOptions,
+                isDualAudioEnabled = isDualAudioEnabled,
+                secondaryPlaybackState = secondaryPlaybackState,
+                onToggleSecondaryPlayPause = { viewModel.toggleSecondaryPlayPause() },
+                onSeekSecondaryTo = { viewModel.seekSecondaryTo(it) },
+                onSeekSecondaryRelative = { viewModel.seekSecondaryRelative(it) },
+                onSetSecondaryVolume = { viewModel.setSecondaryVolume(it) },
+                onStopSecondaryTrack = { viewModel.stopSecondaryTrack() },
                 onDismiss = { viewModel.setFullPlayerVisible(false) },
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNext = { viewModel.next() },
@@ -935,6 +953,7 @@ fun NaviromApp(
         }
     }
     }
+}
 }
 
 @Composable
@@ -1058,9 +1077,11 @@ private fun TabContent(
     isCrossfadeEnabled: Boolean,
     crossfadeDurationSeconds: Int = 5,
     isVinylEffectEnabled: Boolean = false,
+    isDualAudioEnabled: Boolean = false,
     onSetCrossfadeEnabled: (Boolean) -> Unit,
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
     onSetVinylEffectEnabled: (Boolean) -> Unit = {},
+    onSetDualAudioEnabled: (Boolean) -> Unit = {},
     onViewStats: () -> Unit = {},
     onSetLanguage: (AppLanguage) -> Unit,
     onSetThemeMode: (AppThemeMode) -> Unit,
@@ -1273,9 +1294,11 @@ private fun TabContent(
                 isCrossfadeEnabled = isCrossfadeEnabled,
                 crossfadeDurationSeconds = crossfadeDurationSeconds,
                 isVinylEffectEnabled = isVinylEffectEnabled,
+                isDualAudioEnabled = isDualAudioEnabled,
                 onSetCrossfadeEnabled = onSetCrossfadeEnabled,
                 onSetCrossfadeDurationSeconds = onSetCrossfadeDurationSeconds,
                 onSetVinylEffectEnabled = onSetVinylEffectEnabled,
+                onSetDualAudioEnabled = onSetDualAudioEnabled,
                 onViewStats = onViewStats,
                 onSetLanguage = onSetLanguage,
                 onSetThemeMode = onSetThemeMode,
