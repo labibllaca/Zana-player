@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,10 +48,27 @@ import com.labix.ui.theme.*
 data class DualAudioContext(
     val isDualAudioEnabled: Boolean = false,
     val onPlayPlayer1: (NaviromTrack) -> Unit = {},
-    val onPlayPlayer2: (NaviromTrack) -> Unit = {}
+    val onPlayPlayer2: (NaviromTrack, List<NaviromTrack>?) -> Unit = { _, _ -> },
+    val onPlayAllPlayer2: (List<NaviromTrack>) -> Unit = {}
 )
 
 val LocalDualAudioContext = staticCompositionLocalOf { DualAudioContext() }
+
+@Composable
+fun ActionButtonGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content
+    )
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -128,7 +147,7 @@ fun DualAudioPlayButton(
                                 haptics.click()
                                 val firstTrack = tracks.firstOrNull()
                                 if (firstTrack != null) {
-                                    dualAudioContext.onPlayPlayer2(firstTrack)
+                                    dualAudioContext.onPlayPlayer2(firstTrack, tracks)
                                     Toast.makeText(context, "Playing $text on Player 2", Toast.LENGTH_SHORT).show()
                                 }
                             },
@@ -159,7 +178,7 @@ fun DualAudioPlayButton(
         )
     }
 
-    val buttonClick = {
+    val onPerformClick = {
         if (dualAudioContext.isDualAudioEnabled) {
             haptics.toggle()
             showPlayerSelectionDialog = true
@@ -168,41 +187,36 @@ fun DualAudioPlayButton(
         }
     }
 
-    if (isTonal) {
-        FilledTonalButton(
-            onClick = buttonClick,
-            modifier = modifier
-                .testTag(testTag)
-                .combinedClickable(
-                    onClick = buttonClick,
-                    onLongClick = {
-                        haptics.longPress()
-                        showPlayerSelectionDialog = true
-                    }
-                ),
-            shape = RoundedCornerShape(12.dp)
+    val onPerformLongClick = {
+        haptics.longPress()
+        showPlayerSelectionDialog = true
+    }
+
+    val containerColor = if (isTonal) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primary
+    val contentColor = if (isTonal) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimary
+
+    Surface(
+        onClick = onPerformClick,
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        modifier = modifier
+            .testTag(testTag)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onPerformClick() },
+                    onLongPress = { onPerformLongClick() }
+                )
+            }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text(text)
-        }
-    } else {
-        Button(
-            onClick = buttonClick,
-            modifier = modifier
-                .testTag(testTag)
-                .combinedClickable(
-                    onClick = buttonClick,
-                    onLongClick = {
-                        haptics.longPress()
-                        showPlayerSelectionDialog = true
-                    }
-                ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(text)
+            Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
         }
     }
 }
@@ -294,6 +308,7 @@ fun TrackListItem(
     trackIndex: Int? = null,
     onAddToQueueBeginning: (() -> Unit)? = null,
     onAddToQueueEnd: (() -> Unit)? = null,
+    trackList: List<NaviromTrack>? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -370,6 +385,7 @@ fun TrackListItem(
                 onShowMenuChange = { showMenu = it },
                 onAddToQueueBeginning = onAddToQueueBeginning,
                 onAddToQueueEnd = onAddToQueueEnd,
+                trackList = trackList,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -392,6 +408,7 @@ fun TrackListItem(
             onShowMenuChange = { showMenu = it },
             onAddToQueueBeginning = onAddToQueueBeginning,
             onAddToQueueEnd = onAddToQueueEnd,
+            trackList = trackList,
             modifier = modifier
         )
     }
@@ -417,6 +434,7 @@ private fun TrackListItemContent(
     onShowMenuChange: (Boolean) -> Unit,
     onAddToQueueBeginning: (() -> Unit)? = null,
     onAddToQueueEnd: (() -> Unit)? = null,
+    trackList: List<NaviromTrack>? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -518,7 +536,7 @@ private fun TrackListItemContent(
                                 onClick = {
                                     showQueueOptionDialog = false
                                     haptics.click()
-                                    dualAudioContext.onPlayPlayer2(track)
+                                    dualAudioContext.onPlayPlayer2(track, trackList)
                                     Toast.makeText(context, "Playing on Player 2", Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier

@@ -211,7 +211,12 @@ fun NaviromApp(
         LocalDualAudioContext provides DualAudioContext(
             isDualAudioEnabled = isDualAudioEnabled,
             onPlayPlayer1 = { viewModel.playTrack(it) },
-            onPlayPlayer2 = { viewModel.playSecondaryTrack(it) }
+            onPlayPlayer2 = { track, queue -> viewModel.playSecondaryTrack(track, queue) },
+            onPlayAllPlayer2 = { tracks ->
+                tracks.firstOrNull()?.let { first ->
+                    viewModel.playSecondaryTrack(first, tracks)
+                }
+            }
         )
     ) {
         ModalNavigationDrawer(
@@ -838,6 +843,8 @@ fun NaviromApp(
                 isDualAudioEnabled = isDualAudioEnabled,
                 secondaryPlaybackState = secondaryPlaybackState,
                 onToggleSecondaryPlayPause = { viewModel.toggleSecondaryPlayPause() },
+                onPlaySecondaryNext = { viewModel.playSecondaryNext() },
+                onPlaySecondaryPrevious = { viewModel.playSecondaryPrevious() },
                 onSeekSecondaryTo = { viewModel.seekSecondaryTo(it) },
                 onSeekSecondaryRelative = { viewModel.seekSecondaryRelative(it) },
                 onSetSecondaryVolume = { viewModel.setSecondaryVolume(it) },

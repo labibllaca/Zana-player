@@ -2399,8 +2399,16 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         playerController.seekRelative(offsetMs)
     }
 
-    fun playSecondaryTrack(track: NaviromTrack) {
-        playerController.playSecondaryTrack(track)
+    fun playSecondaryTrack(track: NaviromTrack, queue: List<NaviromTrack>? = null) {
+        playerController.playSecondaryTrack(track, queue)
+    }
+
+    fun playSecondaryNext() {
+        playerController.playSecondaryNext()
+    }
+
+    fun playSecondaryPrevious() {
+        playerController.playSecondaryPrevious()
     }
 
     fun toggleSecondaryPlayPause() {

@@ -44,6 +44,7 @@ import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.LibrarySubTab
 import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.SongSortOrder
+import com.labix.navirom.ui.components.ActionButtonGroup
 import com.labix.navirom.ui.components.AlbumCard
 import com.labix.navirom.ui.components.DualAudioPlayButton
 import com.labix.navirom.ui.components.ArtistCard
@@ -1069,6 +1070,7 @@ fun LibraryScreen(
                                 downloadProgress = downloadProgresses[track.id],
                                 isFavorite = favoriteIds.contains(track.id),
                                 showCoverArt = true,
+                                trackList = effectiveSongs,
                                 onTrackClick = { onTrackClick(track, effectiveSongs) },
                                 onToggleFavorite = { onToggleFavorite(track.id) },
                                 onDownloadClick = { onDownloadTrack(track) },
@@ -1427,6 +1429,7 @@ fun LibraryScreen(
                                                         downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                                                         downloadProgress = downloadProgresses[track.id] ?: 0f,
                                                         isFavorite = favoriteIds.contains(track.id),
+                                                        trackList = folder.tracks,
                                                         onTrackClick = { onTrackClick(track, folder.tracks) },
                                                         onToggleFavorite = { onToggleFavorite(track.id) },
                                                         onDownloadClick = { onDownloadTrack(track) },
@@ -1760,6 +1763,7 @@ fun LibraryScreen(
                                     downloadProgress = downloadProgresses[track.id],
                                     isFavorite = favoriteIds.contains(track.id),
                                     showCoverArt = true,
+                                    trackList = librarySongs,
                                     onTrackClick = { onTrackClick(track, librarySongs) },
                                     onToggleFavorite = { onToggleFavorite(track.id) },
                                     onDownloadClick = { onDownloadTrack(track) },
@@ -1884,6 +1888,7 @@ fun LibraryScreen(
                                     downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                                     downloadProgress = downloadProgresses[track.id],
                                     isFavorite = favoriteIds.contains(track.id),
+                                    trackList = recentlyPlayedTracks,
                                     onTrackClick = { onTrackClick(track, recentlyPlayedTracks) },
                                     onToggleFavorite = { onToggleFavorite(track.id) },
                                     onDownloadClick = { onDownloadTrack(track) },
@@ -2051,6 +2056,7 @@ fun LibraryScreen(
                             downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                             downloadProgress = downloadProgresses[track.id],
                             isFavorite = favoriteIds.contains(track.id),
+                            trackList = effectiveNewTracks,
                             onTrackClick = { onTrackClick(track, effectiveNewTracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
                             onDownloadClick = { onDownloadTrack(track) },
@@ -2205,6 +2211,7 @@ fun LibraryScreen(
                             downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                             downloadProgress = downloadProgresses[track.id],
                             isFavorite = favoriteIds.contains(track.id),
+                            trackList = quickMixTracks,
                             onTrackClick = { onTrackClick(track, quickMixTracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
                             onDownloadClick = { onDownloadTrack(track) },
@@ -2479,18 +2486,13 @@ fun AlbumDetailView(
 
         // Action Buttons Row (Play, Shuffle, Download)
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            ActionButtonGroup {
                 DualAudioPlayButton(
                     text = str("btn_play_all"),
                     icon = Icons.Filled.PlayArrow,
                     onClickPlayer1 = onPlayAll,
                     tracks = tracks,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     testTag = "album_play_all"
                 )
 
@@ -2499,7 +2501,7 @@ fun AlbumDetailView(
                     icon = Icons.Filled.Shuffle,
                     onClickPlayer1 = onShuffleAll,
                     tracks = remember(tracks) { tracks.shuffled() },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     isTonal = true,
                     testTag = "album_shuffle_all"
                 )
@@ -2510,6 +2512,8 @@ fun AlbumDetailView(
                     modifier = Modifier.testTag("album_download_btn")
                 ) {
                     Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(str("btn_download"))
                 }
             }
         }
@@ -2526,6 +2530,7 @@ fun AlbumDetailView(
                 isFavorite = favoriteIds.contains(track.id),
                 showCoverArt = false,
                 trackIndex = index,
+                trackList = tracks,
                 onTrackClick = { onTrackClick(track) },
                 onToggleFavorite = { onToggleFavorite(track.id) },
                 onDownloadClick = { onDownloadTrack(track) },

@@ -34,6 +34,7 @@ import com.labix.navirom.data.model.NaviromPlaylist
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
+import com.labix.navirom.ui.components.ActionButtonGroup
 import com.labix.navirom.ui.components.DualAudioPlayButton
 import com.labix.navirom.ui.components.PlaylistCard
 import com.labix.navirom.ui.components.TrackListItem
@@ -446,18 +447,13 @@ fun PlaylistDetailView(
         }
 
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            ActionButtonGroup {
                 DualAudioPlayButton(
                     text = "Play",
                     icon = Icons.Filled.PlayArrow,
                     onClickPlayer1 = onPlayAll,
                     tracks = tracks,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     testTag = "playlist_play_all"
                 )
 
@@ -466,7 +462,7 @@ fun PlaylistDetailView(
                     icon = Icons.Filled.Shuffle,
                     onClickPlayer1 = onShuffleAll,
                     tracks = remember(tracks) { tracks.shuffled() },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     isTonal = true,
                     testTag = "playlist_shuffle_all"
                 )
@@ -477,6 +473,8 @@ fun PlaylistDetailView(
                     modifier = Modifier.testTag("playlist_download_btn")
                 ) {
                     Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Download")
                 }
             }
         }
@@ -490,6 +488,7 @@ fun PlaylistDetailView(
                 downloadProgress = downloadProgresses[track.id],
                 isFavorite = favoriteIds.contains(track.id),
                 showCoverArt = true,
+                trackList = tracks,
                 onTrackClick = { onTrackClick(track) },
                 onToggleFavorite = { onToggleFavorite(track.id) },
                 onDownloadClick = { onDownloadTrack(track) },

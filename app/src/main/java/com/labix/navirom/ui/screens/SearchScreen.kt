@@ -352,6 +352,7 @@ fun SearchScreen(
                                     downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                                     downloadProgress = downloadProgresses[track.id],
                                     isFavorite = favoriteIds.contains(track.id),
+                                    trackList = tracks,
                                     onTrackClick = { onTrackClick(track, tracks) },
                                     onToggleFavorite = { onToggleFavorite(track.id) },
                                     onDownloadClick = { onDownloadTrack(track) },

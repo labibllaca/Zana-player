@@ -136,6 +136,8 @@ fun FullPlayerModal(
     isDualAudioEnabled: Boolean = false,
     secondaryPlaybackState: SecondaryPlaybackState = SecondaryPlaybackState(),
     onToggleSecondaryPlayPause: (() -> Unit)? = null,
+    onPlaySecondaryNext: (() -> Unit)? = null,
+    onPlaySecondaryPrevious: (() -> Unit)? = null,
     onSeekSecondaryTo: ((Long) -> Unit)? = null,
     onSeekSecondaryRelative: ((Long) -> Unit)? = null,
     onSetSecondaryVolume: ((Float) -> Unit)? = null,
@@ -1700,6 +1702,8 @@ fun FullPlayerModal(
                                     textMutedOnCard = textMutedOnCard,
                                     appLanguage = appLanguage,
                                     onTogglePlayPause = { onToggleSecondaryPlayPause?.invoke() },
+                                    onPlayNext = { onPlaySecondaryNext?.invoke() },
+                                    onPlayPrevious = { onPlaySecondaryPrevious?.invoke() },
                                     onSeekTo = { onSeekSecondaryTo?.invoke(it) },
                                     onSeekRelative = { onSeekSecondaryRelative?.invoke(it) },
                                     onSetVolume = { onSetSecondaryVolume?.invoke(it) },
@@ -2626,6 +2630,8 @@ private fun SecondaryPlayerDeckView(
     textMutedOnCard: Color,
     appLanguage: AppLanguage,
     onTogglePlayPause: () -> Unit,
+    onPlayNext: () -> Unit = {},
+    onPlayPrevious: () -> Unit = {},
     onSeekTo: (Long) -> Unit,
     onSeekRelative: (Long) -> Unit,
     onSetVolume: (Float) -> Unit,
@@ -2670,8 +2676,13 @@ private fun SecondaryPlayerDeckView(
                         color = if (state.isPlaying) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.padding(vertical = 2.dp)
                     ) {
+                        val badgeText = if (state.queue.size > 1) {
+                            "P2 (${state.currentIndex + 1}/${state.queue.size})"
+                        } else {
+                            "PLAYER 2"
+                        }
                         Text(
-                            text = "PLAYER 2",
+                            text = badgeText,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Black,
                                 fontSize = 10.sp,
@@ -2786,7 +2797,7 @@ private fun SecondaryPlayerDeckView(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Controls: Rewind 10s | Play/Pause | Fast Forward 10s | Volume Balance
+                // Controls: Previous | Play/Pause | Next | Volume Balance
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -2794,21 +2805,39 @@ private fun SecondaryPlayerDeckView(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        IconButton(
-                            onClick = {
-                                haptics.click()
-                                onSeekRelative(-10000L)
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Replay10,
-                                contentDescription = "Rewind 10s",
-                                tint = textOnCard,
-                                modifier = Modifier.size(20.dp)
-                            )
+                        if (state.queue.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    haptics.click()
+                                    onPlayPrevious()
+                                },
+                                enabled = state.hasPrevious,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SkipPrevious,
+                                    contentDescription = "Previous Track Player 2",
+                                    tint = if (state.hasPrevious) textOnCard else textMutedOnCard.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    haptics.click()
+                                    onSeekRelative(-10000L)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Replay10,
+                                    contentDescription = "Rewind 10s",
+                                    tint = textOnCard,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
 
                         FilledTonalIconButton(
@@ -2837,19 +2866,37 @@ private fun SecondaryPlayerDeckView(
                             }
                         }
 
-                        IconButton(
-                            onClick = {
-                                haptics.click()
-                                onSeekRelative(10000L)
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Forward10,
-                                contentDescription = "Forward 10s",
-                                tint = textOnCard,
-                                modifier = Modifier.size(20.dp)
-                            )
+                        if (state.queue.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    haptics.click()
+                                    onPlayNext()
+                                },
+                                enabled = state.hasNext,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SkipNext,
+                                    contentDescription = "Next Track Player 2",
+                                    tint = if (state.hasNext) textOnCard else textMutedOnCard.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    haptics.click()
+                                    onSeekRelative(10000L)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Forward10,
+                                    contentDescription = "Forward 10s",
+                                    tint = textOnCard,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
 

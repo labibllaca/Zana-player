@@ -210,6 +210,7 @@ fun OfflineCacheScreen(
                         downloadStatus = DownloadStatus.DOWNLOADED,
                         downloadProgress = 1.0f,
                         isFavorite = favoriteIds.contains(track.id),
+                        trackList = trackList,
                         onTrackClick = { onTrackClick(track, trackList) },
                         onToggleFavorite = { onToggleFavorite(track.id) },
                         onDownloadClick = { onDeleteCachedTrack(track.id) },
