@@ -45,6 +45,7 @@ import com.labix.navirom.ui.LibrarySubTab
 import com.labix.navirom.ui.NaviromStrings
 import com.labix.navirom.ui.SongSortOrder
 import com.labix.navirom.ui.components.AlbumCard
+import com.labix.navirom.ui.components.DualAudioPlayButton
 import com.labix.navirom.ui.components.ArtistCard
 import com.labix.navirom.ui.components.SleekFeatureCard
 import com.labix.navirom.ui.components.SongAlbumCover
@@ -2484,25 +2485,24 @@ fun AlbumDetailView(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
-                    onClick = onPlayAll,
-                    modifier = Modifier.weight(1f).testTag("album_play_all"),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(str("btn_play_all"))
-                }
+                DualAudioPlayButton(
+                    text = str("btn_play_all"),
+                    icon = Icons.Filled.PlayArrow,
+                    onClickPlayer1 = onPlayAll,
+                    tracks = tracks,
+                    modifier = Modifier.weight(1f),
+                    testTag = "album_play_all"
+                )
 
-                FilledTonalButton(
-                    onClick = onShuffleAll,
-                    modifier = Modifier.weight(1f).testTag("album_shuffle_all"),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(str("btn_shuffle"))
-                }
+                DualAudioPlayButton(
+                    text = str("btn_shuffle"),
+                    icon = Icons.Filled.Shuffle,
+                    onClickPlayer1 = onShuffleAll,
+                    tracks = remember(tracks) { tracks.shuffled() },
+                    modifier = Modifier.weight(1f),
+                    isTonal = true,
+                    testTag = "album_shuffle_all"
+                )
 
                 OutlinedButton(
                     onClick = onDownloadAlbum,

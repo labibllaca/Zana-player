@@ -248,7 +248,12 @@ class NaviromSubsonicClient(
                         }
                     }
                     val errorMsg = subResponse.error?.message ?: "Subsonic Error Code ${subResponse.error?.code ?: -1}"
-                    AppDiagnostics.logError(DiagnosticCodes.NET_HTTP_ERROR_202, "SubsonicClient", "Subsonic API Error on '$endpoint': $errorMsg", contextInfo = "Code: ${subResponse.error?.code}")
+                    val errorCode = subResponse.error?.code ?: -1
+                    if (errorCode != 70 && !endpoint.startsWith("getLyrics")) {
+                        AppDiagnostics.logError(DiagnosticCodes.NET_HTTP_ERROR_202, "SubsonicClient", "Subsonic API Error on '$endpoint': $errorMsg", contextInfo = "Code: $errorCode")
+                    } else {
+                        Log.d("SubsonicClient", "Subsonic API response not ok for '$endpoint': $errorMsg (code $errorCode)")
+                    }
                     return@withContext Result.failure(Exception(errorMsg))
                 }
 

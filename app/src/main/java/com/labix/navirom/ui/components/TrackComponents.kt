@@ -51,6 +51,162 @@ data class DualAudioContext(
 
 val LocalDualAudioContext = staticCompositionLocalOf { DualAudioContext() }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun DualAudioPlayButton(
+    text: String,
+    icon: ImageVector,
+    onClickPlayer1: () -> Unit,
+    tracks: List<NaviromTrack>,
+    modifier: Modifier = Modifier,
+    isTonal: Boolean = false,
+    testTag: String = "dual_audio_play_btn"
+) {
+    val context = LocalContext.current
+    val haptics = rememberNaviromHaptics()
+    val dualAudioContext = LocalDualAudioContext.current
+    var showPlayerSelectionDialog by remember { mutableStateOf(false) }
+
+    if (showPlayerSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlayerSelectionDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Audiotrack,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Play $text",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Select player for $text (${tracks.size} tracks):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showPlayerSelectionDialog = false
+                                haptics.click()
+                                onClickPlayer1()
+                                Toast.makeText(context, "Playing $text on Player 1", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("${testTag}_player1"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Player 1", maxLines = 1)
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                showPlayerSelectionDialog = false
+                                haptics.click()
+                                val firstTrack = tracks.firstOrNull()
+                                if (firstTrack != null) {
+                                    dualAudioContext.onPlayPlayer2(firstTrack)
+                                    Toast.makeText(context, "Playing $text on Player 2", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("${testTag}_player2"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Player 2", maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPlayerSelectionDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    val buttonClick = {
+        if (dualAudioContext.isDualAudioEnabled) {
+            haptics.toggle()
+            showPlayerSelectionDialog = true
+        } else {
+            onClickPlayer1()
+        }
+    }
+
+    if (isTonal) {
+        FilledTonalButton(
+            onClick = buttonClick,
+            modifier = modifier
+                .testTag(testTag)
+                .combinedClickable(
+                    onClick = buttonClick,
+                    onLongClick = {
+                        haptics.longPress()
+                        showPlayerSelectionDialog = true
+                    }
+                ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text)
+        }
+    } else {
+        Button(
+            onClick = buttonClick,
+            modifier = modifier
+                .testTag(testTag)
+                .combinedClickable(
+                    onClick = buttonClick,
+                    onLongClick = {
+                        haptics.longPress()
+                        showPlayerSelectionDialog = true
+                    }
+                ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text)
+        }
+    }
+}
+
 @Composable
 fun AnimatedEqualizerBars(
     isPlaying: Boolean,
