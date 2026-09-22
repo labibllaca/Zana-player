@@ -199,6 +199,8 @@ class AudioPlayerController(
     private var secondaryMediaPlayer: MediaPlayer? = null
     private val _secondaryPlaybackState = MutableStateFlow(SecondaryPlaybackState())
     val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = _secondaryPlaybackState.asStateFlow()
+    private var secondaryQueue: List<NaviromTrack> = emptyList()
+    private var secondaryCurrentIndex: Int = -1
 
     private val _queue = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val queue: StateFlow<List<NaviromTrack>> = _queue.asStateFlow()
@@ -614,8 +616,12 @@ class AudioPlayerController(
 
             setOnCompletionListener { mp ->
                 if (mp == secondaryMediaPlayer) {
-                    _secondaryPlaybackState.update {
-                        it.copy(isPlaying = false, currentPositionMs = 0L)
+                    if (secondaryCurrentIndex + 1 < secondaryQueue.size) {
+                        playSecondaryNext()
+                    } else {
+                        _secondaryPlaybackState.update {
+                            it.copy(isPlaying = false, currentPositionMs = 0L)
+                        }
                     }
                 } else {
                     safelyReleasePlayer(mp)
@@ -848,7 +854,21 @@ class AudioPlayerController(
         }
     }
 
-    fun playSecondaryTrack(track: NaviromTrack) {
+    fun playSecondaryTrack(track: NaviromTrack, queue: List<NaviromTrack>? = null) {
+        if (queue != null && queue.isNotEmpty()) {
+            secondaryQueue = queue
+            val foundIdx = queue.indexOfFirst { it.id == track.id }
+            secondaryCurrentIndex = if (foundIdx >= 0) foundIdx else 0
+        } else {
+            val existingIdx = secondaryQueue.indexOfFirst { it.id == track.id }
+            if (existingIdx >= 0) {
+                secondaryCurrentIndex = existingIdx
+            } else {
+                secondaryQueue = listOf(track)
+                secondaryCurrentIndex = 0
+            }
+        }
+
         _secondaryPlaybackState.update {
             it.copy(
                 currentTrack = track,
@@ -856,7 +876,11 @@ class AudioPlayerController(
                 isPlaying = false,
                 currentPositionMs = 0L,
                 durationMs = if (track.durationSeconds > 0) track.durationSeconds * 1000L else 0L,
-                errorMessage = null
+                errorMessage = null,
+                queue = secondaryQueue,
+                currentIndex = secondaryCurrentIndex,
+                hasNext = secondaryCurrentIndex < secondaryQueue.size - 1,
+                hasPrevious = secondaryCurrentIndex > 0
             )
         }
 
@@ -896,6 +920,20 @@ class AudioPlayerController(
                     it.copy(isBuffering = false, isPlaying = false, errorMessage = e.message)
                 }
             }
+        }
+    }
+
+    fun playSecondaryNext() {
+        if (secondaryCurrentIndex + 1 < secondaryQueue.size) {
+            val nextTrack = secondaryQueue[secondaryCurrentIndex + 1]
+            playSecondaryTrack(nextTrack, secondaryQueue)
+        }
+    }
+
+    fun playSecondaryPrevious() {
+        if (secondaryCurrentIndex - 1 >= 0) {
+            val prevTrack = secondaryQueue[secondaryCurrentIndex - 1]
+            playSecondaryTrack(prevTrack, secondaryQueue)
         }
     }
 
@@ -969,6 +1007,8 @@ class AudioPlayerController(
             safelyReleasePlayer(secondaryMediaPlayer)
             secondaryMediaPlayer = null
         } catch (_: Exception) {}
+        secondaryQueue = emptyList()
+        secondaryCurrentIndex = -1
         _secondaryPlaybackState.update { SecondaryPlaybackState() }
     }
 

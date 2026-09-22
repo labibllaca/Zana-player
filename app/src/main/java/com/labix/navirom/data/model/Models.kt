@@ -112,7 +112,11 @@ data class SecondaryPlaybackState(
     val currentPositionMs: Long = 0L,
     val durationMs: Long = 0L,
     val volume: Float = 1.0f,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val queue: List<NaviromTrack> = emptyList(),
+    val currentIndex: Int = -1,
+    val hasNext: Boolean = false,
+    val hasPrevious: Boolean = false
 ) {
     val progressFraction: Float
         get() = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
