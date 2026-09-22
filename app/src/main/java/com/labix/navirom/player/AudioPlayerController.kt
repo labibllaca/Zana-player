@@ -314,17 +314,32 @@ class AudioPlayerController(
         _isDeckSyncEnabled.value = enabled
         _secondaryPlaybackState.update { it.copy(isSyncedWithPrimary = enabled) }
         if (enabled) {
-            val current = _playbackState.value.currentTrack
-            if (current != null) {
-                playSecondaryTrack(current, _queue.value)
-                val currentPos = _playbackState.value.currentPositionMs
-                if (currentPos > 0) {
-                    seekSecondaryTo(currentPos)
-                }
-                if (!_playbackState.value.isPlaying) {
-                    pauseSecondary()
+            val p1Track = _playbackState.value.currentTrack
+            if (p1Track != null) {
+                val p2Track = _secondaryPlaybackState.value.currentTrack
+                val p1Pos = try { mediaPlayer?.currentPosition?.toLong() ?: _playbackState.value.currentPositionMs } catch (_: Exception) { _playbackState.value.currentPositionMs }
+                val p1IsPlaying = try { (mediaPlayer?.isPlaying == true) || _playbackState.value.isPlaying } catch (_: Exception) { false }
+
+                if (p2Track?.id == p1Track.id && secondaryMediaPlayer != null) {
+                    // Both players already have the same track loaded! Align directly without reloading
+                    seekSecondaryTo(p1Pos, syncPrimary = false)
+                    if (p1IsPlaying) {
+                        try {
+                            secondaryMediaPlayer?.start()
+                            _secondaryPlaybackState.update { it.copy(isPlaying = true) }
+                            startTicker()
+                        } catch (_: Exception) {}
+                    } else {
+                        pauseSecondary()
+                    }
+                } else {
+                    // Deck 2 needs the track loaded for sync
+                    playSecondaryTrack(p1Track, _queue.value)
                 }
             }
+        } else {
+            // Revert secondary speed to standard speed when sync is disabled
+            applySecondarySpeed(_playbackState.value.playbackSpeed)
         }
     }
 
@@ -353,6 +368,19 @@ class AudioPlayerController(
     private var lastSeekTime = 0L
     @Volatile
     private var targetSeekPositionMs = 0L
+
+    // Deck synchronization & phase-lock loop (PLL)
+    @Volatile
+    private var isSecondarySeeking = false
+    @Volatile
+    private var isWaitingForSyncedDeckStart = false
+    @Volatile
+    private var isDeck1ReadyForSync = false
+    @Volatile
+    private var isDeck2ReadyForSync = false
+    private var syncStartJob: Job? = null
+    private var lastSyncSeekTime = 0L
+    private var currentSecondaryAppliedSpeed = 1.0f
 
     fun markTrackUnplayable(trackId: String) {
         if (trackId.isBlank()) return
@@ -726,34 +754,72 @@ class AudioPlayerController(
             val currentVol = _secondaryPlaybackState.value.volume
             setVolume(currentVol, currentVol)
 
+            setOnSeekCompleteListener { mp ->
+                if (mp == secondaryMediaPlayer) {
+                    isSecondarySeeking = false
+                    val finalPos = try { mp.currentPosition.toLong() } catch (_: Exception) { _secondaryPlaybackState.value.currentPositionMs }
+                    _secondaryPlaybackState.update { it.copy(currentPositionMs = finalPos) }
+                }
+            }
+
             setOnPreparedListener { mp ->
                 if (mp == secondaryMediaPlayer) {
                     acquireWifiLock()
                     val dur = try { mp.duration.toLong() } catch (_: Exception) { 0L }
                     val shouldPlay = if (_isDeckSyncEnabled.value) _playbackState.value.isPlaying else true
-                    val syncPos = if (_isDeckSyncEnabled.value) _playbackState.value.currentPositionMs else 0L
+                    val liveP1 = try { if (mediaPlayer?.isPlaying == true) mediaPlayer?.currentPosition?.toLong() else _playbackState.value.currentPositionMs } catch (_: Exception) { _playbackState.value.currentPositionMs }
+                    val syncPos = if (_isDeckSyncEnabled.value) (liveP1 ?: 0L) else 0L
 
-                    if (syncPos > 0L) {
+                    _secondaryPlaybackState.update {
+                        it.copy(
+                            isBuffering = false,
+                            currentPositionMs = syncPos,
+                            durationMs = if (dur > 0) dur else it.durationMs
+                        )
+                    }
+
+                    if (_isDeckSyncEnabled.value && isWaitingForSyncedDeckStart) {
+                        isDeck2ReadyForSync = true
+                        if (isDeck1ReadyForSync) {
+                            startBothSyncedPlayers()
+                        }
+                    } else if (_isDeckSyncEnabled.value && syncPos > 25L) {
+                        // Seeking to align with already-playing Primary Deck
+                        mp.setOnSeekCompleteListener { seekedMp ->
+                            if (seekedMp == secondaryMediaPlayer) {
+                                isSecondarySeeking = false
+                                val finalPos = try { seekedMp.currentPosition.toLong() } catch (_: Exception) { syncPos }
+                                _secondaryPlaybackState.update { it.copy(currentPositionMs = finalPos) }
+                                if (shouldPlay && _playbackState.value.isPlaying) {
+                                    try {
+                                        seekedMp.start()
+                                        _secondaryPlaybackState.update { it.copy(isPlaying = true) }
+                                        startTicker()
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        }
+                        isSecondarySeeking = true
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 mp.seekTo(syncPos, MediaPlayer.SEEK_CLOSEST)
                             } else {
                                 mp.seekTo(syncPos.toInt())
                             }
-                        } catch (_: Exception) {}
-                    }
-
-                    _secondaryPlaybackState.update {
-                        it.copy(
-                            isBuffering = false,
-                            isPlaying = shouldPlay,
-                            currentPositionMs = syncPos,
-                            durationMs = if (dur > 0) dur else it.durationMs
-                        )
-                    }
-                    if (shouldPlay) {
-                        mp.start()
-                        startTicker()
+                        } catch (_: Exception) {
+                            isSecondarySeeking = false
+                            if (shouldPlay) {
+                                mp.start()
+                                _secondaryPlaybackState.update { it.copy(isPlaying = true) }
+                                startTicker()
+                            }
+                        }
+                    } else {
+                        if (shouldPlay) {
+                            mp.start()
+                            _secondaryPlaybackState.update { it.copy(isPlaying = true) }
+                            startTicker()
+                        }
                     }
                 }
             }
@@ -865,7 +931,6 @@ class AudioPlayerController(
         _playbackState.update {
             it.copy(
                 isBuffering = false,
-                isPlaying = true,
                 durationMs = mp.duration.toLong().coerceAtLeast(0L)
             )
         }
@@ -888,7 +953,32 @@ class AudioPlayerController(
             fadingOutPlayer = null
             mp.setVolume(1.0f, 1.0f)
         }
-        mp.start()
+
+        if (_isDeckSyncEnabled.value && isWaitingForSyncedDeckStart) {
+            isDeck1ReadyForSync = true
+            if (isDeck2ReadyForSync) {
+                startBothSyncedPlayers()
+            }
+            // else wait for syncStartJob timeout or Deck 2's onPrepared to call startBothSyncedPlayers()
+        } else {
+            _playbackState.update { it.copy(isPlaying = true) }
+            mp.start()
+            isPreparingNextForCrossfade = false
+            startTicker()
+        }
+    }
+
+    private fun startBothSyncedPlayers() {
+        syncStartJob?.cancel()
+        isWaitingForSyncedDeckStart = false
+        isDeck1ReadyForSync = false
+        isDeck2ReadyForSync = false
+
+        try { mediaPlayer?.start() } catch (_: Exception) {}
+        try { secondaryMediaPlayer?.start() } catch (_: Exception) {}
+
+        _playbackState.update { it.copy(isPlaying = true, isBuffering = false) }
+        _secondaryPlaybackState.update { it.copy(isPlaying = true, isBuffering = false) }
         isPreparingNextForCrossfade = false
         startTicker()
     }
@@ -959,6 +1049,19 @@ class AudioPlayerController(
         }
 
         if (_isDeckSyncEnabled.value) {
+            isWaitingForSyncedDeckStart = true
+            isDeck1ReadyForSync = false
+            isDeck2ReadyForSync = false
+            syncStartJob?.cancel()
+            syncStartJob = scope.launch {
+                delay(650)
+                if (isWaitingForSyncedDeckStart) {
+                    isWaitingForSyncedDeckStart = false
+                    try { mediaPlayer?.start() } catch (_: Exception) {}
+                    _playbackState.update { it.copy(isPlaying = true) }
+                    startTicker()
+                }
+            }
             playSecondaryTrack(track, currentQueue)
         }
 
@@ -1090,6 +1193,10 @@ class AudioPlayerController(
     }
 
     fun playSecondaryNext() {
+        if (_isDeckSyncEnabled.value) {
+            next()
+            return
+        }
         if (secondaryQueue.isNotEmpty()) {
             val nextIdx = secondaryCurrentIndex + 1
             if (nextIdx < secondaryQueue.size) {
@@ -1103,6 +1210,10 @@ class AudioPlayerController(
     }
 
     fun playSecondaryPrevious() {
+        if (_isDeckSyncEnabled.value) {
+            previous()
+            return
+        }
         if (secondaryQueue.isNotEmpty()) {
             val prevIdx = secondaryCurrentIndex - 1
             if (prevIdx >= 0) {
@@ -1116,6 +1227,10 @@ class AudioPlayerController(
     }
 
     fun toggleSecondaryPlayPause() {
+        if (_isDeckSyncEnabled.value) {
+            togglePlayPause()
+            return
+        }
         if (_secondaryPlaybackState.value.isPlaying) {
             pauseSecondary()
         } else {
@@ -1152,18 +1267,41 @@ class AudioPlayerController(
         }
     }
 
-    fun seekSecondaryTo(positionMs: Long) {
+    fun seekSecondaryTo(positionMs: Long, syncPrimary: Boolean = true) {
         val mp = secondaryMediaPlayer ?: return
         try {
             val duration = _secondaryPlaybackState.value.durationMs.coerceAtLeast(0L)
             val safePos = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs.coerceAtLeast(0L)
+            isSecondarySeeking = true
             _secondaryPlaybackState.update { it.copy(currentPositionMs = safePos) }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 mp.seekTo(safePos, MediaPlayer.SEEK_CLOSEST)
             } else {
                 mp.seekTo(safePos.toInt())
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            isSecondarySeeking = false
+        }
+        if (syncPrimary && _isDeckSyncEnabled.value && !isSeeking) {
+            seekTo(positionMs)
+        }
+    }
+
+    private fun applySecondarySpeed(speed: Float) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                if (kotlin.math.abs(currentSecondaryAppliedSpeed - speed) > 0.005f) {
+                    currentSecondaryAppliedSpeed = speed
+                    secondaryMediaPlayer?.let { mp ->
+                        val params = mp.playbackParams ?: PlaybackParams()
+                        params.speed = speed
+                        mp.playbackParams = params
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AudioPlayer", "Failed to set secondary playback speed", e)
+            }
+        }
     }
 
     fun seekSecondaryRelative(offsetMs: Long) {
@@ -1180,6 +1318,9 @@ class AudioPlayerController(
     }
 
     fun stopSecondaryTrack() {
+        isWaitingForSyncedDeckStart = false
+        isDeck2ReadyForSync = false
+        syncStartJob?.cancel()
         try {
             secondaryMediaPlayer?.stop()
             safelyReleasePlayer(secondaryMediaPlayer)
@@ -1221,6 +1362,13 @@ class AudioPlayerController(
     }
 
     fun resume() {
+        if (_isDeckSyncEnabled.value) {
+            val p1Pos = try { mediaPlayer?.currentPosition?.toLong() ?: _playbackState.value.currentPositionMs } catch (_: Exception) { _playbackState.value.currentPositionMs }
+            val p2Pos = try { secondaryMediaPlayer?.currentPosition?.toLong() ?: _secondaryPlaybackState.value.currentPositionMs } catch (_: Exception) { _secondaryPlaybackState.value.currentPositionMs }
+            if (kotlin.math.abs(p1Pos - p2Pos) > 25L) {
+                seekSecondaryTo(p1Pos, syncPrimary = false)
+            }
+        }
         mediaPlayer?.let {
             if (requestAudioFocus()) {
                 registerNoisyReceiver()
@@ -1274,7 +1422,7 @@ class AudioPlayerController(
             }
         }
         if (_isDeckSyncEnabled.value) {
-            seekSecondaryTo(positionMs)
+            seekSecondaryTo(positionMs, syncPrimary = false)
         }
     }
 
@@ -1611,12 +1759,27 @@ class AudioPlayerController(
                     }
                 }
 
-                if (_isDeckSyncEnabled.value && !isSeeking) {
-                    val p1Pos = try { if (mediaPlayer?.isPlaying == true) mediaPlayer?.currentPosition?.toLong() else null } catch (_: Exception) { null }
-                    val p2Pos = try { if (secondaryMediaPlayer?.isPlaying == true) secondaryMediaPlayer?.currentPosition?.toLong() else null } catch (_: Exception) { null }
+                // Drift Synchronization Controller
+                val isSameTrack = _playbackState.value.currentTrack?.id != null &&
+                        _playbackState.value.currentTrack?.id == _secondaryPlaybackState.value.currentTrack?.id
+                val isSyncActive = _isDeckSyncEnabled.value || isSameTrack
+
+                val p1Playing = try { mediaPlayer?.isPlaying == true } catch (_: Exception) { false }
+                val p2Playing = try { secondaryMediaPlayer?.isPlaying == true } catch (_: Exception) { false }
+
+                if (isSyncActive && !isSeeking && !isSecondarySeeking && !isWaitingForSyncedDeckStart && p1Playing && p2Playing) {
+                    val p1Pos = try { mediaPlayer?.currentPosition?.toLong() } catch (_: Exception) { null }
+                    val p2Pos = try { secondaryMediaPlayer?.currentPosition?.toLong() } catch (_: Exception) { null }
+
                     if (p1Pos != null && p2Pos != null) {
-                        val drift = kotlin.math.abs(p1Pos - p2Pos)
-                        if (drift > 150L) {
+                        val diff = p1Pos - p2Pos // Positive: Deck 1 ahead (Deck 2 lagging). Negative: Deck 2 ahead.
+                        val absDiff = kotlin.math.abs(diff)
+                        val baseSpeed = _playbackState.value.playbackSpeed
+                        val now = System.currentTimeMillis()
+
+                        if (absDiff > 350L && (now - lastSyncSeekTime > 800L)) {
+                            // Large desync (e.g. after buffer underrun or jump): perform a clean seekTo
+                            lastSyncSeekTime = now
                             try {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     secondaryMediaPlayer?.seekTo(p1Pos, MediaPlayer.SEEK_CLOSEST)
@@ -1624,11 +1787,32 @@ class AudioPlayerController(
                                     secondaryMediaPlayer?.seekTo(p1Pos.toInt())
                                 }
                             } catch (_: Exception) {}
+                            applySecondarySpeed(baseSpeed)
+                        } else if (absDiff > 12L) {
+                            // Fine-grained smooth phase adjustment via playback speed (zero audio glitching)
+                            val speedAdj = when {
+                                diff > 150L -> 1.08f   // Deck 2 lagging significantly: +8%
+                                diff > 75L  -> 1.05f   // Deck 2 lagging moderately: +5%
+                                diff > 30L  -> 1.03f   // Deck 2 lagging slightly: +3%
+                                diff > 12L  -> 1.015f  // Deck 2 lagging by a hair: +1.5%
+                                diff < -150L -> 0.92f  // Deck 2 leading significantly: -8%
+                                diff < -75L  -> 0.95f  // Deck 2 leading moderately: -5%
+                                diff < -30L  -> 0.97f  // Deck 2 leading slightly: -3%
+                                diff < -12L  -> 0.985f // Deck 2 leading by a hair: -1.5%
+                                else -> 1.0f
+                            }
+                            applySecondarySpeed(baseSpeed * speedAdj)
+                        } else {
+                            // Locked in sync (within 12ms)!
+                            if (kotlin.math.abs(currentSecondaryAppliedSpeed - baseSpeed) > 0.001f) {
+                                applySecondarySpeed(baseSpeed)
+                            }
                         }
                     }
                 }
 
-                delay(250)
+                val tickInterval = if (isSyncActive && p1Playing && p2Playing) 60L else 250L
+                delay(tickInterval)
             }
         }
     }
