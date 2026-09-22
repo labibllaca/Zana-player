@@ -369,6 +369,7 @@ fun ArtistDetailView(
                                             downloadStatus = downloadStatuses[track.id] ?: DownloadStatus.NOT_DOWNLOADED,
                                             downloadProgress = downloadProgresses[track.id],
                                             isFavorite = favoriteIds.contains(track.id),
+                                            trackList = songs,
                                             onTrackClick = { onTrackClick(track) },
                                             onToggleFavorite = { onToggleFavorite(track.id) },
                                             onDownloadClick = { onDownloadTrack(track) },

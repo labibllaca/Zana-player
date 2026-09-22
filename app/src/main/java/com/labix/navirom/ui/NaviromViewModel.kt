@@ -573,6 +573,10 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     val isDualAudioEnabled: StateFlow<Boolean> = _isDualAudioEnabled.asStateFlow()
 
     val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = playerController.secondaryPlaybackState
+    val isDeckSyncEnabled: StateFlow<Boolean> = playerController.isDeckSyncEnabled
+    val availableOutputDevices: StateFlow<List<AudioOutputDevice>> = playerController.availableOutputDevices
+    val player1DeviceId: StateFlow<Int?> = playerController.player1DeviceId
+    val player2DeviceId: StateFlow<Int?> = playerController.player2DeviceId
 
     init {
         playerController.isCrossfadeEnabled = _isCrossfadeEnabled.value
@@ -2437,6 +2441,26 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun stopSecondaryTrack() {
         playerController.stopSecondaryTrack()
+    }
+
+    fun toggleDeckSync() {
+        playerController.toggleDeckSync()
+    }
+
+    fun setDeckSync(enabled: Boolean) {
+        playerController.setDeckSync(enabled)
+    }
+
+    fun refreshOutputDevices() {
+        playerController.refreshOutputDevices()
+    }
+
+    fun setPlayer1PreferredDevice(deviceId: Int?) {
+        playerController.setPlayer1PreferredDevice(deviceId)
+    }
+
+    fun setPlayer2PreferredDevice(deviceId: Int?) {
+        playerController.setPlayer2PreferredDevice(deviceId)
     }
 
     fun generateDownloadedSongsPlaylist(name: String = "Downloaded Songs"): String {

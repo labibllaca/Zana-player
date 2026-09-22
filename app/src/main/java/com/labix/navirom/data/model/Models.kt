@@ -116,9 +116,19 @@ data class SecondaryPlaybackState(
     val queue: List<NaviromTrack> = emptyList(),
     val currentIndex: Int = -1,
     val hasNext: Boolean = false,
-    val hasPrevious: Boolean = false
+    val hasPrevious: Boolean = false,
+    val isSyncedWithPrimary: Boolean = false
 ) {
     val progressFraction: Float
         get() = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 }
+
+data class AudioOutputDevice(
+    val id: Int,
+    val name: String,
+    val typeName: String,
+    val isBluetooth: Boolean = false,
+    val isSpeaker: Boolean = false,
+    val isHeadphones: Boolean = false
+)
 

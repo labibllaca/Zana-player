@@ -153,6 +153,10 @@ fun NaviromApp(
     val sleepTimerOptions by viewModel.sleepTimerOptions.collectAsStateWithLifecycle()
     val isDualAudioEnabled by viewModel.isDualAudioEnabled.collectAsStateWithLifecycle()
     val secondaryPlaybackState by viewModel.secondaryPlaybackState.collectAsStateWithLifecycle()
+    val isDeckSyncEnabled by viewModel.isDeckSyncEnabled.collectAsStateWithLifecycle()
+    val availableOutputDevices by viewModel.availableOutputDevices.collectAsStateWithLifecycle()
+    val player1DeviceId by viewModel.player1DeviceId.collectAsStateWithLifecycle()
+    val player2DeviceId by viewModel.player2DeviceId.collectAsStateWithLifecycle()
 
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsStateWithLifecycle()
@@ -211,7 +215,7 @@ fun NaviromApp(
         LocalDualAudioContext provides DualAudioContext(
             isDualAudioEnabled = isDualAudioEnabled,
             onPlayPlayer1 = { viewModel.playTrack(it) },
-            onPlayPlayer2 = { track, queue -> viewModel.playSecondaryTrack(track, queue) },
+            onPlayPlayer2 = { track, trackList -> viewModel.playSecondaryTrack(track, trackList ?: queue) },
             onPlayAllPlayer2 = { tracks ->
                 tracks.firstOrNull()?.let { first ->
                     viewModel.playSecondaryTrack(first, tracks)
@@ -842,6 +846,14 @@ fun NaviromApp(
                 sleepTimerOptions = sleepTimerOptions,
                 isDualAudioEnabled = isDualAudioEnabled,
                 secondaryPlaybackState = secondaryPlaybackState,
+                isDeckSyncEnabled = isDeckSyncEnabled,
+                onToggleDeckSync = { viewModel.toggleDeckSync() },
+                availableOutputDevices = availableOutputDevices,
+                player1DeviceId = player1DeviceId,
+                player2DeviceId = player2DeviceId,
+                onSetPlayer1PreferredDevice = { viewModel.setPlayer1PreferredDevice(it) },
+                onSetPlayer2PreferredDevice = { viewModel.setPlayer2PreferredDevice(it) },
+                onRefreshOutputDevices = { viewModel.refreshOutputDevices() },
                 onToggleSecondaryPlayPause = { viewModel.toggleSecondaryPlayPause() },
                 onPlaySecondaryNext = { viewModel.playSecondaryNext() },
                 onPlaySecondaryPrevious = { viewModel.playSecondaryPrevious() },

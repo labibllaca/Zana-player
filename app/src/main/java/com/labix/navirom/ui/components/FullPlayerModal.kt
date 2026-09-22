@@ -54,6 +54,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.labix.navirom.data.model.AudioOutputDevice
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -142,6 +144,14 @@ fun FullPlayerModal(
     onSeekSecondaryRelative: ((Long) -> Unit)? = null,
     onSetSecondaryVolume: ((Float) -> Unit)? = null,
     onStopSecondaryTrack: (() -> Unit)? = null,
+    isDeckSyncEnabled: Boolean = false,
+    onToggleDeckSync: (() -> Unit)? = null,
+    availableOutputDevices: List<AudioOutputDevice> = emptyList(),
+    player1DeviceId: Int? = null,
+    player2DeviceId: Int? = null,
+    onSetPlayer1PreferredDevice: ((Int?) -> Unit)? = null,
+    onSetPlayer2PreferredDevice: ((Int?) -> Unit)? = null,
+    onRefreshOutputDevices: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val track = playbackState.currentTrack ?: return
@@ -156,6 +166,7 @@ fun FullPlayerModal(
     var showSecureSettingsAssistant by remember { mutableStateOf(false) }
     var showArtistsDialog by remember { mutableStateOf(false) }
     var showTeksteShqipDialog by remember { mutableStateOf(false) }
+    var showAudioRoutingDialog by remember { mutableStateOf(false) }
     var teksteShqipUrlInput by remember { mutableStateOf("") }
     var customMinutesText by remember { mutableStateOf("30") }
 
@@ -835,6 +846,364 @@ fun FullPlayerModal(
             track.artist.split(Regex("[,&/]|\\bfeat\\.?\\b|\\bft\\.?\\b|\\bwith\\b", RegexOption.IGNORE_CASE))
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
+        }
+
+        // Audio Output Routing Dialog (Bluetooth & Device Selection + Sync Control)
+        if (showAudioRoutingDialog) {
+            val p1Device = availableOutputDevices.firstOrNull { it.id == player1DeviceId }
+            val p2Device = availableOutputDevices.firstOrNull { it.id == player2DeviceId }
+
+            AlertDialog(
+                onDismissRequest = { showAudioRoutingDialog = false },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.BluetoothConnected,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = NaviromStrings.get("audio_routing_title", appLanguage),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "${availableOutputDevices.size} devices connected",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                haptics.click()
+                                onRefreshOutputDevices?.invoke()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Deck Sync Mirroring Switch Card
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isDeckSyncEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isDeckSyncEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptics.toggle()
+                                        onToggleDeckSync?.invoke()
+                                    }
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isDeckSyncEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (isDeckSyncEnabled) Icons.Filled.Sync else Icons.Filled.SyncDisabled,
+                                            contentDescription = null,
+                                            tint = if (isDeckSyncEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            text = NaviromStrings.get("sync_decks_title", appLanguage),
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (isDeckSyncEnabled) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(vertical = 1.dp)
+                                            ) {
+                                                Text(
+                                                    text = "ACTIVE",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
+                                                    color = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = NaviromStrings.get("sync_decks_desc", appLanguage),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = isDeckSyncEnabled,
+                                    onCheckedChange = {
+                                        haptics.toggle()
+                                        onToggleDeckSync?.invoke()
+                                    }
+                                )
+                            }
+                        }
+
+                        // Player 1 (Deck A) Output Device Selector
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = NaviromStrings.get("audio_routing_deck1", appLanguage),
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            // System default option
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (player1DeviceId == null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                border = if (player1DeviceId == null) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptics.tick()
+                                        onSetPlayer1PreferredDevice?.invoke(null)
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    RadioButton(
+                                        selected = player1DeviceId == null,
+                                        onClick = {
+                                            haptics.tick()
+                                            onSetPlayer1PreferredDevice?.invoke(null)
+                                        }
+                                    )
+                                    Icon(Icons.Filled.Speaker, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = NaviromStrings.get("audio_routing_default", appLanguage),
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        )
+                                        Text(
+                                            text = "System active output",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Connected devices list for Player 1
+                            availableOutputDevices.forEach { device ->
+                                val isSelected = player1DeviceId == device.id
+                                val deviceIcon = when {
+                                    device.isBluetooth -> Icons.Filled.Bluetooth
+                                    device.isHeadphones -> Icons.Filled.Headphones
+                                    else -> Icons.Filled.Speaker
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            haptics.tick()
+                                            onSetPlayer1PreferredDevice?.invoke(device.id)
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = {
+                                                haptics.tick()
+                                                onSetPlayer1PreferredDevice?.invoke(device.id)
+                                            }
+                                        )
+                                        Icon(deviceIcon, contentDescription = null, modifier = Modifier.size(20.dp), tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = device.name,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                            Text(
+                                                text = device.typeName,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Player 2 (Deck B) Output Device Selector (always visible if dual audio or deck sync)
+                        if (isDualAudioEnabled || isDeckSyncEnabled) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = NaviromStrings.get("audio_routing_deck2", appLanguage),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+
+                                // System default option for Player 2
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (player2DeviceId == null) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    border = if (player2DeviceId == null) BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            haptics.tick()
+                                            onSetPlayer2PreferredDevice?.invoke(null)
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        RadioButton(
+                                            selected = player2DeviceId == null,
+                                            onClick = {
+                                                haptics.tick()
+                                                onSetPlayer2PreferredDevice?.invoke(null)
+                                            },
+                                            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
+                                        )
+                                        Icon(Icons.Filled.Speaker, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = NaviromStrings.get("audio_routing_default", appLanguage),
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                            Text(
+                                                text = "System active output",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Connected devices list for Player 2
+                                availableOutputDevices.forEach { device ->
+                                    val isSelected = player2DeviceId == device.id
+                                    val deviceIcon = when {
+                                        device.isBluetooth -> Icons.Filled.Bluetooth
+                                        device.isHeadphones -> Icons.Filled.Headphones
+                                        else -> Icons.Filled.Speaker
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary) else null,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                haptics.tick()
+                                                onSetPlayer2PreferredDevice?.invoke(device.id)
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            RadioButton(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    haptics.tick()
+                                                    onSetPlayer2PreferredDevice?.invoke(device.id)
+                                                },
+                                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
+                                            )
+                                            Icon(deviceIcon, contentDescription = null, modifier = Modifier.size(20.dp), tint = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = device.name,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                                )
+                                                Text(
+                                                    text = device.typeName,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (availableOutputDevices.isEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = NaviromStrings.get("audio_routing_bt_hint", appLanguage),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { showAudioRoutingDialog = false }) {
+                        Text("Done")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
         }
 
         if (showArtistsDialog) {
@@ -1694,6 +2063,7 @@ fun FullPlayerModal(
 
                             // Dual Audio Deck B (when enabled) OR 2-Line Lyric Preview below control buttons
                             if (isDualAudioEnabled) {
+                                val p2Device = availableOutputDevices.firstOrNull { it.id == player2DeviceId }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 SecondaryPlayerDeckView(
                                     state = secondaryPlaybackState,
@@ -1701,6 +2071,10 @@ fun FullPlayerModal(
                                     textOnCard = textOnCard,
                                     textMutedOnCard = textMutedOnCard,
                                     appLanguage = appLanguage,
+                                    isDeckSyncEnabled = isDeckSyncEnabled,
+                                    onToggleDeckSync = { onToggleDeckSync?.invoke() },
+                                    onOpenAudioRouting = { showAudioRoutingDialog = true },
+                                    player2DeviceName = p2Device?.name,
                                     onTogglePlayPause = { onToggleSecondaryPlayPause?.invoke() },
                                     onPlayNext = { onPlaySecondaryNext?.invoke() },
                                     onPlayPrevious = { onPlaySecondaryPrevious?.invoke() },
@@ -1771,137 +2145,225 @@ fun FullPlayerModal(
                         }
                     }
 
-                    // Bottom Dark Section: Lyrics Mic Button | [Artist, Album, Sleep Timer Countdown] | Queue Button
+                    // Bottom Grouped & Scrollable Action Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(horizontal = 24.dp, vertical = 18.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Lyrics button
+                        // Group 1: Lyrics Mic Button
                         Surface(
                             shape = CircleShape,
                             color = Color(0xFFF3D959), // Yellow
-                            modifier = Modifier.size(48.dp).clickable {
-                                haptics.toggle()
-                                viewMode = PlayerViewMode.LYRICS
-                            }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable {
+                                    haptics.toggle()
+                                    viewMode = PlayerViewMode.LYRICS
+                                }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.Mic, contentDescription = "Lyrics", tint = Color.Black)
                             }
                         }
 
-                        // Center Actions: Artist (single or multi popup), Album, Sleep Timer (with countdown)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Group 2: Context Cluster (Artist & Album)
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = Color(0xFF222222),
+                            border = BorderStroke(1.dp, Color(0xFF333333))
                         ) {
-                            // 1. Artist Action Button
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF2C2C2C),
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clickable {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 1. Artist Action Button
+                                IconButton(
+                                    onClick = {
                                         haptics.click()
                                         if (artistList.size > 1) {
                                             showArtistsDialog = true
                                         } else {
                                             onArtistClick?.invoke(track.artistId)
                                         }
-                                    }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
                                     Icon(
                                         imageVector = if (artistList.size > 1) Icons.Filled.People else Icons.Filled.Person,
                                         contentDescription = "Artist",
                                         tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
-                            }
 
-                            // 2. Album Action Button
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF2C2C2C),
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clickable {
+                                // 2. Album Action Button
+                                IconButton(
+                                    onClick = {
                                         haptics.click()
                                         onAlbumClick?.invoke(track.albumId)
-                                    }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
                                     Icon(
                                         imageVector = Icons.Filled.Album,
                                         contentDescription = "Album",
                                         tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
-
-                            // 3. Sleep Timer Action Button with Live Countdown
-                            val isTimerActive = (playbackState.sleepTimerSecondsLeft != null && playbackState.sleepTimerSecondsLeft > 0) ||
-                                    (playbackState.sleepTimerMinutesLeft != null && playbackState.sleepTimerMinutesLeft > 0)
-
-                            val timerCountdownText = remember(playbackState.sleepTimerSecondsLeft, playbackState.sleepTimerMinutesLeft) {
-                                val totalSecs = playbackState.sleepTimerSecondsLeft ?: (playbackState.sleepTimerMinutesLeft?.times(60) ?: 0)
-                                if (totalSecs <= 0) ""
-                                else {
-                                    val mins = totalSecs / 60
-                                    val secs = totalSecs % 60
-                                    "%02d:%02d".format(mins, secs)
-                                }
-                            }
-
-                            Surface(
-                                shape = if (isTimerActive) RoundedCornerShape(22.dp) else CircleShape,
-                                color = if (isTimerActive) MaterialTheme.colorScheme.primary else Color(0xFF2C2C2C),
-                                modifier = Modifier
-                                    .height(44.dp)
-                                    .then(if (isTimerActive) Modifier.padding(horizontal = 2.dp) else Modifier.width(44.dp))
-                                    .clickable {
-                                        haptics.click()
-                                        showSleepTimerDialog = true
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = if (isTimerActive) 12.dp else 0.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (isTimerActive) Icons.Filled.HourglassTop else Icons.Filled.Timer,
-                                        contentDescription = "Sleep Timer",
-                                        tint = if (isTimerActive) MaterialTheme.colorScheme.onPrimary else Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
-                                    if (isTimerActive && timerCountdownText.isNotBlank()) {
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = timerCountdownText,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Group 3: Audio Deck & Utilities Cluster (Sleep Timer, Sync Decks, Audio Routing)
+                        val isTimerActive = (playbackState.sleepTimerSecondsLeft != null && playbackState.sleepTimerSecondsLeft > 0) ||
+                                (playbackState.sleepTimerMinutesLeft != null && playbackState.sleepTimerMinutesLeft > 0)
+
+                        val timerCountdownText = remember(playbackState.sleepTimerSecondsLeft, playbackState.sleepTimerMinutesLeft) {
+                            val totalSecs = playbackState.sleepTimerSecondsLeft ?: (playbackState.sleepTimerMinutesLeft?.times(60) ?: 0)
+                            if (totalSecs <= 0) ""
+                            else {
+                                val mins = totalSecs / 60
+                                val secs = totalSecs % 60
+                                "%02d:%02d".format(mins, secs)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = Color(0xFF222222),
+                            border = BorderStroke(1.dp, Color(0xFF333333))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Sleep Timer Button
+                                Surface(
+                                    shape = if (isTimerActive) RoundedCornerShape(18.dp) else CircleShape,
+                                    color = if (isTimerActive) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .then(if (isTimerActive) Modifier.padding(horizontal = 2.dp) else Modifier.width(38.dp))
+                                        .clickable {
+                                            haptics.click()
+                                            showSleepTimerDialog = true
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = if (isTimerActive) 10.dp else 0.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isTimerActive) Icons.Filled.HourglassTop else Icons.Filled.Timer,
+                                            contentDescription = "Sleep Timer",
+                                            tint = if (isTimerActive) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                        if (isTimerActive && timerCountdownText.isNotBlank()) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = timerCountdownText,
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Sync Decks (Mirror Playback) Button
+                                if (isDualAudioEnabled) {
+                                    Surface(
+                                        shape = if (isDeckSyncEnabled) RoundedCornerShape(18.dp) else CircleShape,
+                                        color = if (isDeckSyncEnabled) MaterialTheme.colorScheme.secondary else Color.Transparent,
+                                        modifier = Modifier
+                                            .height(38.dp)
+                                            .then(if (isDeckSyncEnabled) Modifier.padding(horizontal = 2.dp) else Modifier.width(38.dp))
+                                            .clickable {
+                                                haptics.toggle()
+                                                onToggleDeckSync?.invoke()
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = if (isDeckSyncEnabled) 10.dp else 0.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isDeckSyncEnabled) Icons.Filled.Sync else Icons.Filled.SyncDisabled,
+                                                contentDescription = "Sync Decks",
+                                                tint = if (isDeckSyncEnabled) MaterialTheme.colorScheme.onSecondary else Color.White,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                            if (isDeckSyncEnabled) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "SYNC",
+                                                    color = MaterialTheme.colorScheme.onSecondary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Black
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Audio Routing (Bluetooth / Speakers) Button
+                                IconButton(
+                                    onClick = {
+                                        haptics.click()
+                                        showAudioRoutingDialog = true
+                                    },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (availableOutputDevices.isNotEmpty()) {
+                                                Badge(
+                                                    containerColor = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier = Modifier.size(14.dp)
+                                                ) {
+                                                    Text("${availableOutputDevices.size}", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.BluetoothAudio,
+                                            contentDescription = "Audio Routing",
+                                            tint = if (player1DeviceId != null || player2DeviceId != null) MaterialTheme.colorScheme.primary else Color.White,
+                                            modifier = Modifier.size(19.dp)
                                         )
                                     }
                                 }
                             }
                         }
 
-                        // Queue button
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Group 4: Queue Button
                         Surface(
                             shape = CircleShape,
                             color = Color(0xFF2C2C2C),
-                            modifier = Modifier.size(48.dp).clickable {
-                                haptics.click()
-                                onOpenQueue()
-                            }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable {
+                                    haptics.click()
+                                    onOpenQueue()
+                                }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.QueueMusic, contentDescription = "Queue", tint = Color.White)
@@ -2629,6 +3091,10 @@ private fun SecondaryPlayerDeckView(
     textOnCard: Color,
     textMutedOnCard: Color,
     appLanguage: AppLanguage,
+    isDeckSyncEnabled: Boolean = false,
+    onToggleDeckSync: (() -> Unit)? = null,
+    onOpenAudioRouting: (() -> Unit)? = null,
+    player2DeviceName: String? = null,
     onTogglePlayPause: () -> Unit,
     onPlayNext: () -> Unit = {},
     onPlayPrevious: () -> Unit = {},
@@ -2660,7 +3126,7 @@ private fun SecondaryPlayerDeckView(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            // Header Row: Deck Badge + Title/Artist + Stop Button
+            // Header Row: Deck Badge + Sync Pill + Audio Device + Title/Artist + Stop Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -2668,7 +3134,7 @@ private fun SecondaryPlayerDeckView(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Surface(
@@ -2691,6 +3157,71 @@ private fun SecondaryPlayerDeckView(
                             color = if (state.isPlaying) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
+                    }
+
+                    // Sync Indicator Button
+                    if (onToggleDeckSync != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isDeckSyncEnabled) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (isDeckSyncEnabled) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary) else null,
+                            modifier = Modifier
+                                .clickable {
+                                    haptics.toggle()
+                                    onToggleDeckSync()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isDeckSyncEnabled) Icons.Filled.Sync else Icons.Filled.SyncDisabled,
+                                    contentDescription = "Deck Sync",
+                                    tint = if (isDeckSyncEnabled) MaterialTheme.colorScheme.secondary else textMutedOnCard,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = if (isDeckSyncEnabled) "SYNC" else "ASYNC",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                    color = if (isDeckSyncEnabled) MaterialTheme.colorScheme.secondary else textMutedOnCard
+                                )
+                            }
+                        }
+                    }
+
+                    // Audio Output Device Indicator / Switcher
+                    if (onOpenAudioRouting != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier
+                                .clickable {
+                                    haptics.click()
+                                    onOpenAudioRouting()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Bluetooth,
+                                    contentDescription = "Output Device",
+                                    tint = textMutedOnCard,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = player2DeviceName ?: "System",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = textMutedOnCard,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
 
                     if (track != null) {

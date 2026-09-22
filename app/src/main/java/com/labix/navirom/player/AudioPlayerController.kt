@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -20,6 +21,7 @@ import com.labix.navirom.data.local.CachedTrackDao
 import com.labix.navirom.data.local.NaviromDatabase
 import com.labix.navirom.data.local.PlaybackQueueDao
 import com.labix.navirom.data.local.PlaybackQueueEntity
+import com.labix.navirom.data.model.AudioOutputDevice
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.SecondaryPlaybackState
@@ -201,6 +203,130 @@ class AudioPlayerController(
     val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = _secondaryPlaybackState.asStateFlow()
     private var secondaryQueue: List<NaviromTrack> = emptyList()
     private var secondaryCurrentIndex: Int = -1
+
+    private val _availableOutputDevices = MutableStateFlow<List<AudioOutputDevice>>(emptyList())
+    val availableOutputDevices: StateFlow<List<AudioOutputDevice>> = _availableOutputDevices.asStateFlow()
+
+    private val _player1DeviceId = MutableStateFlow<Int?>(null)
+    val player1DeviceId: StateFlow<Int?> = _player1DeviceId.asStateFlow()
+
+    private val _player2DeviceId = MutableStateFlow<Int?>(null)
+    val player2DeviceId: StateFlow<Int?> = _player2DeviceId.asStateFlow()
+
+    private val _isDeckSyncEnabled = MutableStateFlow<Boolean>(false)
+    val isDeckSyncEnabled: StateFlow<Boolean> = _isDeckSyncEnabled.asStateFlow()
+
+    private var audioDeviceCallback: Any? = null
+
+    init {
+        initAudioDeviceListener()
+    }
+
+    private fun initAudioDeviceListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val callback = object : android.media.AudioDeviceCallback() {
+                    override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                        refreshOutputDevices()
+                    }
+                    override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                        refreshOutputDevices()
+                    }
+                }
+                audioManager.registerAudioDeviceCallback(callback, Handler(Looper.getMainLooper()))
+                audioDeviceCallback = callback
+            } catch (e: Exception) {
+                Log.w("AudioPlayer", "Failed to register AudioDeviceCallback", e)
+            }
+        }
+        refreshOutputDevices()
+    }
+
+    fun refreshOutputDevices() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                val list = devices.mapNotNull { dev ->
+                    val typeName = when (dev.type) {
+                        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Speaker"
+                        AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Headphones"
+                        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth"
+                        AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST -> "BLE Audio"
+                        AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET -> "USB Audio"
+                        AudioDeviceInfo.TYPE_LINE_ANALOG, AudioDeviceInfo.TYPE_LINE_DIGITAL -> "Line Out"
+                        else -> "Audio Output"
+                    }
+                    val rawName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        dev.productName?.toString()?.takeIf { it.isNotBlank() } ?: typeName
+                    } else {
+                        typeName
+                    }
+                    val isBt = dev.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            dev.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (dev.type == AudioDeviceInfo.TYPE_BLE_HEADSET || dev.type == AudioDeviceInfo.TYPE_BLE_SPEAKER || dev.type == AudioDeviceInfo.TYPE_BLE_BROADCAST))
+                    val isSpeaker = dev.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    val isHp = dev.type == AudioDeviceInfo.TYPE_WIRED_HEADSET || dev.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+
+                    AudioOutputDevice(
+                        id = dev.id,
+                        name = rawName,
+                        typeName = typeName,
+                        isBluetooth = isBt,
+                        isSpeaker = isSpeaker,
+                        isHeadphones = isHp
+                    )
+                }
+                _availableOutputDevices.value = list
+            } catch (e: Exception) {
+                Log.w("AudioPlayer", "Failed to query audio output devices", e)
+            }
+        }
+    }
+
+    fun setPlayer1PreferredDevice(deviceId: Int?) {
+        _player1DeviceId.value = deviceId
+        applyPreferredDevice(mediaPlayer, deviceId)
+    }
+
+    fun setPlayer2PreferredDevice(deviceId: Int?) {
+        _player2DeviceId.value = deviceId
+        applyPreferredDevice(secondaryMediaPlayer, deviceId)
+    }
+
+    private fun applyPreferredDevice(player: MediaPlayer?, deviceId: Int?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && player != null) {
+            try {
+                val dev = if (deviceId != null) {
+                    audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull { it.id == deviceId }
+                } else null
+                player.setPreferredDevice(dev)
+            } catch (e: Exception) {
+                Log.w("AudioPlayer", "Failed to setPreferredDevice $deviceId", e)
+            }
+        }
+    }
+
+    fun toggleDeckSync() {
+        setDeckSync(!_isDeckSyncEnabled.value)
+    }
+
+    fun setDeckSync(enabled: Boolean) {
+        _isDeckSyncEnabled.value = enabled
+        _secondaryPlaybackState.update { it.copy(isSyncedWithPrimary = enabled) }
+        if (enabled) {
+            val current = _playbackState.value.currentTrack
+            if (current != null) {
+                playSecondaryTrack(current, _queue.value)
+                val currentPos = _playbackState.value.currentPositionMs
+                if (currentPos > 0) {
+                    seekSecondaryTo(currentPos)
+                }
+                if (!_playbackState.value.isPlaying) {
+                    pauseSecondary()
+                }
+            }
+        }
+    }
 
     private val _queue = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val queue: StateFlow<List<NaviromTrack>> = _queue.asStateFlow()
@@ -513,6 +639,7 @@ class AudioPlayerController(
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .build()
             )
+            applyPreferredDevice(this, _player1DeviceId.value)
             setOnPreparedListener { mp ->
                 handlePrepared(mp)
             }
@@ -595,6 +722,7 @@ class AudioPlayerController(
                 @Suppress("DEPRECATION")
                 setAudioStreamType(AudioManager.STREAM_MUSIC)
             }
+            applyPreferredDevice(this, _player2DeviceId.value)
             val currentVol = _secondaryPlaybackState.value.volume
             setVolume(currentVol, currentVol)
 
@@ -602,25 +730,51 @@ class AudioPlayerController(
                 if (mp == secondaryMediaPlayer) {
                     acquireWifiLock()
                     val dur = try { mp.duration.toLong() } catch (_: Exception) { 0L }
+                    val shouldPlay = if (_isDeckSyncEnabled.value) _playbackState.value.isPlaying else true
+                    val syncPos = if (_isDeckSyncEnabled.value) _playbackState.value.currentPositionMs else 0L
+
+                    if (syncPos > 0L) {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                mp.seekTo(syncPos, MediaPlayer.SEEK_CLOSEST)
+                            } else {
+                                mp.seekTo(syncPos.toInt())
+                            }
+                        } catch (_: Exception) {}
+                    }
+
                     _secondaryPlaybackState.update {
                         it.copy(
                             isBuffering = false,
-                            isPlaying = true,
+                            isPlaying = shouldPlay,
+                            currentPositionMs = syncPos,
                             durationMs = if (dur > 0) dur else it.durationMs
                         )
                     }
-                    mp.start()
-                    startTicker()
+                    if (shouldPlay) {
+                        mp.start()
+                        startTicker()
+                    }
                 }
             }
 
             setOnCompletionListener { mp ->
                 if (mp == secondaryMediaPlayer) {
-                    if (secondaryCurrentIndex + 1 < secondaryQueue.size) {
-                        playSecondaryNext()
-                    } else {
+                    if (_isDeckSyncEnabled.value) {
                         _secondaryPlaybackState.update {
                             it.copy(isPlaying = false, currentPositionMs = 0L)
+                        }
+                    } else if (secondaryCurrentIndex + 1 < secondaryQueue.size) {
+                        playSecondaryNext()
+                    } else {
+                        val mode = _playbackState.value.repeatMode
+                        if (mode == RepeatMode.ALL && secondaryQueue.isNotEmpty()) {
+                            val nextTrack = secondaryQueue[0]
+                            playSecondaryTrack(nextTrack, secondaryQueue)
+                        } else {
+                            _secondaryPlaybackState.update {
+                                it.copy(isPlaying = false, currentPositionMs = 0L)
+                            }
                         }
                     }
                 } else {
@@ -647,6 +801,10 @@ class AudioPlayerController(
                     }
                     safelyReleasePlayer(mp)
                     if (secondaryMediaPlayer == mp) secondaryMediaPlayer = null
+
+                    if (!_isDeckSyncEnabled.value && secondaryCurrentIndex + 1 < secondaryQueue.size) {
+                        playSecondaryNext()
+                    }
                 }
                 true
             }
@@ -800,6 +958,10 @@ class AudioPlayerController(
             )
         }
 
+        if (_isDeckSyncEnabled.value) {
+            playSecondaryTrack(track, currentQueue)
+        }
+
         acquireWifiLock() // Keep CPU and Wi-Fi awake during async preparation phase
 
         scope.launch(Dispatchers.Default) {
@@ -855,19 +1017,16 @@ class AudioPlayerController(
     }
 
     fun playSecondaryTrack(track: NaviromTrack, queue: List<NaviromTrack>? = null) {
-        if (queue != null && queue.isNotEmpty()) {
-            secondaryQueue = queue
-            val foundIdx = queue.indexOfFirst { it.id == track.id }
-            secondaryCurrentIndex = if (foundIdx >= 0) foundIdx else 0
-        } else {
-            val existingIdx = secondaryQueue.indexOfFirst { it.id == track.id }
-            if (existingIdx >= 0) {
-                secondaryCurrentIndex = existingIdx
-            } else {
-                secondaryQueue = listOf(track)
-                secondaryCurrentIndex = 0
-            }
+        val effectiveQueue = when {
+            !queue.isNullOrEmpty() -> queue
+            secondaryQueue.isNotEmpty() && secondaryQueue.any { it.id == track.id } -> secondaryQueue
+            _queue.value.isNotEmpty() && _queue.value.any { it.id == track.id } -> _queue.value
+            _queue.value.isNotEmpty() -> listOf(track) + _queue.value.filter { it.id != track.id }
+            else -> listOf(track)
         }
+        secondaryQueue = effectiveQueue
+        val foundIdx = effectiveQueue.indexOfFirst { it.id == track.id }
+        secondaryCurrentIndex = if (foundIdx >= 0) foundIdx else 0
 
         _secondaryPlaybackState.update {
             it.copy(
@@ -879,8 +1038,8 @@ class AudioPlayerController(
                 errorMessage = null,
                 queue = secondaryQueue,
                 currentIndex = secondaryCurrentIndex,
-                hasNext = secondaryCurrentIndex < secondaryQueue.size - 1,
-                hasPrevious = secondaryCurrentIndex > 0
+                hasNext = secondaryCurrentIndex < secondaryQueue.size - 1 || _playbackState.value.repeatMode == RepeatMode.ALL,
+                hasPrevious = secondaryCurrentIndex > 0 || _playbackState.value.repeatMode == RepeatMode.ALL
             )
         }
 
@@ -913,27 +1072,46 @@ class AudioPlayerController(
                     _secondaryPlaybackState.update {
                         it.copy(isBuffering = false, isPlaying = false, errorMessage = "Cannot resolve audio source")
                     }
+                    if (!_isDeckSyncEnabled.value && secondaryCurrentIndex + 1 < secondaryQueue.size) {
+                        playSecondaryNext()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("AudioPlayer", "Error preparing secondary track ${track.title}", e)
                 _secondaryPlaybackState.update {
                     it.copy(isBuffering = false, isPlaying = false, errorMessage = e.message)
                 }
+                if (!_isDeckSyncEnabled.value && secondaryCurrentIndex + 1 < secondaryQueue.size) {
+                    delay(300L)
+                    playSecondaryNext()
+                }
             }
         }
     }
 
     fun playSecondaryNext() {
-        if (secondaryCurrentIndex + 1 < secondaryQueue.size) {
-            val nextTrack = secondaryQueue[secondaryCurrentIndex + 1]
-            playSecondaryTrack(nextTrack, secondaryQueue)
+        if (secondaryQueue.isNotEmpty()) {
+            val nextIdx = secondaryCurrentIndex + 1
+            if (nextIdx < secondaryQueue.size) {
+                val nextTrack = secondaryQueue[nextIdx]
+                playSecondaryTrack(nextTrack, secondaryQueue)
+            } else if (_playbackState.value.repeatMode == RepeatMode.ALL) {
+                val nextTrack = secondaryQueue[0]
+                playSecondaryTrack(nextTrack, secondaryQueue)
+            }
         }
     }
 
     fun playSecondaryPrevious() {
-        if (secondaryCurrentIndex - 1 >= 0) {
-            val prevTrack = secondaryQueue[secondaryCurrentIndex - 1]
-            playSecondaryTrack(prevTrack, secondaryQueue)
+        if (secondaryQueue.isNotEmpty()) {
+            val prevIdx = secondaryCurrentIndex - 1
+            if (prevIdx >= 0) {
+                val prevTrack = secondaryQueue[prevIdx]
+                playSecondaryTrack(prevTrack, secondaryQueue)
+            } else if (_playbackState.value.repeatMode == RepeatMode.ALL) {
+                val prevTrack = secondaryQueue[secondaryQueue.lastIndex]
+                playSecondaryTrack(prevTrack, secondaryQueue)
+            }
         }
     }
 
@@ -1037,6 +1215,9 @@ class AudioPlayerController(
             _playbackState.update { state -> state.copy(isPlaying = false) }
             stopTicker()
         }
+        if (_isDeckSyncEnabled.value) {
+            pauseSecondary()
+        }
     }
 
     fun resume() {
@@ -1050,6 +1231,9 @@ class AudioPlayerController(
                 _playbackState.update { state -> state.copy(isPlaying = true) }
                 startTicker()
             }
+        }
+        if (_isDeckSyncEnabled.value) {
+            playSecondary()
         }
     }
 
@@ -1088,6 +1272,9 @@ class AudioPlayerController(
                 fadingOutPlayer = null
                 try { mp.setVolume(1.0f, 1.0f) } catch (_: Exception) {}
             }
+        }
+        if (_isDeckSyncEnabled.value) {
+            seekSecondaryTo(positionMs)
         }
     }
 
@@ -1214,6 +1401,15 @@ class AudioPlayerController(
                         val params = mp.playbackParams ?: PlaybackParams()
                         params.speed = speed
                         mp.playbackParams = params
+                    }
+                }
+                if (_isDeckSyncEnabled.value) {
+                    secondaryMediaPlayer?.let { mp ->
+                        if (mp.isPlaying || _secondaryPlaybackState.value.isPlaying) {
+                            val params = mp.playbackParams ?: PlaybackParams()
+                            params.speed = speed
+                            mp.playbackParams = params
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -1415,6 +1611,23 @@ class AudioPlayerController(
                     }
                 }
 
+                if (_isDeckSyncEnabled.value && !isSeeking) {
+                    val p1Pos = try { if (mediaPlayer?.isPlaying == true) mediaPlayer?.currentPosition?.toLong() else null } catch (_: Exception) { null }
+                    val p2Pos = try { if (secondaryMediaPlayer?.isPlaying == true) secondaryMediaPlayer?.currentPosition?.toLong() else null } catch (_: Exception) { null }
+                    if (p1Pos != null && p2Pos != null) {
+                        val drift = kotlin.math.abs(p1Pos - p2Pos)
+                        if (drift > 150L) {
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    secondaryMediaPlayer?.seekTo(p1Pos, MediaPlayer.SEEK_CLOSEST)
+                                } else {
+                                    secondaryMediaPlayer?.seekTo(p1Pos.toInt())
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+                }
+
                 delay(250)
             }
         }
@@ -1435,6 +1648,12 @@ class AudioPlayerController(
         unregisterNoisyReceiver()
         releaseWifiLock()
         abandonAudioFocus()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback != null) {
+            try {
+                audioManager.unregisterAudioDeviceCallback(audioDeviceCallback as android.media.AudioDeviceCallback)
+            } catch (_: Exception) {}
+            audioDeviceCallback = null
+        }
         safelyReleasePlayer(mediaPlayer)
         mediaPlayer = null
         safelyReleasePlayer(secondaryMediaPlayer)
