@@ -27,6 +27,7 @@ import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.SecondaryPlaybackState
 import com.labix.navirom.data.model.RepeatMode
 import com.labix.navirom.data.model.SleepTimerOptions
+import com.labix.navirom.player.wlan.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -345,6 +346,21 @@ class AudioPlayerController(
 
     private val _queue = MutableStateFlow<List<NaviromTrack>>(emptyList())
     val queue: StateFlow<List<NaviromTrack>> = _queue.asStateFlow()
+
+    val wlanSpeakerManager: WlanSpeakerManager by lazy {
+        WlanSpeakerManager(
+            context = context,
+            downloadManager = downloadManager,
+            urlResolverProvider = { urlResolver },
+            currentTrackProvider = { _playbackState.value.currentTrack },
+            currentQueueProvider = { _queue.value },
+            onTrackEndedOnSpeaker = {
+                scope.launch {
+                    next()
+                }
+            }
+        )
+    }
 
     private val _currentIndex = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
@@ -962,6 +978,17 @@ class AudioPlayerController(
             // else wait for syncStartJob timeout or Deck 2's onPrepared to call startBothSyncedPlayers()
         } else {
             _playbackState.update { it.copy(isPlaying = true) }
+            val wlanSpeaker = wlanSpeakerManager.wlanState.value.selectedDevice
+            val wlanMode = wlanSpeakerManager.wlanState.value.playbackMode
+            if (wlanSpeaker != null) {
+                val curTrack = _playbackState.value.currentTrack
+                if (curTrack != null) {
+                    wlanSpeakerManager.playTrackOnSpeaker(curTrack, 0L)
+                }
+                if (wlanMode == WlanPlaybackMode.WLAN_SPEAKER_ONLY) {
+                    try { mp.setVolume(0f, 0f) } catch (_: Exception) {}
+                }
+            }
             mp.start()
             isPreparingNextForCrossfade = false
             startTicker()
@@ -1347,6 +1374,7 @@ class AudioPlayerController(
     fun pause() {
         unregisterNoisyReceiver()
         releaseWifiLock()
+        wlanSpeakerManager.pause()
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) {
@@ -1369,6 +1397,7 @@ class AudioPlayerController(
                 seekSecondaryTo(p1Pos, syncPrimary = false)
             }
         }
+        wlanSpeakerManager.resume()
         mediaPlayer?.let {
             if (requestAudioFocus()) {
                 registerNoisyReceiver()
@@ -1386,6 +1415,7 @@ class AudioPlayerController(
     }
 
     fun seekTo(positionMs: Long) {
+        wlanSpeakerManager.seekTo(positionMs)
         mediaPlayer?.let { mp ->
             val duration = _playbackState.value.durationMs.coerceAtLeast(0L)
             val safePos = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs.coerceAtLeast(0L)
@@ -1844,5 +1874,6 @@ class AudioPlayerController(
         secondaryMediaPlayer = null
         safelyReleasePlayer(fadingOutPlayer)
         fadingOutPlayer = null
+        wlanSpeakerManager.release()
     }
 }

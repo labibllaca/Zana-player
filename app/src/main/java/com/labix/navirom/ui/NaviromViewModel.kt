@@ -17,6 +17,7 @@ import com.labix.navirom.data.model.*
 import com.labix.navirom.data.stats.ListeningStatsManager
 import com.labix.navirom.data.stats.ListeningStatsSummary
 import com.labix.navirom.player.AudioPlayerController
+import com.labix.navirom.player.wlan.*
 import com.labix.navirom.update.AppUpdateInfo
 import com.labix.navirom.update.UpdateManager
 import com.labix.navirom.update.UpdateState
@@ -193,6 +194,48 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isStatsScreenVisible = MutableStateFlow(false)
     val isStatsScreenVisible: StateFlow<Boolean> = _isStatsScreenVisible.asStateFlow()
+
+    val wlanSpeakerState: StateFlow<WlanSpeakerState> = playerController.wlanSpeakerManager.wlanState
+
+    private val _isWlanCastSheetVisible = MutableStateFlow(false)
+    val isWlanCastSheetVisible: StateFlow<Boolean> = _isWlanCastSheetVisible.asStateFlow()
+
+    fun showWlanCastSheet() {
+        _isWlanCastSheetVisible.value = true
+        startWlanDiscovery()
+    }
+
+    fun hideWlanCastSheet() {
+        _isWlanCastSheetVisible.value = false
+    }
+
+    fun startWlanDiscovery() {
+        playerController.wlanSpeakerManager.startDiscovery()
+    }
+
+    fun connectToWlanSpeaker(device: WlanSpeakerDevice) {
+        playerController.wlanSpeakerManager.connectToDevice(device)
+    }
+
+    fun disconnectWlanSpeaker() {
+        playerController.wlanSpeakerManager.disconnect()
+    }
+
+    fun setWlanPlaybackMode(mode: WlanPlaybackMode) {
+        playerController.wlanSpeakerManager.setPlaybackMode(mode)
+    }
+
+    fun setWlanSpeakerVolume(vol: Float) {
+        playerController.wlanSpeakerManager.setSpeakerVolume(vol)
+    }
+
+    fun toggleWlanMute() {
+        playerController.wlanSpeakerManager.toggleMute()
+    }
+
+    fun addCustomWlanDevice(ip: String, port: Int, name: String) {
+        playerController.wlanSpeakerManager.addCustomDevice(ip, port, name)
+    }
 
     // Offline only mode toggle
     private val _isOfflineOnlyMode = MutableStateFlow(false)

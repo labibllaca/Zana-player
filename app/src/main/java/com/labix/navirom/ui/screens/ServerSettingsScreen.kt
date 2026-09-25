@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +52,7 @@ import com.labix.ui.theme.AccentEmerald
 import androidx.compose.ui.text.style.TextOverflow
 
 import com.labix.navirom.player.SecureSettingsManager
+import com.labix.navirom.player.wlan.*
 import com.labix.navirom.ui.components.SecureSettingsAssistantDialog
 import com.labix.navirom.diagnostics.AppDiagnostics
 import com.labix.navirom.ui.components.DebugLogsDialog
@@ -79,6 +81,8 @@ fun ServerSettingsScreen(
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
     onSetVinylEffectEnabled: (Boolean) -> Unit = {},
     onSetDualAudioEnabled: (Boolean) -> Unit = {},
+    wlanSpeakerState: WlanSpeakerState? = null,
+    onOpenWlanCast: (() -> Unit)? = null,
     statsSummary: ListeningStatsSummary = ListeningStatsSummary(),
     onViewStats: () -> Unit = {},
     onSetLanguage: (AppLanguage) -> Unit,
@@ -707,6 +711,70 @@ fun ServerSettingsScreen(
                         checked = isDualAudioEnabled,
                         onCheckedChange = { onSetDualAudioEnabled(it) }
                     )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // WLAN Receiver Speaker Output
+                val isWlanConnected = wlanSpeakerState?.selectedDevice != null
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            haptics.click()
+                            onOpenWlanCast?.invoke()
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isWlanConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isWlanConnected) Icons.Filled.CastConnected else Icons.Filled.Cast,
+                                contentDescription = null,
+                                tint = if (isWlanConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "WLAN Receiver Speaker (Wi-Fi)",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isWlanConnected)
+                                    "Connected: ${wlanSpeakerState?.selectedDevice?.name}"
+                                else
+                                    "Stream audio to DLNA, UPnP, Sonos, Bose, or Wi-Fi speakers",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            haptics.click()
+                            onOpenWlanCast?.invoke()
+                        },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(if (isWlanConnected) "Manage" else "Connect", fontSize = 12.sp)
+                    }
                 }
             }
         }

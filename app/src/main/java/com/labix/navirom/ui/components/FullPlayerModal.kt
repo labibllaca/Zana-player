@@ -93,6 +93,7 @@ import com.labix.navirom.data.model.DownloadStatus
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.RepeatMode
 import com.labix.navirom.data.model.SecondaryPlaybackState
+import com.labix.navirom.player.wlan.*
 import com.labix.navirom.data.model.SleepTimerOptions
 import com.labix.navirom.ui.AppLanguage
 import com.labix.navirom.ui.NaviromStrings
@@ -152,6 +153,8 @@ fun FullPlayerModal(
     onSetPlayer1PreferredDevice: ((Int?) -> Unit)? = null,
     onSetPlayer2PreferredDevice: ((Int?) -> Unit)? = null,
     onRefreshOutputDevices: (() -> Unit)? = null,
+    wlanSpeakerState: WlanSpeakerState? = null,
+    onOpenWlanCast: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val track = playbackState.currentTrack ?: return
@@ -2347,6 +2350,42 @@ fun FullPlayerModal(
                                             tint = if (player1DeviceId != null || player2DeviceId != null) MaterialTheme.colorScheme.primary else Color.White,
                                             modifier = Modifier.size(19.dp)
                                         )
+                                    }
+                                }
+
+                                // WLAN Receiver Speaker Cast Button
+                                val isWlanActive = wlanSpeakerState?.selectedDevice != null
+                                Surface(
+                                    shape = if (isWlanActive) RoundedCornerShape(18.dp) else CircleShape,
+                                    color = if (isWlanActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .then(if (isWlanActive) Modifier.padding(horizontal = 2.dp) else Modifier.width(38.dp))
+                                        .clickable {
+                                            haptics.click()
+                                            onOpenWlanCast?.invoke()
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = if (isWlanActive) 8.dp else 0.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isWlanActive) Icons.Filled.CastConnected else Icons.Filled.Cast,
+                                            contentDescription = "WLAN Speaker",
+                                            tint = if (isWlanActive) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                        if (isWlanActive) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "WLAN",
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }

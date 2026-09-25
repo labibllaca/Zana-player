@@ -1,5 +1,6 @@
 package com.labix.navirom.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.labix.navirom.data.api.dto.MusicFolderDto
 import com.labix.navirom.data.local.LocalMusicFolder
+import com.labix.navirom.player.wlan.*
 import com.labix.navirom.ui.NaviromTab
 
 @Composable
@@ -44,6 +47,8 @@ fun LibrariesSidebarContent(
     onGoToSettings: (() -> Unit)? = null,
     onSyncLibrary: () -> Unit,
     onCloseSidebar: () -> Unit,
+    wlanSpeakerState: WlanSpeakerState? = null,
+    onOpenWlanCast: (() -> Unit)? = null,
     profileName: String = "",
     serverConnected: Boolean = true,
     onNavigateToTab: ((NaviromTab) -> Unit)? = null,
@@ -340,6 +345,65 @@ fun LibrariesSidebarContent(
                             }
                         }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // WLAN Speaker Cast Action Tile
+            val isWlanConnected = wlanSpeakerState?.selectedDevice != null
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (isWlanConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                border = BorderStroke(1.dp, if (isWlanConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onCloseSidebar()
+                        onOpenWlanCast?.invoke()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isWlanConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isWlanConnected) Icons.Filled.CastConnected else Icons.Filled.Cast,
+                            contentDescription = "WLAN Speaker",
+                            tint = if (isWlanConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "WLAN Receiver Speaker",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isWlanConnected) wlanSpeakerState?.selectedDevice?.name ?: "Connected" else "Tap to connect Wi-Fi speaker",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(12.dp)
+                    )
                 }
             }
 

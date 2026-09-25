@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labix.R
 import com.labix.navirom.data.model.DownloadStatus
+import com.labix.navirom.player.wlan.*
 import com.labix.navirom.ui.components.*
 import com.labix.navirom.update.AppUpdateInfo
 import com.labix.navirom.update.UpdateState
@@ -157,6 +158,8 @@ fun NaviromApp(
     val availableOutputDevices by viewModel.availableOutputDevices.collectAsStateWithLifecycle()
     val player1DeviceId by viewModel.player1DeviceId.collectAsStateWithLifecycle()
     val player2DeviceId by viewModel.player2DeviceId.collectAsStateWithLifecycle()
+    val wlanSpeakerState by viewModel.wlanSpeakerState.collectAsStateWithLifecycle()
+    val isWlanCastSheetVisible by viewModel.isWlanCastSheetVisible.collectAsStateWithLifecycle()
 
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsStateWithLifecycle()
@@ -242,6 +245,8 @@ fun NaviromApp(
                 onGoToSettings = { viewModel.setTab(NaviromTab.SETTINGS) },
                 onSyncLibrary = { viewModel.syncLibrary() },
                 onCloseSidebar = { scope.launch { drawerState.close() } },
+                wlanSpeakerState = wlanSpeakerState,
+                onOpenWlanCast = { viewModel.showWlanCastSheet() },
                 profileName = serverState.username,
                 serverConnected = serverState.isConnected,
                 onNavigateToTab = { tab -> viewModel.setTab(tab) },
@@ -765,6 +770,8 @@ fun NaviromApp(
                         onSetCrossfadeDurationSeconds = { viewModel.setCrossfadeDurationSeconds(it) },
                         onSetVinylEffectEnabled = { viewModel.setVinylEffectEnabled(it) },
                         onSetDualAudioEnabled = { viewModel.setDualAudioEnabled(it) },
+                        wlanSpeakerState = wlanSpeakerState,
+                        onOpenWlanCast = { viewModel.showWlanCastSheet() },
                         onViewStats = { viewModel.setStatsScreenVisible(true) },
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetThemeMode = { viewModel.setThemeMode(it) },
@@ -854,6 +861,8 @@ fun NaviromApp(
                 onSetPlayer1PreferredDevice = { viewModel.setPlayer1PreferredDevice(it) },
                 onSetPlayer2PreferredDevice = { viewModel.setPlayer2PreferredDevice(it) },
                 onRefreshOutputDevices = { viewModel.refreshOutputDevices() },
+                wlanSpeakerState = wlanSpeakerState,
+                onOpenWlanCast = { viewModel.showWlanCastSheet() },
                 onToggleSecondaryPlayPause = { viewModel.toggleSecondaryPlayPause() },
                 onPlaySecondaryNext = { viewModel.playSecondaryNext() },
                 onPlaySecondaryPrevious = { viewModel.playSecondaryPrevious() },
@@ -902,6 +911,14 @@ fun NaviromApp(
                 onRemoveIndex = { viewModel.removeFromQueue(it) },
                 onClearQueue = { viewModel.clearQueue() },
                 onDismiss = { viewModel.setQueueSheetVisible(false) }
+            )
+        }
+
+        // WLAN Receiver Speaker Cast Bottom Sheet
+        if (isWlanCastSheetVisible) {
+            WlanSpeakerCastSheet(
+                viewModel = viewModel,
+                onDismiss = { viewModel.hideWlanCastSheet() }
             )
         }
 
@@ -1097,6 +1114,8 @@ private fun TabContent(
     crossfadeDurationSeconds: Int = 5,
     isVinylEffectEnabled: Boolean = false,
     isDualAudioEnabled: Boolean = false,
+    wlanSpeakerState: WlanSpeakerState? = null,
+    onOpenWlanCast: (() -> Unit)? = null,
     onSetCrossfadeEnabled: (Boolean) -> Unit,
     onSetCrossfadeDurationSeconds: (Int) -> Unit = {},
     onSetVinylEffectEnabled: (Boolean) -> Unit = {},
@@ -1314,6 +1333,8 @@ private fun TabContent(
                 crossfadeDurationSeconds = crossfadeDurationSeconds,
                 isVinylEffectEnabled = isVinylEffectEnabled,
                 isDualAudioEnabled = isDualAudioEnabled,
+                wlanSpeakerState = wlanSpeakerState,
+                onOpenWlanCast = onOpenWlanCast,
                 onSetCrossfadeEnabled = onSetCrossfadeEnabled,
                 onSetCrossfadeDurationSeconds = onSetCrossfadeDurationSeconds,
                 onSetVinylEffectEnabled = onSetVinylEffectEnabled,
