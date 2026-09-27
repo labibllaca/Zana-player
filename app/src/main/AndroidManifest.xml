@@ -71,6 +71,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".navirom.update.UpdateInstallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.labix.navirom.ACTION_UPDATE_INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

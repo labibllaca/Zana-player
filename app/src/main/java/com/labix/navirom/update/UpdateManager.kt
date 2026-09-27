@@ -1,8 +1,11 @@
 package com.labix.navirom.update
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -400,71 +403,99 @@ class UpdateManager(private val context: Context) {
 
             apkFile.setReadable(true, false)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!context.packageManager.canRequestPackageInstalls()) {
-                    val info = updateInfo ?: AppUpdateInfo(
-                        tagName = "",
-                        title = "",
-                        body = "",
-                        publishedAt = "",
-                        htmlUrl = "",
-                        apkDownloadUrl = "",
-                        apkName = apkFile.name,
-                        apkSize = apkFile.length()
-                    )
-                    _updateState.value = UpdateState.ReadyToInstall(apkFile, info)
-                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(settingsIntent)
-                    Toast.makeText(context, "Please allow installing unknown apps for Zana, then return to install.", Toast.LENGTH_LONG).show()
-                    return
-                }
-            }
-
-            val authority = "${context.packageName}.provider"
-            val apkUri: Uri = FileProvider.getUriForFile(context, authority, apkFile)
-
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            // Explicitly grant URI read permissions to any resolver (package installer)
-            val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.queryIntentActivities(intent, android.content.pm.PackageManager.ResolveInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.queryIntentActivities(intent, 0)
-            }
-            for (resolveInfo in resInfoList) {
-                val pkg = resolveInfo.activityInfo.packageName
-                try {
-                    context.grantUriPermission(pkg, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (_: Exception) {}
-            }
-
-            // 1. Stop background playback service so audio and foreground notifications are stopped
+            // Stop background playback service so audio and foreground notifications are cleanly released
             try {
                 com.labix.navirom.player.NaviromPlaybackService.stopService(context)
             } catch (_: Exception) {}
 
-            // 2. Start the system package installer
-            context.startActivity(intent)
-
-            // 3. Close the application completely so the system package installer is displayed cleanly
-            try {
-                com.labix.MainActivity.closeApplication(context)
+            // Strategy 1: Use Android's modern PackageInstaller Session API for self-updates
+            // Self-updates on Android 12+ (API 31+) do not require user confirmation or unknown sources permission.
+            // On earlier versions, PackageInstaller invokes the system update confirmation directly.
+            val packageInstallerSuccess = try {
+                installViaPackageInstaller(context, apkFile)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to close MainActivity on update install", e)
+                Log.w(TAG, "PackageInstaller session creation failed, falling back to direct intent", e)
+                false
+            }
+
+            if (!packageInstallerSuccess) {
+                // Strategy 2: Direct Package Installer Intent fallback
+                installViaIntent(context, apkFile)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error launching package installer", e)
             AppDiagnostics.logError(DiagnosticCodes.UPDATE_INSTALL_ERR_708, TAG, "Install failed: ${e.message}", e)
             _updateState.value = UpdateState.Error("Installation could not be started: ${e.localizedMessage}")
         }
+    }
+
+    private fun installViaPackageInstaller(context: Context, apkFile: File): Boolean {
+        val packageInstaller = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(context.packageName)
+            setSize(apkFile.length())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Allows self-update without requiring the user to grant unknown-app installation permission
+                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                setRequestUpdateOwnership(true)
+            }
+        }
+
+        val sessionId = packageInstaller.createSession(params)
+        val session = packageInstaller.openSession(sessionId)
+
+        session.use { activeSession ->
+            apkFile.inputStream().use { inputStream ->
+                activeSession.openWrite("package", 0, apkFile.length()).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+
+            val statusIntent = Intent(context, UpdateInstallReceiver::class.java).apply {
+                action = UpdateInstallReceiver.ACTION_INSTALL_STATUS
+                putExtra(UpdateInstallReceiver.EXTRA_SESSION_ID, sessionId)
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                sessionId,
+                statusIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+
+            activeSession.commit(pendingIntent.intentSender)
+            Log.i(TAG, "PackageInstaller session $sessionId committed successfully")
+        }
+        return true
+    }
+
+    private fun installViaIntent(context: Context, apkFile: File) {
+        val authority = "${context.packageName}.provider"
+        val apkUri: Uri = FileProvider.getUriForFile(context, authority, apkFile)
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.queryIntentActivities(intent, 0)
+        }
+        for (resolveInfo in resInfoList) {
+            val pkg = resolveInfo.activityInfo.packageName
+            try {
+                context.grantUriPermission(pkg, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+        }
+
+        context.startActivity(intent)
+        Log.i(TAG, "Started package installer intent via ACTION_VIEW successfully")
     }
 
     private fun extractVersionString(input: String): String? {
