@@ -617,11 +617,22 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     val secondaryPlaybackState: StateFlow<SecondaryPlaybackState> = playerController.secondaryPlaybackState
     val isDeckSyncEnabled: StateFlow<Boolean> = playerController.isDeckSyncEnabled
+    val dualSpeakerMode: StateFlow<DualSpeakerMode> = playerController.dualSpeakerMode
+    val deckSyncBalance: StateFlow<Float> = playerController.deckSyncBalance
     val availableOutputDevices: StateFlow<List<AudioOutputDevice>> = playerController.availableOutputDevices
     val player1DeviceId: StateFlow<Int?> = playerController.player1DeviceId
     val player2DeviceId: StateFlow<Int?> = playerController.player2DeviceId
 
     init {
+        val savedSpeakerMode = try {
+            DualSpeakerMode.valueOf(prefs.getString("dual_speaker_mode", DualSpeakerMode.DUAL_STEREO.name) ?: DualSpeakerMode.DUAL_STEREO.name)
+        } catch (_: Exception) {
+            DualSpeakerMode.DUAL_STEREO
+        }
+        playerController.setDualSpeakerMode(savedSpeakerMode)
+        val savedBalance = prefs.getFloat("deck_sync_balance", 0.5f)
+        playerController.setDeckSyncBalance(savedBalance)
+
         playerController.isCrossfadeEnabled = _isCrossfadeEnabled.value
         playerController.crossfadeDurationMs = _crossfadeDurationSeconds.value * 1000L
         playerController.urlResolver = { url -> subsonicClient.resolveUrl(url) }
@@ -2492,6 +2503,20 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun setDeckSync(enabled: Boolean) {
         playerController.setDeckSync(enabled)
+    }
+
+    fun realignDeckSync() {
+        playerController.realignDeckSync()
+    }
+
+    fun setDualSpeakerMode(mode: DualSpeakerMode) {
+        playerController.setDualSpeakerMode(mode)
+        prefs.edit().putString("dual_speaker_mode", mode.name).apply()
+    }
+
+    fun setDeckSyncBalance(balance: Float) {
+        playerController.setDeckSyncBalance(balance)
+        prefs.edit().putFloat("deck_sync_balance", balance).apply()
     }
 
     fun refreshOutputDevices() {

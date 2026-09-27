@@ -55,6 +55,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.labix.navirom.data.model.AudioOutputDevice
+import com.labix.navirom.data.model.DualSpeakerMode
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -147,6 +148,11 @@ fun FullPlayerModal(
     onStopSecondaryTrack: (() -> Unit)? = null,
     isDeckSyncEnabled: Boolean = false,
     onToggleDeckSync: (() -> Unit)? = null,
+    dualSpeakerMode: DualSpeakerMode = DualSpeakerMode.DUAL_STEREO,
+    deckSyncBalance: Float = 0.5f,
+    onSetDualSpeakerMode: ((DualSpeakerMode) -> Unit)? = null,
+    onSetDeckSyncBalance: ((Float) -> Unit)? = null,
+    onRealignDeckSync: (() -> Unit)? = null,
     availableOutputDevices: List<AudioOutputDevice> = emptyList(),
     player1DeviceId: Int? = null,
     player2DeviceId: Int? = null,
@@ -983,6 +989,239 @@ fun FullPlayerModal(
                                         onToggleDeckSync?.invoke()
                                     }
                                 )
+                            }
+                        }
+
+                        // When Deck Sync is active: Show Dual Speaker Mode, Quality Assurance, and Balance Control
+                        if (isDeckSyncEnabled) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.HighQuality,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Text(
+                                                text = NaviromStrings.get("dual_speaker_sync_status", appLanguage),
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        // Re-align Sync Button
+                                        FilledTonalButton(
+                                            onClick = {
+                                                haptics.click()
+                                                onRealignDeckSync?.invoke()
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Autorenew, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = NaviromStrings.get("dual_speaker_realign_btn", appLanguage),
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = NaviromStrings.get("dual_speaker_sync_quality_info", appLanguage),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                                    // Dual Speaker Mode Selector
+                                    Text(
+                                        text = NaviromStrings.get("dual_speaker_mode_title", appLanguage),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        // Mode 1: Dual Full Stereo
+                                        val isStereoSelected = dualSpeakerMode == DualSpeakerMode.DUAL_STEREO
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isStereoSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            border = if (isStereoSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    haptics.tick()
+                                                    onSetDualSpeakerMode?.invoke(DualSpeakerMode.DUAL_STEREO)
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                RadioButton(
+                                                    selected = isStereoSelected,
+                                                    onClick = {
+                                                        haptics.tick()
+                                                        onSetDualSpeakerMode?.invoke(DualSpeakerMode.DUAL_STEREO)
+                                                    },
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Column {
+                                                    Text(
+                                                        text = NaviromStrings.get("dual_speaker_mode_stereo", appLanguage),
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                                    )
+                                                    Text(
+                                                        text = NaviromStrings.get("dual_speaker_mode_stereo_desc", appLanguage),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Mode 2: Stereo Pair (Speaker 1 Left / Speaker 2 Right)
+                                        val isPairLrSelected = dualSpeakerMode == DualSpeakerMode.STEREO_PAIR_LR
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isPairLrSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            border = if (isPairLrSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    haptics.tick()
+                                                    onSetDualSpeakerMode?.invoke(DualSpeakerMode.STEREO_PAIR_LR)
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                RadioButton(
+                                                    selected = isPairLrSelected,
+                                                    onClick = {
+                                                        haptics.tick()
+                                                        onSetDualSpeakerMode?.invoke(DualSpeakerMode.STEREO_PAIR_LR)
+                                                    },
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Text(
+                                                    text = NaviromStrings.get("dual_speaker_mode_pair_lr", appLanguage),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                                )
+                                            }
+                                        }
+
+                                        // Mode 3: Stereo Pair (Speaker 1 Right / Speaker 2 Left)
+                                        val isPairRlSelected = dualSpeakerMode == DualSpeakerMode.STEREO_PAIR_RL
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isPairRlSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            border = if (isPairRlSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    haptics.tick()
+                                                    onSetDualSpeakerMode?.invoke(DualSpeakerMode.STEREO_PAIR_RL)
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                RadioButton(
+                                                    selected = isPairRlSelected,
+                                                    onClick = {
+                                                        haptics.tick()
+                                                        onSetDualSpeakerMode?.invoke(DualSpeakerMode.STEREO_PAIR_RL)
+                                                    },
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Text(
+                                                    text = NaviromStrings.get("dual_speaker_mode_pair_rl", appLanguage),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                                    // Speaker Balance Slider
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = NaviromStrings.get("dual_speaker_balance_title", appLanguage),
+                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = when {
+                                                    deckSyncBalance < 0.45f -> "Speaker 1 (+${((0.5f - deckSyncBalance) * 200).toInt()}%)"
+                                                    deckSyncBalance > 0.55f -> "Speaker 2 (+${((deckSyncBalance - 0.5f) * 200).toInt()}%)"
+                                                    else -> "Center (Balanced)"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+
+                                        Slider(
+                                            value = deckSyncBalance,
+                                            onValueChange = { onSetDeckSyncBalance?.invoke(it) },
+                                            valueRange = 0f..1f,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Speaker 1",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "Center",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "Speaker 2",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 

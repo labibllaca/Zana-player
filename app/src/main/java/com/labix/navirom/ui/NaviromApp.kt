@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labix.R
 import com.labix.navirom.data.model.DownloadStatus
+import com.labix.navirom.data.model.DualSpeakerMode
 import com.labix.navirom.player.wlan.*
 import com.labix.navirom.ui.components.*
 import com.labix.navirom.update.AppUpdateInfo
@@ -155,6 +156,8 @@ fun NaviromApp(
     val isDualAudioEnabled by viewModel.isDualAudioEnabled.collectAsStateWithLifecycle()
     val secondaryPlaybackState by viewModel.secondaryPlaybackState.collectAsStateWithLifecycle()
     val isDeckSyncEnabled by viewModel.isDeckSyncEnabled.collectAsStateWithLifecycle()
+    val dualSpeakerMode by viewModel.dualSpeakerMode.collectAsStateWithLifecycle()
+    val deckSyncBalance by viewModel.deckSyncBalance.collectAsStateWithLifecycle()
     val availableOutputDevices by viewModel.availableOutputDevices.collectAsStateWithLifecycle()
     val player1DeviceId by viewModel.player1DeviceId.collectAsStateWithLifecycle()
     val player2DeviceId by viewModel.player2DeviceId.collectAsStateWithLifecycle()
@@ -855,6 +858,11 @@ fun NaviromApp(
                 secondaryPlaybackState = secondaryPlaybackState,
                 isDeckSyncEnabled = isDeckSyncEnabled,
                 onToggleDeckSync = { viewModel.toggleDeckSync() },
+                dualSpeakerMode = dualSpeakerMode,
+                deckSyncBalance = deckSyncBalance,
+                onSetDualSpeakerMode = { viewModel.setDualSpeakerMode(it) },
+                onSetDeckSyncBalance = { viewModel.setDeckSyncBalance(it) },
+                onRealignDeckSync = { viewModel.realignDeckSync() },
                 availableOutputDevices = availableOutputDevices,
                 player1DeviceId = player1DeviceId,
                 player2DeviceId = player2DeviceId,

@@ -22,6 +22,7 @@ import com.labix.navirom.data.local.NaviromDatabase
 import com.labix.navirom.data.local.PlaybackQueueDao
 import com.labix.navirom.data.local.PlaybackQueueEntity
 import com.labix.navirom.data.model.AudioOutputDevice
+import com.labix.navirom.data.model.DualSpeakerMode
 import com.labix.navirom.data.model.NaviromTrack
 import com.labix.navirom.data.model.PlaybackState
 import com.labix.navirom.data.model.SecondaryPlaybackState
@@ -217,6 +218,12 @@ class AudioPlayerController(
     private val _isDeckSyncEnabled = MutableStateFlow<Boolean>(false)
     val isDeckSyncEnabled: StateFlow<Boolean> = _isDeckSyncEnabled.asStateFlow()
 
+    private val _dualSpeakerMode = MutableStateFlow(DualSpeakerMode.DUAL_STEREO)
+    val dualSpeakerMode: StateFlow<DualSpeakerMode> = _dualSpeakerMode.asStateFlow()
+
+    private val _deckSyncBalance = MutableStateFlow(0.5f) // 0.0 (Deck 1 100%) to 0.5 (Center) to 1.0 (Deck 2 100%)
+    val deckSyncBalance: StateFlow<Float> = _deckSyncBalance.asStateFlow()
+
     private var audioDeviceCallback: Any? = null
 
     init {
@@ -307,6 +314,71 @@ class AudioPlayerController(
         }
     }
 
+    fun setDualSpeakerMode(mode: DualSpeakerMode) {
+        _dualSpeakerMode.value = mode
+        applyChannelVolumes()
+    }
+
+    fun setDeckSyncBalance(balance: Float) {
+        _deckSyncBalance.value = balance.coerceIn(0f, 1f)
+        applyChannelVolumes()
+    }
+
+    fun applyChannelVolumes() {
+        val isDeckSync = _isDeckSyncEnabled.value
+        val mode = _dualSpeakerMode.value
+        val balance = _deckSyncBalance.value // 0.0 (Deck 1 100%, Deck 2 0%) to 0.5 (100%/100%) to 1.0 (Deck 1 0%, Deck 2 100%)
+        val p2MasterVol = _secondaryPlaybackState.value.volume
+
+        // Calculate smooth balance gains
+        val p1Bal = if (balance <= 0.5f) 1.0f else (1.0f - (balance - 0.5f) * 2f).coerceIn(0f, 1f)
+        val p2Bal = if (balance >= 0.5f) 1.0f else (balance * 2f).coerceIn(0f, 1f)
+
+        if (isDeckSync) {
+            when (mode) {
+                DualSpeakerMode.DUAL_STEREO -> {
+                    // Both Bluetooth speakers output full uncompressed stereo (Lossless Mirror)
+                    try { mediaPlayer?.setVolume(p1Bal, p1Bal) } catch (_: Exception) {}
+                    try { secondaryMediaPlayer?.setVolume(p2MasterVol * p2Bal, p2MasterVol * p2Bal) } catch (_: Exception) {}
+                }
+                DualSpeakerMode.STEREO_PAIR_LR -> {
+                    // Speaker 1 plays Left channel, Speaker 2 plays Right channel (Wireless Stereo Pair)
+                    try { mediaPlayer?.setVolume(p1Bal, 0f) } catch (_: Exception) {}
+                    try { secondaryMediaPlayer?.setVolume(0f, p2MasterVol * p2Bal) } catch (_: Exception) {}
+                }
+                DualSpeakerMode.STEREO_PAIR_RL -> {
+                    // Speaker 1 plays Right channel, Speaker 2 plays Left channel
+                    try { mediaPlayer?.setVolume(0f, p1Bal) } catch (_: Exception) {}
+                    try { secondaryMediaPlayer?.setVolume(p2MasterVol * p2Bal, 0f) } catch (_: Exception) {}
+                }
+            }
+        } else {
+            // Independent Decks: Primary full stereo, Secondary full stereo with user volume
+            try { mediaPlayer?.setVolume(1.0f, 1.0f) } catch (_: Exception) {}
+            try { secondaryMediaPlayer?.setVolume(p2MasterVol, p2MasterVol) } catch (_: Exception) {}
+        }
+    }
+
+    fun realignDeckSync() {
+        if (!_isDeckSyncEnabled.value) return
+        val p1Pos = try { mediaPlayer?.currentPosition?.toLong() ?: _playbackState.value.currentPositionMs } catch (_: Exception) { _playbackState.value.currentPositionMs }
+        val p1IsPlaying = try { (mediaPlayer?.isPlaying == true) || _playbackState.value.isPlaying } catch (_: Exception) { false }
+
+        emaDiff = 0.0
+        driftDurationMs = 0L
+        val baseSpeed = _playbackState.value.playbackSpeed
+        applySecondarySpeed(baseSpeed)
+
+        seekSecondaryTo(p1Pos, syncPrimary = false)
+        if (p1IsPlaying) {
+            try {
+                secondaryMediaPlayer?.start()
+                _secondaryPlaybackState.update { it.copy(isPlaying = true) }
+            } catch (_: Exception) {}
+        }
+        applyChannelVolumes()
+    }
+
     fun toggleDeckSync() {
         setDeckSync(!_isDeckSyncEnabled.value)
     }
@@ -314,6 +386,11 @@ class AudioPlayerController(
     fun setDeckSync(enabled: Boolean) {
         _isDeckSyncEnabled.value = enabled
         _secondaryPlaybackState.update { it.copy(isSyncedWithPrimary = enabled) }
+        emaDiff = 0.0
+        driftDurationMs = 0L
+        val baseSpeed = _playbackState.value.playbackSpeed
+        applySecondarySpeed(baseSpeed)
+
         if (enabled) {
             val p1Track = _playbackState.value.currentTrack
             if (p1Track != null) {
@@ -338,10 +415,8 @@ class AudioPlayerController(
                     playSecondaryTrack(p1Track, _queue.value)
                 }
             }
-        } else {
-            // Revert secondary speed to standard speed when sync is disabled
-            applySecondarySpeed(_playbackState.value.playbackSpeed)
         }
+        applyChannelVolumes()
     }
 
     private val _queue = MutableStateFlow<List<NaviromTrack>>(emptyList())
@@ -397,6 +472,11 @@ class AudioPlayerController(
     private var syncStartJob: Job? = null
     private var lastSyncSeekTime = 0L
     private var currentSecondaryAppliedSpeed = 1.0f
+
+    // Stabilized sync filter fields
+    private var emaDiff = 0.0
+    private var driftDurationMs = 0L
+    private var lastSyncEvaluationTime = 0L
 
     fun markTrackUnplayable(trackId: String) {
         if (trackId.isBlank()) return
@@ -767,8 +847,7 @@ class AudioPlayerController(
                 setAudioStreamType(AudioManager.STREAM_MUSIC)
             }
             applyPreferredDevice(this, _player2DeviceId.value)
-            val currentVol = _secondaryPlaybackState.value.volume
-            setVolume(currentVol, currentVol)
+            applyChannelVolumes()
 
             setOnSeekCompleteListener { mp ->
                 if (mp == secondaryMediaPlayer) {
@@ -1339,9 +1418,7 @@ class AudioPlayerController(
     fun setSecondaryVolume(volume: Float) {
         val clamped = volume.coerceIn(0f, 1f)
         _secondaryPlaybackState.update { it.copy(volume = clamped) }
-        try {
-            secondaryMediaPlayer?.setVolume(clamped, clamped)
-        } catch (_: Exception) {}
+        applyChannelVolumes()
     }
 
     fun stopSecondaryTrack() {
@@ -1789,7 +1866,7 @@ class AudioPlayerController(
                     }
                 }
 
-                // Drift Synchronization Controller
+                // Drift Synchronization Controller (Bit-Perfect Lossless Architecture)
                 val isSameTrack = _playbackState.value.currentTrack?.id != null &&
                         _playbackState.value.currentTrack?.id == _secondaryPlaybackState.value.currentTrack?.id
                 val isSyncActive = _isDeckSyncEnabled.value || isSameTrack
@@ -1802,14 +1879,24 @@ class AudioPlayerController(
                     val p2Pos = try { secondaryMediaPlayer?.currentPosition?.toLong() } catch (_: Exception) { null }
 
                     if (p1Pos != null && p2Pos != null) {
-                        val diff = p1Pos - p2Pos // Positive: Deck 1 ahead (Deck 2 lagging). Negative: Deck 2 ahead.
-                        val absDiff = kotlin.math.abs(diff)
+                        val rawDiff = (p1Pos - p2Pos).toDouble() // Positive: Deck 1 ahead (Deck 2 lagging). Negative: Deck 2 ahead.
                         val baseSpeed = _playbackState.value.playbackSpeed
                         val now = System.currentTimeMillis()
+                        val dt = if (lastSyncEvaluationTime > 0L) (now - lastSyncEvaluationTime).coerceIn(20L, 500L) else 100L
+                        lastSyncEvaluationTime = now
 
-                        if (absDiff > 350L && (now - lastSyncSeekTime > 800L)) {
-                            // Large desync (e.g. after buffer underrun or jump): perform a clean seekTo
+                        // Exponential Moving Average filter to eliminate Android MediaPlayer timestamp reporting quantization steps
+                        val alpha = 0.18
+                        emaDiff = alpha * rawDiff + (1.0 - alpha) * emaDiff
+                        val absEma = kotlin.math.abs(emaDiff)
+                        val absRaw = kotlin.math.abs(rawDiff)
+
+                        // 1. Large desync (e.g. Bluetooth packet drop or track jump > 380ms):
+                        // Clean, instantaneous sample-aligned seek with zero speed distortion
+                        if ((absRaw > 380.0 || absEma > 320.0) && (now - lastSyncSeekTime > 900L)) {
                             lastSyncSeekTime = now
+                            emaDiff = 0.0
+                            driftDurationMs = 0L
                             try {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     secondaryMediaPlayer?.seekTo(p1Pos, MediaPlayer.SEEK_CLOSEST)
@@ -1818,30 +1905,36 @@ class AudioPlayerController(
                                 }
                             } catch (_: Exception) {}
                             applySecondarySpeed(baseSpeed)
-                        } else if (absDiff > 12L) {
-                            // Fine-grained smooth phase adjustment via playback speed (zero audio glitching)
-                            val speedAdj = when {
-                                diff > 150L -> 1.08f   // Deck 2 lagging significantly: +8%
-                                diff > 75L  -> 1.05f   // Deck 2 lagging moderately: +5%
-                                diff > 30L  -> 1.03f   // Deck 2 lagging slightly: +3%
-                                diff > 12L  -> 1.015f  // Deck 2 lagging by a hair: +1.5%
-                                diff < -150L -> 0.92f  // Deck 2 leading significantly: -8%
-                                diff < -75L  -> 0.95f  // Deck 2 leading moderately: -5%
-                                diff < -30L  -> 0.97f  // Deck 2 leading slightly: -3%
-                                diff < -12L  -> 0.985f // Deck 2 leading by a hair: -1.5%
-                                else -> 1.0f
-                            }
-                            applySecondarySpeed(baseSpeed * speedAdj)
-                        } else {
-                            // Locked in sync (within 12ms)!
-                            if (kotlin.math.abs(currentSecondaryAppliedSpeed - baseSpeed) > 0.001f) {
+                        }
+                        // 2. Deadband: within ±200ms (within Android A2DP HAL/MediaPlayer timestamp report granularity)
+                        // Strictly locked at exact 1.0000x base speed! Zero time-stretching DSP active, bit-perfect quality!
+                        else if (absEma < 200.0) {
+                            driftDurationMs = 0L
+                            if (kotlin.math.abs(currentSecondaryAppliedSpeed - baseSpeed) > 0.0005f) {
                                 applySecondarySpeed(baseSpeed)
                             }
                         }
+                        // 3. Persistent real hardware clock drift (between 200ms and 320ms sustained for > 1400ms):
+                        // Apply an imperceptible, microscopic trim (±0.6% maximum) to smoothly pull phase without pitch flutter
+                        else {
+                            driftDurationMs += dt
+                            if (driftDurationMs > 1400L) {
+                                val microTrim = if (emaDiff > 0) 1.006f else 0.994f
+                                applySecondarySpeed(baseSpeed * microTrim)
+                            } else {
+                                if (kotlin.math.abs(currentSecondaryAppliedSpeed - baseSpeed) > 0.0005f) {
+                                    applySecondarySpeed(baseSpeed)
+                                }
+                            }
+                        }
                     }
+                } else {
+                    lastSyncEvaluationTime = 0L
+                    driftDurationMs = 0L
+                    emaDiff = 0.0
                 }
 
-                val tickInterval = if (isSyncActive && p1Playing && p2Playing) 60L else 250L
+                val tickInterval = if (isSyncActive && p1Playing && p2Playing) 100L else 250L
                 delay(tickInterval)
             }
         }

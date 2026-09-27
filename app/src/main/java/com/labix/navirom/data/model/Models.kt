@@ -132,3 +132,9 @@ data class AudioOutputDevice(
     val isHeadphones: Boolean = false
 )
 
+enum class DualSpeakerMode {
+    DUAL_STEREO,     // Both speakers play full lossless stereo
+    STEREO_PAIR_LR,  // Speaker 1 = Left, Speaker 2 = Right
+    STEREO_PAIR_RL   // Speaker 1 = Right, Speaker 2 = Left
+}
+
