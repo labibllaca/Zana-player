@@ -3,11 +3,15 @@ package com.labix.navirom.ui.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.ui.draw.blur
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -466,10 +470,13 @@ fun FullPlayerModal(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // Quick Presets Row
+                        // Quick Presets Row (scrollable group showing icons only)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             listOf(15, 30, 45, 60).forEach { mins ->
                                 val isSelected = isTimerActive && (playbackState.sleepTimerMinutesLeft == mins)
@@ -488,10 +495,9 @@ fun FullPlayerModal(
                                         onSetSleepTimer(mins, opt)
                                         showSleepTimerDialog = false
                                     },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(42.dp),
-                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.size(42.dp),
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
                                     colors = if (isSelected) {
                                         ButtonDefaults.filledTonalButtonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
@@ -499,9 +505,15 @@ fun FullPlayerModal(
                                         )
                                     } else ButtonDefaults.filledTonalButtonColors()
                                 ) {
-                                    Text(
-                                        text = "${mins}m",
-                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = when (mins) {
+                                            15 -> Icons.Filled.HourglassTop
+                                            30 -> Icons.Filled.HourglassBottom
+                                            45 -> Icons.Filled.HourglassFull
+                                            else -> Icons.Filled.AvTimer
+                                        },
+                                        contentDescription = "${mins}m",
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -1732,6 +1744,38 @@ fun FullPlayerModal(
                             // Artwork with vinyl effect - vinyl rotates cleanly without overlaid text
                             val artworkShape = if (isVinylEffectEnabled) CircleShape else RoundedCornerShape(32.dp)
 
+                            // Vinyl unblur animation: initially blurry and steadily unblurs within the first 10 seconds of playback
+                            val vinylBlurAnim = remember(track.id) {
+                                Animatable(if (currentPosMs < 10_000L) (1f - (currentPosMs.toFloat() / 10_000f)).coerceIn(0f, 1f) else 0f)
+                            }
+
+                            LaunchedEffect(track.id, playbackState.isPlaying) {
+                                if (currentPosMs >= 10_000L) {
+                                    vinylBlurAnim.snapTo(0f)
+                                } else {
+                                    val remainingMs = (10_000L - currentPosMs).coerceAtLeast(100L)
+                                    if (playbackState.isPlaying) {
+                                        vinylBlurAnim.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = tween(
+                                                durationMillis = remainingMs.toInt(),
+                                                easing = LinearEasing
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            LaunchedEffect(currentPosMs) {
+                                val expectedFactor = if (currentPosMs >= 10_000L) 0f else (1f - (currentPosMs.toFloat() / 10_000f)).coerceIn(0f, 1f)
+                                if (kotlin.math.abs(vinylBlurAnim.value - expectedFactor) > 0.25f) {
+                                    vinylBlurAnim.snapTo(expectedFactor)
+                                }
+                            }
+
+                            val vinylBlurFactor = vinylBlurAnim.value.coerceIn(0f, 1f)
+                            val animatedVinylBlurDp = (vinylBlurFactor * 26f).dp
+
                             // Platter depression spring animation while vinyl is being scratched
                             val vinylPlatterScale by animateFloatAsState(
                                 targetValue = if (isVinylScratching) 0.982f else 1.0f,
@@ -1973,6 +2017,13 @@ fun FullPlayerModal(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .then(
+                                            if (isVinylEffectEnabled && animatedVinylBlurDp > 0.5.dp) {
+                                                Modifier.blur(radius = animatedVinylBlurDp)
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                        .then(
                                             if (!isVinylEffectEnabled) {
                                                 Modifier
                                                     .testTag("full_player_cover_click")
@@ -2041,6 +2092,16 @@ fun FullPlayerModal(
                                             }
                                         )
                                 )
+
+                                // Soft diffused scrim that unblurs steadily in the first 10 seconds for the vinyl image
+                                if (isVinylEffectEnabled && vinylBlurFactor > 0.01f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.White.copy(alpha = vinylBlurFactor * 0.16f))
+                                            .background(Color.Black.copy(alpha = vinylBlurFactor * 0.30f))
+                                    )
+                                }
 
                                 // Subtle Countdown Timer Badge on cover if timer is running
                                 if (isTimerActive) {
@@ -2294,12 +2355,39 @@ fun FullPlayerModal(
                                             }
                                     )
                                 }
-                                IconButton(onClick = onToggleShuffle) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Shuffle,
-                                        contentDescription = "Shuffle",
-                                        tint = if (playbackState.isShuffle) textOnCard else textMutedOnCard
-                                    )
+                                IconButton(
+                                    onClick = {
+                                        haptics.toggle()
+                                        val toastMsg = when {
+                                            !playbackState.isShuffle -> NaviromStrings.get("shuffle_standard_toast", appLanguage)
+                                            !playbackState.isSmartShuffle -> NaviromStrings.get("smart_shuffle_toast", appLanguage)
+                                            else -> NaviromStrings.get("shuffle_off_toast", appLanguage)
+                                        }
+                                        Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                        onToggleShuffle()
+                                    },
+                                    modifier = Modifier.testTag("player_toggle_shuffle_btn")
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (playbackState.isSmartShuffle) Icons.Filled.AutoAwesome else Icons.Filled.Shuffle,
+                                            contentDescription = if (playbackState.isSmartShuffle) "Smart Shuffle" else "Shuffle",
+                                            tint = when {
+                                                playbackState.isSmartShuffle -> MaterialTheme.colorScheme.primary
+                                                playbackState.isShuffle -> textOnCard
+                                                else -> textMutedOnCard
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        if (playbackState.isSmartShuffle) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -3052,15 +3140,20 @@ fun FullPlayerModal(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     OutlinedButton(
                                         onClick = onRefetchLyrics,
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(42.dp),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.5f))
                                     ) {
-                                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Retry", fontSize = 13.sp)
+                                        Icon(Icons.Filled.Refresh, contentDescription = "Retry", modifier = Modifier.size(20.dp))
                                     }
 
                                     OutlinedButton(
@@ -3074,12 +3167,13 @@ fun FullPlayerModal(
                                             }
                                             showTeksteShqipDialog = true
                                         },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(42.dp),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD54F)),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.6f))
                                     ) {
-                                        Icon(Icons.Filled.Language, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("TeksteShqip", fontSize = 13.sp)
+                                        Icon(Icons.Filled.Language, contentDescription = "TeksteShqip", modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }

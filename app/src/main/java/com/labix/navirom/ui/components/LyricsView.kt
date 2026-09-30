@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -328,12 +329,18 @@ fun LyricsView(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Button(
                             onClick = onRefetch,
-                            shape = RoundedCornerShape(12.dp)
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(40.dp)
                         ) {
-                            Text(str("lyrics_reload"))
+                            Icon(Icons.Filled.Refresh, contentDescription = str("lyrics_reload"), modifier = Modifier.size(20.dp))
                         }
                         if (onFetchTeksteShqip != null) {
                             FilledTonalButton(
@@ -346,11 +353,11 @@ fun LyricsView(
                                     }
                                     showTeksteShqipDialog = true
                                 },
-                                shape = RoundedCornerShape(12.dp)
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Icon(Icons.Filled.Language, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("TeksteShqip")
+                                Icon(Icons.Filled.Language, contentDescription = "TeksteShqip", modifier = Modifier.size(20.dp))
                             }
                         }
                     }

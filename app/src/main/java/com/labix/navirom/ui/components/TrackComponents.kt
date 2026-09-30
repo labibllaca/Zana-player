@@ -79,7 +79,8 @@ fun DualAudioPlayButton(
     tracks: List<NaviromTrack>,
     modifier: Modifier = Modifier,
     isTonal: Boolean = false,
-    testTag: String = "dual_audio_play_btn"
+    testTag: String = "dual_audio_play_btn",
+    showText: Boolean = false
 ) {
     val context = LocalContext.current
     val haptics = rememberNaviromHaptics()
@@ -116,7 +117,9 @@ fun DualAudioPlayButton(
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
@@ -127,18 +130,12 @@ fun DualAudioPlayButton(
                                 Toast.makeText(context, "Playing $text on Player 1", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1f, fill = false)
                                 .testTag("${testTag}_player1"),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Player 1", maxLines = 1)
-                            }
+                            Icon(Icons.Filled.PlayArrow, contentDescription = "Player 1", modifier = Modifier.size(20.dp))
                         }
 
                         Button(
@@ -152,18 +149,12 @@ fun DualAudioPlayButton(
                                 }
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1f, fill = false)
                                 .testTag("${testTag}_player2"),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Player 2", maxLines = 1)
-                            }
+                            Icon(Icons.Filled.MusicNote, contentDescription = "Player 2", modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -210,13 +201,15 @@ fun DualAudioPlayButton(
             }
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = if (showText) 16.dp else 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+            Icon(icon, contentDescription = text, modifier = Modifier.size(20.dp))
+            if (showText) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+            }
         }
     }
 }
@@ -501,8 +494,11 @@ private fun TrackListItemContent(
                         )
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Button(
                                 onClick = {
@@ -516,20 +512,15 @@ private fun TrackListItemContent(
                                     Toast.makeText(context, "Playing on Player 1", Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .size(44.dp)
                                     .testTag("play_deck_1_btn"),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 )
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Text("Player 1", maxLines = 1)
-                                }
+                                Icon(Icons.Filled.PlayArrow, contentDescription = "Player 1", modifier = Modifier.size(20.dp))
                             }
 
                             Button(
@@ -540,20 +531,15 @@ private fun TrackListItemContent(
                                     Toast.makeText(context, "Playing on Player 2", Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .size(44.dp)
                                     .testTag("play_deck_2_btn"),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.secondary
                                 )
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Text("Player 2", maxLines = 1)
-                                }
+                                Icon(Icons.Filled.MusicNote, contentDescription = "Player 2", modifier = Modifier.size(20.dp))
                             }
                         }
 
@@ -570,8 +556,11 @@ private fun TrackListItemContent(
                     }
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
                             onClick = {
@@ -579,11 +568,12 @@ private fun TrackListItemContent(
                                 handleBeginning()
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .size(44.dp)
                                 .testTag("queue_beginning_btn"),
-                            shape = RoundedCornerShape(14.dp)
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Play Next")
+                            Icon(Icons.Filled.PlaylistPlay, contentDescription = "Play Next", modifier = Modifier.size(22.dp))
                         }
 
                         OutlinedButton(
@@ -592,11 +582,12 @@ private fun TrackListItemContent(
                                 handleEnd()
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .size(44.dp)
                                 .testTag("queue_end_btn"),
-                            shape = RoundedCornerShape(14.dp)
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Add to End")
+                            Icon(Icons.Filled.PlaylistAdd, contentDescription = "Add to End", modifier = Modifier.size(22.dp))
                         }
                     }
                 }

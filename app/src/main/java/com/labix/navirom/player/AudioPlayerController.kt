@@ -47,6 +47,7 @@ class AudioPlayerController(
     private val playbackQueueDao: PlaybackQueueDao
 ) {
     var urlResolver: ((String) -> String)? = null
+    var smartShuffleProvider: ((List<NaviromTrack>) -> List<NaviromTrack>)? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var mediaPlayer: MediaPlayer? = null
@@ -1625,17 +1626,37 @@ class AudioPlayerController(
     }
 
     fun toggleShuffle() {
-        val newShuffle = !_playbackState.value.isShuffle
-        _playbackState.update { it.copy(isShuffle = newShuffle) }
+        val currentShuffle = _playbackState.value.isShuffle
+        val currentSmart = _playbackState.value.isSmartShuffle
+        
+        val (nextShuffle, nextSmart) = when {
+            !currentShuffle -> Pair(true, false)
+            !currentSmart -> Pair(true, true)
+            else -> Pair(false, false)
+        }
+        setShuffleMode(enabled = nextShuffle, isSmart = nextSmart)
+    }
+
+    fun setSmartShuffle(enabled: Boolean) {
+        setShuffleMode(enabled = enabled, isSmart = enabled)
+    }
+
+    fun setShuffleMode(enabled: Boolean, isSmart: Boolean = false) {
+        _playbackState.update { it.copy(isShuffle = enabled, isSmartShuffle = isSmart) }
 
         val currentTrack = _playbackState.value.currentTrack
-        if (newShuffle) {
-            val shuffled = originalQueueList.shuffled().toMutableList()
+        if (enabled) {
+            val tracksToShuffle = originalQueueList.filter { it.id != currentTrack?.id }
+            val shuffledRest = if (isSmart && smartShuffleProvider != null) {
+                smartShuffleProvider!!.invoke(tracksToShuffle)
+            } else {
+                tracksToShuffle.shuffled()
+            }.toMutableList()
+
             if (currentTrack != null) {
-                shuffled.remove(currentTrack)
-                shuffled.add(0, currentTrack)
+                shuffledRest.add(0, currentTrack)
             }
-            _queue.value = shuffled
+            _queue.value = shuffledRest
             _currentIndex.value = 0
         } else {
             _queue.value = originalQueueList

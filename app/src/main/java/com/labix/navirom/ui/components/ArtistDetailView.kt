@@ -7,12 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,6 +64,7 @@ fun ArtistDetailView(
     onTrackClick: (NaviromTrack) -> Unit,
     onPlayAllSongs: () -> Unit,
     onShuffleAllSongs: () -> Unit,
+    onSmartShuffleSongs: (() -> Unit)? = null,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
     onPlayNext: (NaviromTrack) -> Unit,
@@ -204,6 +207,7 @@ fun ArtistDetailView(
                         if (songs.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -213,23 +217,16 @@ fun ArtistDetailView(
                                         onPlayAllSongs()
                                     },
                                     modifier = Modifier
-                                        .height(34.dp)
-                                        .weight(1f)
+                                        .size(36.dp)
                                         .testTag("artist_play_all_btn"),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = str("btn_play_all"),
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        maxLines = 1
+                                        contentDescription = str("btn_play_all"),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
 
@@ -239,22 +236,41 @@ fun ArtistDetailView(
                                         onShuffleAllSongs()
                                     },
                                     modifier = Modifier
-                                        .height(34.dp)
-                                        .weight(1f)
+                                        .size(36.dp)
                                         .testTag("artist_shuffle_all_btn"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Shuffle,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
+                                        contentDescription = str("btn_shuffle_all"),
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = str("btn_shuffle_all"),
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        maxLines = 1
+                                }
+
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptics.toggle()
+                                        if (onSmartShuffleSongs != null) {
+                                            onSmartShuffleSongs()
+                                        } else {
+                                            onShuffleAllSongs()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .testTag("artist_smart_shuffle_btn"),
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.AutoAwesome,
+                                        contentDescription = str("smart_shuffle"),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }

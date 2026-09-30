@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.labix.navirom.data.api.NaviromSubsonicClient
@@ -87,6 +88,10 @@ data class ServerConnectionUiState(
 }
 
 class NaviromViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        private const val TAG = "NaviromViewModel"
+    }
 
     private val prefs = application.getSharedPreferences("navirom_prefs", Context.MODE_PRIVATE)
 
@@ -360,6 +365,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val scanned = localAudioRepository.getLocalAudioTracks()
                 val folders = localAudioRepository.groupTracksIntoFolders(scanned)
+                    .filter { it.trackCount > 0 && it.tracks.isNotEmpty() }
                 _localTracks.value = scanned
                 _allDiscoveredLocalFolders.value = folders
             } catch (e: Exception) {
@@ -636,6 +642,7 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         playerController.isCrossfadeEnabled = _isCrossfadeEnabled.value
         playerController.crossfadeDurationMs = _crossfadeDurationSeconds.value * 1000L
         playerController.urlResolver = { url -> subsonicClient.resolveUrl(url) }
+        playerController.smartShuffleProvider = { tracks -> smartShuffleTracks(tracks) }
         loadSearchHistoryFromPrefs()
         loadActiveServerConfig()
         observePlaybackForLyricsAndStats()
@@ -964,6 +971,9 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     private fun loadActiveServerConfig() {
         viewModelScope.launch {
+            try {
+                serverConfigDao.pruneToLastThreeServers()
+            } catch (_: Exception) {}
             val saved = serverConfigDao.getActiveServer()
             if (saved != null && saved.serverUrl.isNotBlank()) {
                 val cleanUrl = saved.serverUrl.trim()
@@ -1127,6 +1137,16 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
             isConnected = false,
             alternativeHost = server.alternativeHost
         )
+    }
+
+    fun deleteServerConfig(server: ServerConfigEntity) {
+        viewModelScope.launch {
+            try {
+                serverConfigDao.deleteServer(server)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to delete server config", e)
+            }
+        }
     }
 
     fun updateServerConfig(
@@ -1754,21 +1774,32 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
                         )
                     }
 
-                    // Persist config to database
+                    // Persist config to database - keep strictly only the last three different servers
                     viewModelScope.launch {
-                        serverConfigDao.deactivateAllServers()
-                        serverConfigDao.insertServer(
-                            ServerConfigEntity(
-                                name = "Server ${System.currentTimeMillis() % 10000}",
+                        try {
+                            serverConfigDao.deactivateAllServers()
+                            val existing = serverConfigDao.getServerByUrl(finalUrl)
+                            val serverName = if (existing != null && existing.name.isNotBlank()) {
+                                existing.name
+                            } else {
+                                "Server ${effectiveHost}"
+                            }
+                            val entityToSave = (existing ?: ServerConfigEntity(name = serverName)).copy(
+                                name = serverName,
                                 serverUrl = finalUrl,
                                 username = state.username,
                                 password = state.password,
                                 useTokenAuth = state.useTokenAuth,
                                 isConnected = true,
                                 activeMusicFolderId = if (state.selectedMusicFolderIds.isEmpty()) null else state.selectedMusicFolderIds.joinToString(","),
-                                alternativeHost = state.alternativeHost
+                                alternativeHost = state.alternativeHost,
+                                lastSyncTime = System.currentTimeMillis()
                             )
-                        )
+                            serverConfigDao.insertServer(entityToSave)
+                            serverConfigDao.pruneToLastThreeServers()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to persist server config to database", e)
+                        }
                     }
 
                     // Load music folders
@@ -2386,8 +2417,22 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
 
     fun shuffleAll(tracks: List<NaviromTrack>) {
         val shuffled = tracks.shuffled()
+        playerController.setShuffleMode(enabled = true, isSmart = false)
         playerController.playTrackList(shuffled, 0)
         shuffled.firstOrNull()?.let { recordTrackToHistory(it) }
+    }
+
+    fun smartShuffleTracks(tracks: List<NaviromTrack>): List<NaviromTrack> {
+        return ListeningStatsManager.smartShuffle(tracks, listeningStats.value.rawHistory)
+    }
+
+    fun smartShuffle(tracks: List<NaviromTrack>? = null) {
+        val targetTracks = tracks ?: librarySongs.value.ifEmpty { _rawLibrarySongs.value }.ifEmpty { _localTracks.value }
+        if (targetTracks.isEmpty()) return
+        val smartShuffled = smartShuffleTracks(targetTracks)
+        playerController.setSmartShuffle(true)
+        playerController.playTrackList(smartShuffled, 0)
+        smartShuffled.firstOrNull()?.let { recordTrackToHistory(it) }
     }
 
     fun togglePlayPause() {

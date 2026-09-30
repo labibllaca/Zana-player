@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -260,7 +261,9 @@ fun CoverQuickActionsSheet(
                         )
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -273,18 +276,13 @@ fun CoverQuickActionsSheet(
                                     containerColor = MaterialTheme.colorScheme.error,
                                     contentColor = MaterialTheme.colorScheme.onError
                                 ),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
                                 modifier = Modifier
-                                    .weight(1.2f)
+                                    .size(40.dp)
                                     .testTag("cover_sheet_stop_timer_btn")
                             ) {
-                                Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = NaviromStrings.get("countdown_timer_stop", appLanguage),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Icon(Icons.Filled.Stop, contentDescription = NaviromStrings.get("countdown_timer_stop", appLanguage), modifier = Modifier.size(18.dp))
                             }
 
                             FilledTonalButton(
@@ -293,10 +291,11 @@ fun CoverQuickActionsSheet(
                                     val newMins = (totalTimerSecs / 60) + 5
                                     onSetSleepTimer(newMins.coerceAtLeast(1), sleepTimerOptions)
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(0.9f)
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Text("+5m", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Filled.Forward5, contentDescription = "+5m", modifier = Modifier.size(18.dp))
                             }
 
                             FilledTonalButton(
@@ -305,10 +304,11 @@ fun CoverQuickActionsSheet(
                                     val newMins = (totalTimerSecs / 60) + 15
                                     onSetSleepTimer(newMins.coerceAtLeast(1), sleepTimerOptions)
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(0.9f)
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(40.dp)
                             ) {
-                                Text("+15m", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Filled.Forward10, contentDescription = "+15m", modifier = Modifier.size(18.dp))
                             }
                         }
                     } else {
@@ -320,8 +320,11 @@ fun CoverQuickActionsSheet(
                         )
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             listOf(15, 30, 45, 60).forEach { mins ->
                                 FilledTonalButton(
@@ -329,15 +332,19 @@ fun CoverQuickActionsSheet(
                                         haptics.click()
                                         onSetSleepTimer(mins, sleepTimerOptions)
                                     },
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp)
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(40.dp),
+                                    contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text(
-                                        text = "${mins}m",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = when (mins) {
+                                            15 -> Icons.Filled.HourglassTop
+                                            30 -> Icons.Filled.HourglassBottom
+                                            45 -> Icons.Filled.HourglassFull
+                                            else -> Icons.Filled.AvTimer
+                                        },
+                                        contentDescription = "${mins}m",
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -349,17 +356,14 @@ fun CoverQuickActionsSheet(
                                     haptics.click()
                                     onSetSleepTimer(remainingSongMins, sleepTimerOptions)
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .weight(1.3f)
-                                    .height(38.dp),
-                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                shape = CircleShape,
+                                modifier = Modifier.size(40.dp),
+                                contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text(
-                                    text = NaviromStrings.get("countdown_end_of_track", appLanguage),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                Icon(
+                                    imageVector = Icons.Filled.MusicOff,
+                                    contentDescription = NaviromStrings.get("countdown_end_of_track", appLanguage),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -500,53 +504,48 @@ fun CoverQuickActionsSheet(
                         )
                     }
 
-                    // Quick Jump Chips
+                    // Quick Jump Buttons (scrollable icon-only group)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         FilledTonalButton(
                             onClick = { executeJump((currentPosMs - 30_000L).coerceAtLeast(0L)) },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                            shape = CircleShape,
+                            modifier = Modifier.size(38.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(NaviromStrings.get("jump_quick_rewind", appLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Filled.Replay, contentDescription = NaviromStrings.get("jump_quick_rewind", appLanguage), modifier = Modifier.size(18.dp))
                         }
 
                         FilledTonalButton(
                             onClick = { executeJump((currentPosMs + 30_000L).coerceAtMost(totalDurationMs)) },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                            shape = CircleShape,
+                            modifier = Modifier.size(38.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(NaviromStrings.get("jump_quick_forward", appLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Filled.Forward30, contentDescription = NaviromStrings.get("jump_quick_forward", appLanguage), modifier = Modifier.size(18.dp))
                         }
 
                         FilledTonalButton(
                             onClick = { executeJump(0L) },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                            shape = CircleShape,
+                            modifier = Modifier.size(38.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(NaviromStrings.get("jump_quick_start", appLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Icon(Icons.Filled.SkipPrevious, contentDescription = NaviromStrings.get("jump_quick_start", appLanguage), modifier = Modifier.size(18.dp))
                         }
 
                         FilledTonalButton(
                             onClick = { executeJump(totalDurationMs / 2L) },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                            shape = CircleShape,
+                            modifier = Modifier.size(38.dp),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text(NaviromStrings.get("jump_quick_middle", appLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Icon(Icons.Filled.CenterFocusStrong, contentDescription = NaviromStrings.get("jump_quick_middle", appLanguage), modifier = Modifier.size(18.dp))
                         }
                     }
 

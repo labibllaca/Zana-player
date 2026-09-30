@@ -64,6 +64,8 @@ data class ListeningStatsSummary(
     val timeSlots: List<TimeSlotStat> = emptyList(),
     val topArtists: List<TopArtistStat> = emptyList(),
     val topTracks: List<TopTrackStat> = emptyList(),
+    val trackPlayCounts: Map<String, Int> = emptyMap(),
+    val trackLastPlayed: Map<String, Long> = emptyMap(),
     val rawHistory: List<PlaybackHistoryEntity> = emptyList()
 )
 
@@ -263,6 +265,10 @@ class ListeningStatsManager(
             )
         }.sortedByDescending { it.totalSeconds }.take(10)
 
+        val trackPlayCounts = history.groupingBy { it.trackId }.eachCount()
+        val trackLastPlayed = history.groupBy { it.trackId }
+            .mapValues { (_, sessions) -> sessions.maxOfOrNull { it.timestamp } ?: 0L }
+
         return ListeningStatsSummary(
             totalListeningSeconds = totalListeningSeconds,
             todayListeningSeconds = todayListeningSeconds,
@@ -278,7 +284,36 @@ class ListeningStatsManager(
             timeSlots = timeSlots,
             topArtists = topArtists,
             topTracks = topTracks,
+            trackPlayCounts = trackPlayCounts,
+            trackLastPlayed = trackLastPlayed,
             rawHistory = history
         )
+    }
+
+    companion object {
+        /**
+         * Smart Shuffle algorithm:
+         * Prioritizes playing less-frequently listened-to tracks from the user's library.
+         * 1. Tracks with fewer plays (0 plays first, then 1 play, then 2 plays, etc.) come earlier.
+         * 2. For identical play counts, tracks listened to longest ago (or never) come first.
+         * 3. Randomized initial shuffle ensures varied order within each priority tier.
+         */
+        fun smartShuffle(
+            tracks: List<com.labix.navirom.data.model.NaviromTrack>,
+            history: List<PlaybackHistoryEntity>
+        ): List<com.labix.navirom.data.model.NaviromTrack> {
+            if (tracks.isEmpty()) return emptyList()
+            val playCounts = history.groupingBy { it.trackId }.eachCount()
+            val lastPlayed = history.groupBy { it.trackId }
+                .mapValues { (_, sessions) -> sessions.maxOfOrNull { it.timestamp } ?: 0L }
+
+            return tracks.shuffled().sortedWith(
+                compareBy<com.labix.navirom.data.model.NaviromTrack> { track ->
+                    playCounts[track.id] ?: 0
+                }.thenBy { track ->
+                    lastPlayed[track.id] ?: 0L
+                }
+            )
+        }
     }
 }

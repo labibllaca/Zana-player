@@ -86,7 +86,7 @@ interface FavoriteDao {
 
 @Dao
 interface ServerConfigDao {
-    @Query("SELECT * FROM server_config")
+    @Query("SELECT * FROM server_config ORDER BY lastSyncTime DESC, id DESC")
     fun getAllServers(): Flow<List<ServerConfigEntity>>
 
     @Query("SELECT * FROM server_config WHERE isConnected = 1 LIMIT 1")
@@ -106,6 +106,12 @@ interface ServerConfigDao {
 
     @Delete
     suspend fun deleteServer(config: ServerConfigEntity)
+
+    @Query("SELECT * FROM server_config WHERE serverUrl = :url LIMIT 1")
+    suspend fun getServerByUrl(url: String): ServerConfigEntity?
+
+    @Query("DELETE FROM server_config WHERE id NOT IN (SELECT id FROM server_config ORDER BY lastSyncTime DESC, id DESC LIMIT 3)")
+    suspend fun pruneToLastThreeServers()
 }
 
 @Dao

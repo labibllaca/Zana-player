@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -162,12 +164,14 @@ fun DebugLogsDialog(
                 )
             }
 
-            // Action Buttons (Copy & Clear)
+            // Action Buttons (Copy & Clear) - scrollable group with icons only
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
                     onClick = {
@@ -180,28 +184,25 @@ fun DebugLogsDialog(
                         } catch (_: Exception) {}
                         Toast.makeText(context, "Logs copied to clipboard!", Toast.LENGTH_SHORT).show()
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.size(42.dp)
                 ) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Copy All Logs", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy All Logs", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
 
                 OutlinedButton(
                     onClick = {
                         AppDiagnostics.clearLogs()
                         Toast.makeText(context, "Logs cleared", Toast.LENGTH_SHORT).show()
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.size(42.dp)
                 ) {
-                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Clear", fontSize = 13.sp)
+                    Icon(Icons.Outlined.Delete, contentDescription = "Clear Logs", modifier = Modifier.size(20.dp))
                 }
             }
 

@@ -6,12 +6,15 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -59,6 +62,7 @@ fun PlaylistsScreen(
     onTrackClick: (NaviromTrack, List<NaviromTrack>) -> Unit,
     onPlayAll: (List<NaviromTrack>) -> Unit,
     onShuffleAll: (List<NaviromTrack>) -> Unit,
+    onSmartShuffle: ((List<NaviromTrack>) -> Unit)? = null,
     onDownloadPlaylist: (List<NaviromTrack>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -100,6 +104,7 @@ fun PlaylistsScreen(
                 onTrackClick = { track -> onTrackClick(track, selectedPlaylistTracks) },
                 onPlayAll = { onPlayAll(selectedPlaylistTracks) },
                 onShuffleAll = { onShuffleAll(selectedPlaylistTracks) },
+                onSmartShuffle = { if (onSmartShuffle != null) onSmartShuffle(selectedPlaylistTracks) else onShuffleAll(selectedPlaylistTracks) },
                 onDownloadPlaylist = { onDownloadPlaylist(selectedPlaylistTracks) },
                 onToggleFavorite = onToggleFavorite,
                 onDownloadTrack = onDownloadTrack,
@@ -138,35 +143,26 @@ fun PlaylistsScreen(
                     }
 
                     Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         FilledTonalButton(
                             onClick = { onSelectPlaylist("downloaded_dynamic_playlist_id") },
-                            shape = RoundedCornerShape(20.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            modifier = Modifier.testTag("open_downloaded_playlist_btn")
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(38.dp).testTag("open_downloaded_playlist_btn")
                         ) {
-                            Icon(Icons.Filled.DownloadDone, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Downloaded",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
-                            )
+                            Icon(Icons.Filled.DownloadDone, contentDescription = "Downloaded", modifier = Modifier.size(18.dp))
                         }
 
                         Button(
                             onClick = { showCreateDialog = true },
-                            shape = RoundedCornerShape(20.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            modifier = Modifier.testTag("create_playlist_btn")
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(38.dp).testTag("create_playlist_btn")
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Create",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
-                            )
+                            Icon(Icons.Filled.Add, contentDescription = "Create", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -275,6 +271,7 @@ fun PlaylistDetailView(
     onTrackClick: (NaviromTrack) -> Unit,
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
+    onSmartShuffle: (() -> Unit)? = null,
     onDownloadPlaylist: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -453,7 +450,6 @@ fun PlaylistDetailView(
                     icon = Icons.Filled.PlayArrow,
                     onClickPlayer1 = onPlayAll,
                     tracks = tracks,
-                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     testTag = "playlist_play_all"
                 )
 
@@ -462,19 +458,32 @@ fun PlaylistDetailView(
                     icon = Icons.Filled.Shuffle,
                     onClickPlayer1 = onShuffleAll,
                     tracks = remember(tracks) { tracks.shuffled() },
-                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     isTonal = true,
                     testTag = "playlist_shuffle_all"
                 )
 
+                DualAudioPlayButton(
+                    text = "Smart Shuffle",
+                    icon = Icons.Filled.AutoAwesome,
+                    onClickPlayer1 = {
+                        if (onSmartShuffle != null) {
+                            onSmartShuffle()
+                        } else {
+                            onShuffleAll()
+                        }
+                    },
+                    tracks = tracks,
+                    isTonal = true,
+                    testTag = "playlist_smart_shuffle_all"
+                )
+
                 OutlinedButton(
                     onClick = onDownloadPlaylist,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     modifier = Modifier.testTag("playlist_download_btn")
                 ) {
-                    Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Download")
+                    Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(20.dp))
                 }
             }
         }

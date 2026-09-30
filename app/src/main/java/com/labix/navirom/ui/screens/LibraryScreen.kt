@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -94,6 +95,7 @@ fun LibraryScreen(
     onTrackClick: (NaviromTrack, List<NaviromTrack>) -> Unit,
     onPlayAll: (List<NaviromTrack>) -> Unit,
     onShuffleAll: (List<NaviromTrack>) -> Unit,
+    onSmartShuffle: ((List<NaviromTrack>?) -> Unit)? = null,
     onDownloadTracks: (List<NaviromTrack>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -182,6 +184,7 @@ fun LibraryScreen(
             onTrackClick = { track -> onTrackClick(track, selectedAlbumTracks) },
             onPlayAll = { onPlayAll(selectedAlbumTracks) },
             onShuffleAll = { onShuffleAll(selectedAlbumTracks) },
+            onSmartShuffle = { if (onSmartShuffle != null) onSmartShuffle(selectedAlbumTracks) else onShuffleAll(selectedAlbumTracks) },
             onDownloadAlbum = { onDownloadTracks(selectedAlbumTracks) },
             onToggleFavorite = onToggleFavorite,
             onDownloadTrack = onDownloadTrack,
@@ -210,6 +213,13 @@ fun LibraryScreen(
             onTrackClick = { track -> onTrackClick(track, currentArtistSongs) },
             onPlayAllSongs = { onPlayAll(currentArtistSongs) },
             onShuffleAllSongs = { onShuffleAll(currentArtistSongs) },
+            onSmartShuffleSongs = {
+                if (onSmartShuffle != null) {
+                    onSmartShuffle(currentArtistSongs)
+                } else {
+                    onShuffleAll(currentArtistSongs)
+                }
+            },
             onToggleFavorite = onToggleFavorite,
             onDownloadTrack = onDownloadTrack,
             onPlayNext = onPlayNext,
@@ -259,24 +269,30 @@ fun LibraryScreen(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(20.dp))
-                    Button(
-                        onClick = onScanLocalAudio,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(str("scan_local_audio"))
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = onGoToSettings,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                    ) {
-                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(str("btn_connect_server"))
+                        Button(
+                            onClick = onScanLocalAudio,
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Filled.FolderOpen, contentDescription = str("scan_local_audio"), modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        OutlinedButton(
+                            onClick = onGoToSettings,
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Filled.Settings, contentDescription = str("btn_connect_server"), modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
             }
@@ -971,27 +987,47 @@ fun LibraryScreen(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Button(
                                             onClick = { onPlayAll(effectiveSongs) },
-                                            shape = RoundedCornerShape(12.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                            modifier = Modifier.testTag("songs_play_all_btn")
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(38.dp).testTag("songs_play_all_btn")
                                         ) {
-                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(str("btn_play_all"), style = MaterialTheme.typography.labelMedium)
+                                            Icon(Icons.Filled.PlayArrow, contentDescription = str("btn_play_all"), modifier = Modifier.size(20.dp))
                                         }
 
                                         FilledTonalButton(
                                             onClick = { onShuffleAll(effectiveSongs) },
-                                            shape = RoundedCornerShape(12.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                            modifier = Modifier.testTag("songs_shuffle_all_btn")
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(38.dp).testTag("songs_shuffle_all_btn")
                                         ) {
-                                            Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(str("btn_shuffle"), style = MaterialTheme.typography.labelMedium)
+                                            Icon(Icons.Filled.Shuffle, contentDescription = str("btn_shuffle"), modifier = Modifier.size(20.dp))
+                                        }
+
+                                        FilledTonalButton(
+                                            onClick = {
+                                                haptics.click()
+                                                if (onSmartShuffle != null) {
+                                                    onSmartShuffle(effectiveSongs)
+                                                } else {
+                                                    onShuffleAll(effectiveSongs)
+                                                }
+                                            },
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                            ),
+                                            modifier = Modifier.size(38.dp).testTag("songs_smart_shuffle_btn")
+                                        ) {
+                                            Icon(Icons.Filled.AutoAwesome, contentDescription = str("smart_shuffle"), modifier = Modifier.size(19.dp))
                                         }
                                     }
                                 }
@@ -1082,10 +1118,13 @@ fun LibraryScreen(
                     }
                 }
                 LibrarySubTab.LIBRARIES -> {
-                    // Local Music Folders & Server Libraries tab
+                    // Local Music Folders & Server Libraries tab - hide folders that don't have music in it
+                    val musicLocalFolders = remember(localFolders) {
+                        localFolders.filter { it.trackCount > 0 && it.tracks.isNotEmpty() }
+                    }
                     val isAllServerSelected = selectedMusicFolderIds.isEmpty() || (selectedMusicFolderIds.size >= musicFolders.size)
-                    val activeLocalFolderCount = localFolders.count { !disabledLocalFolderIds.contains(it.id) }
-                    val allLocalSelected = disabledLocalFolderIds.isEmpty() && localFolders.isNotEmpty()
+                    val activeLocalFolderCount = musicLocalFolders.count { !disabledLocalFolderIds.contains(it.id) }
+                    val allLocalSelected = disabledLocalFolderIds.isEmpty() && musicLocalFolders.isNotEmpty()
 
                     LazyColumn(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
@@ -1125,8 +1164,8 @@ fun LibraryScreen(
                                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                                             )
                                             Text(
-                                                text = if (localFolders.isNotEmpty()) {
-                                                    String.format(str("local_folders_active"), activeLocalFolderCount, localFolders.size) + " • ${localFolders.sumOf { it.trackCount }} ${str("tracks_count")}"
+                                                text = if (musicLocalFolders.isNotEmpty()) {
+                                                    String.format(str("local_folders_active"), activeLocalFolderCount, musicLocalFolders.size) + " • ${musicLocalFolders.sumOf { it.trackCount }} ${str("tracks_count")}"
                                                 } else {
                                                     str("local_music_folders_subtitle")
                                                 },
@@ -1139,10 +1178,13 @@ fun LibraryScreen(
                                     Spacer(modifier = Modifier.height(16.dp))
 
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (localFolders.isNotEmpty()) {
+                                        if (musicLocalFolders.isNotEmpty()) {
                                             Button(
                                                 onClick = {
                                                     haptics.click()
@@ -1152,8 +1194,9 @@ fun LibraryScreen(
                                                         onSelectAllLocalFolders()
                                                     }
                                                 },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = CircleShape,
+                                                contentPadding = PaddingValues(0.dp),
+                                                modifier = Modifier.size(44.dp),
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = MaterialTheme.colorScheme.tertiary,
                                                     contentColor = MaterialTheme.colorScheme.onTertiary
@@ -1161,13 +1204,8 @@ fun LibraryScreen(
                                             ) {
                                                 Icon(
                                                     imageVector = if (allLocalSelected) Icons.Filled.Deselect else Icons.Filled.SelectAll,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = if (allLocalSelected) str("deselect_all_local_folders") else str("select_all_local_folders"),
-                                                    fontWeight = FontWeight.Bold
+                                                    contentDescription = if (allLocalSelected) str("deselect_all_local_folders") else str("select_all_local_folders"),
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }
@@ -1177,8 +1215,9 @@ fun LibraryScreen(
                                                 haptics.click()
                                                 requestLocalPermission()
                                             },
-                                            modifier = if (localFolders.isNotEmpty()) Modifier.weight(1f) else Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(12.dp),
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(44.dp),
                                             enabled = !isScanningLocalAudio,
                                             colors = ButtonDefaults.outlinedButtonColors(
                                                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -1187,22 +1226,15 @@ fun LibraryScreen(
                                         ) {
                                             if (isScanningLocalAudio) {
                                                 CircularProgressIndicator(
-                                                    modifier = Modifier.size(16.dp),
+                                                    modifier = Modifier.size(18.dp),
                                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                                                     strokeWidth = 2.dp
                                                 )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Scanning...", style = MaterialTheme.typography.labelSmall)
                                             } else {
                                                 Icon(
                                                     imageVector = Icons.Filled.Refresh,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = if (localFolders.isEmpty()) str("scan_device_folders") else str("rescan_device_folders"),
-                                                    fontWeight = FontWeight.SemiBold
+                                                    contentDescription = if (musicLocalFolders.isEmpty()) str("scan_device_folders") else str("rescan_device_folders"),
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         }
@@ -1211,8 +1243,8 @@ fun LibraryScreen(
                             }
                         }
 
-                        // Local Folders List
-                        if (localFolders.isNotEmpty()) {
+                        // Local Folders List (Hiding folders with no music)
+                        if (musicLocalFolders.isNotEmpty()) {
                             item {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -1220,19 +1252,19 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "${str("local_folders_header")} (${localFolders.size})",
+                                        text = "${str("local_folders_header")} (${musicLocalFolders.size})",
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "${activeLocalFolderCount} ${str("deck_discover").lowercase()} / ${localFolders.size}",
+                                        text = "${activeLocalFolderCount} ${str("deck_discover").lowercase()} / ${musicLocalFolders.size}",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
                                 }
                             }
 
-                            items(localFolders, key = { "local_folder_${it.id}" }) { folder ->
+                            items(musicLocalFolders, key = { "local_folder_${it.id}" }) { folder ->
                                 val isFolderEnabled = !disabledLocalFolderIds.contains(folder.id)
                                 var isExpanded by remember(folder.id) { mutableStateOf(false) }
 
@@ -1344,7 +1376,9 @@ fun LibraryScreen(
 
                                         // Actions Row: Play All Folder, Shuffle Folder, Expand/Collapse
                                         Row(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
@@ -1356,17 +1390,15 @@ fun LibraryScreen(
                                                     }
                                                     onPlayAll(folder.tracks)
                                                 },
-                                                shape = RoundedCornerShape(10.dp),
-                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(36.dp),
                                                 colors = ButtonDefaults.filledTonalButtonColors(
                                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                                                 ),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                contentPadding = PaddingValues(0.dp)
                                             ) {
-                                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(str("local_folder_play_all"), style = MaterialTheme.typography.labelMedium)
+                                                Icon(Icons.Filled.PlayArrow, contentDescription = str("local_folder_play_all"), modifier = Modifier.size(18.dp))
                                             }
 
                                             FilledTonalButton(
@@ -1377,17 +1409,15 @@ fun LibraryScreen(
                                                     }
                                                     onShuffleAll(folder.tracks)
                                                 },
-                                                shape = RoundedCornerShape(10.dp),
-                                                modifier = Modifier.weight(1f).height(36.dp),
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(36.dp),
                                                 colors = ButtonDefaults.filledTonalButtonColors(
                                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f),
                                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                                                 ),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                                contentPadding = PaddingValues(0.dp)
                                             ) {
-                                                Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(str("local_folder_shuffle"), style = MaterialTheme.typography.labelMedium)
+                                                Icon(Icons.Filled.Shuffle, contentDescription = str("local_folder_shuffle"), modifier = Modifier.size(18.dp))
                                             }
 
                                             IconButton(
@@ -1521,16 +1551,20 @@ fun LibraryScreen(
                                     Spacer(modifier = Modifier.height(16.dp))
 
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Button(
                                             onClick = {
                                                 haptics.click()
                                                 onSelectAllMusicFolders()
                                             },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(12.dp),
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(44.dp),
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -1538,13 +1572,8 @@ fun LibraryScreen(
                                         ) {
                                             Icon(
                                                 imageVector = if (isAllServerSelected) Icons.Filled.DoneAll else Icons.Filled.SelectAll,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = if (isAllServerSelected) "Reset Filter" else "Select All",
-                                                fontWeight = FontWeight.Bold
+                                                contentDescription = if (isAllServerSelected) "Reset Filter" else "Select All",
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
 
@@ -1553,8 +1582,9 @@ fun LibraryScreen(
                                                 haptics.click()
                                                 onGoToSettings()
                                             },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(12.dp),
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(44.dp),
                                             colors = ButtonDefaults.outlinedButtonColors(
                                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                             ),
@@ -1562,13 +1592,8 @@ fun LibraryScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Filled.Settings,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Settings",
-                                                fontWeight = FontWeight.SemiBold
+                                                contentDescription = "Settings",
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
                                     }
@@ -1730,25 +1755,27 @@ fun LibraryScreen(
                                         )
                                     }
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         FilledTonalButton(
                                             onClick = { onPlayAll(librarySongs) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(36.dp)
                                         ) {
-                                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(str("play_all"), fontSize = 12.sp)
+                                            Icon(Icons.Filled.PlayArrow, contentDescription = str("play_all"), modifier = Modifier.size(18.dp))
                                         }
 
                                         FilledTonalButton(
                                             onClick = { onShuffleAll(librarySongs) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(36.dp)
                                         ) {
-                                            Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(str("shuffle_all"), fontSize = 12.sp)
+                                            Icon(Icons.Filled.Shuffle, contentDescription = str("shuffle_all"), modifier = Modifier.size(18.dp))
                                         }
                                     }
                                 }
@@ -1823,26 +1850,27 @@ fun LibraryScreen(
                                     if (recentlyPlayedTracks.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Button(
                                                 onClick = { onPlayAll(recentlyPlayedTracks) },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp)
+                                                shape = CircleShape,
+                                                contentPadding = PaddingValues(0.dp),
+                                                modifier = Modifier.size(44.dp)
                                             ) {
-                                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(str("play_all"))
+                                                Icon(Icons.Filled.PlayArrow, contentDescription = str("play_all"), modifier = Modifier.size(20.dp))
                                             }
                                             FilledTonalButton(
                                                 onClick = { onShuffleAll(recentlyPlayedTracks) },
-                                                modifier = Modifier.weight(1f),
-                                                shape = RoundedCornerShape(12.dp)
+                                                shape = CircleShape,
+                                                contentPadding = PaddingValues(0.dp),
+                                                modifier = Modifier.size(44.dp)
                                             ) {
-                                                Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(str("shuffle_all"))
+                                                Icon(Icons.Filled.Shuffle, contentDescription = str("shuffle_all"), modifier = Modifier.size(20.dp))
                                             }
                                         }
                                     }
@@ -1953,31 +1981,32 @@ fun LibraryScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Button(
                                         onClick = {
                                             if (effectiveNewTracks.isNotEmpty()) onPlayAll(effectiveNewTracks)
                                         },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(44.dp)
                                     ) {
-                                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(str("play_all"))
+                                        Icon(Icons.Filled.PlayArrow, contentDescription = str("play_all"), modifier = Modifier.size(20.dp))
                                     }
 
                                     FilledTonalButton(
                                         onClick = {
                                             if (effectiveNewTracks.isNotEmpty()) onShuffleAll(effectiveNewTracks)
                                         },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(44.dp)
                                     ) {
-                                        Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(str("shuffle_all"))
+                                        Icon(Icons.Filled.Shuffle, contentDescription = str("shuffle_all"), modifier = Modifier.size(20.dp))
                                     }
                                 }
                             }
@@ -2136,12 +2165,18 @@ fun LibraryScreen(
                                 }
                                 Box(modifier = Modifier.weight(1f)) {
                                     SleekFeatureCard(
-                                        title = str("deck_mix"),
-                                        subtitle = "${quickMixTracks.size} ${str("deck_mix_sub")}",
+                                        title = str("smart_shuffle"),
+                                        subtitle = str("smart_shuffle_desc"),
                                         icon = Icons.Filled.AutoAwesome,
                                         iconBgColor = SleekPillMixBg,
                                         iconColor = SleekPillMixIcon,
-                                        onClick = { onPlayAll(quickMixTracks) }
+                                        onClick = {
+                                            if (onSmartShuffle != null) {
+                                                onSmartShuffle(null)
+                                            } else {
+                                                onShuffleAll(quickMixTracks)
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -2370,6 +2405,7 @@ fun AlbumDetailView(
     onTrackClick: (NaviromTrack) -> Unit,
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
+    onSmartShuffle: (() -> Unit)? = null,
     onDownloadAlbum: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -2492,7 +2528,6 @@ fun AlbumDetailView(
                     icon = Icons.Filled.PlayArrow,
                     onClickPlayer1 = onPlayAll,
                     tracks = tracks,
-                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     testTag = "album_play_all"
                 )
 
@@ -2501,19 +2536,32 @@ fun AlbumDetailView(
                     icon = Icons.Filled.Shuffle,
                     onClickPlayer1 = onShuffleAll,
                     tracks = remember(tracks) { tracks.shuffled() },
-                    modifier = Modifier.defaultMinSize(minWidth = 110.dp),
                     isTonal = true,
                     testTag = "album_shuffle_all"
                 )
 
+                DualAudioPlayButton(
+                    text = str("smart_shuffle"),
+                    icon = Icons.Filled.AutoAwesome,
+                    onClickPlayer1 = {
+                        if (onSmartShuffle != null) {
+                            onSmartShuffle()
+                        } else {
+                            onShuffleAll()
+                        }
+                    },
+                    tracks = tracks,
+                    isTonal = true,
+                    testTag = "album_smart_shuffle_all"
+                )
+
                 OutlinedButton(
                     onClick = onDownloadAlbum,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     modifier = Modifier.testTag("album_download_btn")
                 ) {
-                    Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(str("btn_download"))
+                    Icon(Icons.Filled.Download, contentDescription = str("btn_download"), modifier = Modifier.size(20.dp))
                 }
             }
         }

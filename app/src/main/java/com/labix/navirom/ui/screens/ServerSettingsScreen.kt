@@ -71,6 +71,7 @@ fun ServerSettingsScreen(
     serverState: ServerConnectionUiState,
     allServers: List<com.labix.navirom.data.local.ServerConfigEntity>,
     onSelectServer: (com.labix.navirom.data.local.ServerConfigEntity) -> Unit,
+    onDeleteServer: ((com.labix.navirom.data.local.ServerConfigEntity) -> Unit)? = null,
     appLanguage: AppLanguage,
     appThemeMode: AppThemeMode,
     isCrossfadeEnabled: Boolean = false,
@@ -177,21 +178,41 @@ fun ServerSettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Multi-Server List
-        if (allServers.isNotEmpty()) {
+        // Multi-Server List (Keep only the last 3 different servers)
+        val lastThreeServers = remember(allServers) {
+            allServers.distinctBy { it.serverUrl.trim().removeSuffix("/") }.take(3)
+        }
+        if (lastThreeServers.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = str("saved_servers"),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = str("saved_servers"),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = "Last ${lastThreeServers.size} / 3",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
-                    allServers.forEach { server ->
+                    lastThreeServers.forEach { server ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -209,6 +230,23 @@ fun ServerSettingsScreen(
                                 }
                                 if (server.isConnected) {
                                     Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                if (onDeleteServer != null) {
+                                    IconButton(
+                                        onClick = {
+                                            haptics.click()
+                                            onDeleteServer(server)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.DeleteOutline,
+                                            contentDescription = "Delete Server",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

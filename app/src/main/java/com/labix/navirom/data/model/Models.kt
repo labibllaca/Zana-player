@@ -94,6 +94,7 @@ data class PlaybackState(
     val durationMs: Long = 0L,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val isShuffle: Boolean = false,
+    val isSmartShuffle: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val sleepTimerMinutesLeft: Int? = null,
     val sleepTimerSecondsLeft: Int? = null,

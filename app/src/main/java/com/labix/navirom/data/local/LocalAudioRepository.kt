@@ -315,7 +315,7 @@ class LocalAudioRepository(private val context: Context) {
                 directTracksCount = subDirect,
                 subfoldersCount = subSubCount
             )
-        }.sortedBy { it.name.lowercase() }
+        }.filter { it.totalTracksCount > 0 }.sortedBy { it.name.lowercase() }
 
         return FolderViewContent(
             currentPath = normPath,
@@ -362,7 +362,7 @@ class LocalAudioRepository(private val context: Context) {
                 totalDurationSeconds = durationSec,
                 tracks = folderTracks.sortedBy { it.title.lowercase() }
             )
-        }.sortedBy { it.name.lowercase() }
+        }.filter { it.trackCount > 0 && it.tracks.isNotEmpty() }.sortedBy { it.name.lowercase() }
     }
 
     private fun formatFolderNames(folderPath: String, file: File?): Pair<String, String> {
