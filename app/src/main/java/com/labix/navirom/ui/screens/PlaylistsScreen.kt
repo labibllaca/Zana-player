@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,6 +64,8 @@ fun PlaylistsScreen(
     onPlayAll: (List<NaviromTrack>) -> Unit,
     onShuffleAll: (List<NaviromTrack>) -> Unit,
     onSmartShuffle: ((List<NaviromTrack>) -> Unit)? = null,
+    onPlayTracksNext: ((List<NaviromTrack>) -> Unit)? = null,
+    onAddTracksToQueue: ((List<NaviromTrack>) -> Unit)? = null,
     onDownloadPlaylist: (List<NaviromTrack>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -71,6 +74,7 @@ fun PlaylistsScreen(
     modifier: Modifier = Modifier
 ) {
     fun str(key: String): String = NaviromStrings.get(key, appLanguage)
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
 
@@ -105,6 +109,14 @@ fun PlaylistsScreen(
                 onPlayAll = { onPlayAll(selectedPlaylistTracks) },
                 onShuffleAll = { onShuffleAll(selectedPlaylistTracks) },
                 onSmartShuffle = { if (onSmartShuffle != null) onSmartShuffle(selectedPlaylistTracks) else onShuffleAll(selectedPlaylistTracks) },
+                onPlayTracksNext = {
+                    onPlayTracksNext?.invoke(selectedPlaylistTracks)
+                    android.widget.Toast.makeText(context, String.format(str("toast_added_next"), selectedPlaylistTracks.size), android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onAddTracksToQueue = {
+                    onAddTracksToQueue?.invoke(selectedPlaylistTracks)
+                    android.widget.Toast.makeText(context, String.format(str("toast_added_queue"), selectedPlaylistTracks.size), android.widget.Toast.LENGTH_SHORT).show()
+                },
                 onDownloadPlaylist = { onDownloadPlaylist(selectedPlaylistTracks) },
                 onToggleFavorite = onToggleFavorite,
                 onDownloadTrack = onDownloadTrack,
@@ -272,6 +284,8 @@ fun PlaylistDetailView(
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
     onSmartShuffle: (() -> Unit)? = null,
+    onPlayTracksNext: (() -> Unit)? = null,
+    onAddTracksToQueue: (() -> Unit)? = null,
     onDownloadPlaylist: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -476,6 +490,34 @@ fun PlaylistDetailView(
                     isTonal = true,
                     testTag = "playlist_smart_shuffle_all"
                 )
+
+                FilledTonalButton(
+                    onClick = {
+                        haptics.click()
+                        onPlayTracksNext?.invoke()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.testTag("playlist_play_next_btn")
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = str("btn_play_next"), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(str("btn_play_next"))
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        haptics.click()
+                        onAddTracksToQueue?.invoke()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.testTag("playlist_add_to_queue_btn")
+                ) {
+                    Icon(Icons.Filled.QueueMusic, contentDescription = str("btn_add_to_queue"), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(str("btn_add_to_queue"))
+                }
 
                 OutlinedButton(
                     onClick = onDownloadPlaylist,

@@ -482,6 +482,8 @@ fun NaviromApp(
                             onPlayAll = { viewModel.playAll(it) },
                             onShuffleAll = { viewModel.shuffleAll(it) },
                             onSmartShuffle = { viewModel.smartShuffle(it) },
+                            onPlayTracksNext = { viewModel.playTracksNext(it) },
+                            onAddTracksToQueue = { viewModel.addTracksToQueue(it) },
                             onDownloadTracks = { viewModel.downloadTracks(it) },
                             onToggleFavorite = { viewModel.toggleFavorite(it) },
                             onDownloadTrack = { viewModel.downloadTrack(it) },
@@ -525,7 +527,13 @@ fun NaviromApp(
                             onSelectAllSettingsLocalFolders = { viewModel.selectAllSettingsLocalFolders() },
                             onDeselectAllSettingsLocalFolders = { viewModel.deselectAllSettingsLocalFolders() },
                             isScanningLocalAudio = isScanningLocalAudio,
-                            onScanLocalAudio = { viewModel.scanLocalAudio() }
+                            onScanLocalAudio = { viewModel.scanLocalAudio() },
+                            currentMusicFolderPath = currentMusicFolderPath,
+                            onNavigateToMusicFolder = { viewModel.navigateToMusicFolder(it) },
+                            onNavigateUpMusicFolder = { viewModel.navigateUpMusicFolder() },
+                            onPlayFolder = { path, shuffle -> viewModel.playFolder(path, shuffle) },
+                            onPlayFolderNext = { viewModel.playFolderNext(it) },
+                            onAddFolderToQueue = { viewModel.addFolderToQueue(it) }
                         )
                     }
 
@@ -792,6 +800,8 @@ fun NaviromApp(
                         onPlayAll = { viewModel.playAll(it) },
                         onShuffleAll = { viewModel.shuffleAll(it) },
                         onSmartShuffle = { viewModel.smartShuffle(it) },
+                        onPlayTracksNext = { viewModel.playTracksNext(it) },
+                        onAddTracksToQueue = { viewModel.addTracksToQueue(it) },
                         onDownloadTracks = { viewModel.downloadTracks(it) },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
                         onDownloadTrack = { viewModel.downloadTrack(it) },
@@ -839,7 +849,9 @@ fun NaviromApp(
                         currentMusicFolderPath = currentMusicFolderPath,
                         onNavigateToMusicFolder = { viewModel.navigateToMusicFolder(it) },
                         onNavigateUpMusicFolder = { viewModel.navigateUpMusicFolder() },
-                        onPlayFolder = { path, shuffle -> viewModel.playFolder(path, shuffle) }
+                        onPlayFolder = { path, shuffle -> viewModel.playFolder(path, shuffle) },
+                        onPlayFolderNext = { viewModel.playFolderNext(it) },
+                        onAddFolderToQueue = { viewModel.addFolderToQueue(it) }
                     )
                 }
             }
@@ -1017,17 +1029,18 @@ private fun AppTopBar(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 if (onOpenSidebar != null) {
                     IconButton(
                         onClick = onOpenSidebar,
-                        modifier = Modifier.size(40.dp).testTag("open_sidebar_btn")
+                        modifier = Modifier
+                            .size(40.dp)
+                            .align(Alignment.CenterStart)
+                            .testTag("open_sidebar_btn")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Menu,
@@ -1036,8 +1049,6 @@ private fun AppTopBar(
                             modifier = Modifier.size(22.dp)
                         )
                     }
-                } else {
-                    Box(modifier = Modifier.size(40.dp))
                 }
 
                 Text(
@@ -1048,12 +1059,17 @@ private fun AppTopBar(
                         letterSpacing = 4.sp
                     ),
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.testTag("app_brand_title")
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .testTag("app_brand_title")
                 )
 
                 IconButton(
                     onClick = onCloseApp,
-                    modifier = Modifier.size(40.dp).testTag("close_app_btn")
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.CenterEnd)
+                        .testTag("close_app_btn")
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
@@ -1143,6 +1159,10 @@ private fun TabContent(
     onPlayAll: (List<com.labix.navirom.data.model.NaviromTrack>) -> Unit,
     onShuffleAll: (List<com.labix.navirom.data.model.NaviromTrack>) -> Unit,
     onSmartShuffle: ((List<com.labix.navirom.data.model.NaviromTrack>?) -> Unit)? = null,
+    onPlayTracksNext: ((List<com.labix.navirom.data.model.NaviromTrack>) -> Unit)? = null,
+    onAddTracksToQueue: ((List<com.labix.navirom.data.model.NaviromTrack>) -> Unit)? = null,
+    onPlayFolderNext: ((String) -> Unit)? = null,
+    onAddFolderToQueue: ((String) -> Unit)? = null,
     onDownloadTracks: (List<com.labix.navirom.data.model.NaviromTrack>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (com.labix.navirom.data.model.NaviromTrack) -> Unit,
@@ -1244,6 +1264,8 @@ private fun TabContent(
                 onPlayAll = onPlayAll,
                 onShuffleAll = onShuffleAll,
                 onSmartShuffle = onSmartShuffle,
+                onPlayTracksNext = onPlayTracksNext,
+                onAddTracksToQueue = onAddTracksToQueue,
                 onDownloadTracks = onDownloadTracks,
                 onToggleFavorite = onToggleFavorite,
                 onDownloadTrack = onDownloadTrack,
@@ -1287,6 +1309,8 @@ private fun TabContent(
                 onPlayAll = onPlayAll,
                 onShuffleAll = onShuffleAll,
                 onSmartShuffle = { onSmartShuffle?.invoke(it) ?: onShuffleAll(it) },
+                onPlayTracksNext = onPlayTracksNext,
+                onAddTracksToQueue = onAddTracksToQueue,
                 onDownloadPlaylist = onDownloadTracks,
                 onToggleFavorite = onToggleFavorite,
                 onDownloadTrack = onDownloadTrack,
@@ -1331,6 +1355,8 @@ private fun TabContent(
                 onRescanStorage = onScanLocalAudio,
                 onPlayTrack = onTrackClick,
                 onPlayFolder = onPlayFolder,
+                onPlayFolderNext = onPlayFolderNext,
+                onAddFolderToQueue = onAddFolderToQueue,
                 onPlayNext = onPlayNext,
                 onAddToQueue = onAddToQueue,
                 onToggleFavorite = { track -> onToggleFavorite(track.id) },

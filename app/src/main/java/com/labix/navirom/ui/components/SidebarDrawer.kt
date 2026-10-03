@@ -74,11 +74,9 @@ fun LibrariesSidebarContent(
                 .navigationBarsPadding()
                 .padding(20.dp)
         ) {
-            // Header inspired by MenuMobile.jpg: Typographic brand mark + Close cross
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Header: Typographic brand mark centered + Close cross
+            Box(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = "ZANA",
@@ -87,12 +85,16 @@ fun LibrariesSidebarContent(
                         fontWeight = FontWeight.Normal,
                         letterSpacing = 4.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.align(Alignment.Center)
                 )
 
                 IconButton(
                     onClick = onCloseSidebar,
-                    modifier = Modifier.size(36.dp).testTag("close_libraries_sidebar_btn")
+                    modifier = Modifier
+                        .size(36.dp)
+                        .align(Alignment.CenterEnd)
+                        .testTag("close_libraries_sidebar_btn")
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
@@ -105,49 +107,7 @@ fun LibrariesSidebarContent(
 
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Primary Navigation Links (Inspired by MenuMobile.jpg bold vertical menu)
-            if (onNavigateToTab != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SidebarNavMenuItem(
-                        label = str("tab_library"),
-                        isSelected = currentTab == NaviromTab.LIBRARY,
-                        onClick = {
-                            onNavigateToTab(NaviromTab.LIBRARY)
-                            onCloseSidebar()
-                        }
-                    )
-                    SidebarNavMenuItem(
-                        label = str("tab_playlists"),
-                        isSelected = currentTab == NaviromTab.PLAYLISTS,
-                        onClick = {
-                            onNavigateToTab(NaviromTab.PLAYLISTS)
-                            onCloseSidebar()
-                        }
-                    )
-                    SidebarNavMenuItem(
-                        label = str("tab_search"),
-                        isSelected = currentTab == NaviromTab.SEARCH,
-                        onClick = {
-                            onNavigateToTab(NaviromTab.SEARCH)
-                            onCloseSidebar()
-                        }
-                    )
-                    SidebarNavMenuItem(
-                        label = str("tab_settings"),
-                        isSelected = currentTab == NaviromTab.SETTINGS,
-                        onClick = {
-                            onNavigateToTab(NaviromTab.SETTINGS)
-                            onCloseSidebar()
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(modifier = Modifier.height(14.dp))
-            }
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Scrollable Libraries Section
             LazyColumn(
@@ -490,26 +450,5 @@ fun LibrariesSidebarContent(
             }
         }
     }
-}
-
-@Composable
-private fun SidebarNavMenuItem(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.headlineSmall.copy(
-            fontFamily = FontFamily.Serif,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            letterSpacing = 1.sp
-        ),
-        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp)
-    )
 }
 

@@ -1764,6 +1764,32 @@ class AudioPlayerController(
         _queue.value = curList
     }
 
+    fun playTracksNext(tracks: List<NaviromTrack>) {
+        if (tracks.isEmpty()) return
+        val curList = _queue.value.toMutableList()
+        if (curList.isEmpty() || _currentIndex.value < 0) {
+            playTrackList(tracks, 0)
+            return
+        }
+        val insertIndex = (_currentIndex.value + 1).coerceIn(0, curList.size)
+        curList.addAll(insertIndex, tracks)
+        _queue.value = curList
+        val origList = originalQueueList.toMutableList()
+        val origInsertIndex = (_currentIndex.value + 1).coerceIn(0, origList.size)
+        origList.addAll(origInsertIndex, tracks)
+        originalQueueList = origList
+    }
+
+    fun addTracksToQueue(tracks: List<NaviromTrack>) {
+        if (tracks.isEmpty()) return
+        if (_queue.value.isEmpty() || _currentIndex.value < 0) {
+            playTrackList(tracks, 0)
+            return
+        }
+        _queue.update { it + tracks }
+        originalQueueList = originalQueueList + tracks
+    }
+
     fun removeFromQueue(index: Int) {
         val curList = _queue.value.toMutableList()
         if (index in curList.indices) {

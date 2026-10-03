@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -62,6 +64,8 @@ fun MusicFoldersScreen(
     onRescanStorage: () -> Unit,
     onPlayTrack: (NaviromTrack, List<NaviromTrack>) -> Unit,
     onPlayFolder: (String, Boolean) -> Unit,
+    onPlayFolderNext: ((String) -> Unit)? = null,
+    onAddFolderToQueue: ((String) -> Unit)? = null,
     onPlayNext: (NaviromTrack) -> Unit,
     onAddToQueue: (NaviromTrack) -> Unit,
     onToggleFavorite: (NaviromTrack) -> Unit,
@@ -396,12 +400,14 @@ fun MusicFoldersScreen(
                 )
             }
 
-            // Quick Play Actions (Play All & Shuffle)
+            // Quick Play Actions (Play All, Shuffle, Play Next, Add to Queue)
             if (folderContent.totalTracksInTree.isNotEmpty()) {
                 item(key = "play_actions") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
@@ -410,8 +416,8 @@ fun MusicFoldersScreen(
                                 onPlayFolder(currentFolderPath, false)
                             },
                             shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                             modifier = Modifier
-                                .weight(1f)
                                 .height(46.dp)
                                 .testTag("folders_play_all_btn")
                         ) {
@@ -419,18 +425,21 @@ fun MusicFoldersScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "${str("folders_play_all")} (${folderContent.totalTracksInTree.size})",
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                             )
                         }
 
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = {
                                 haptics.click()
                                 onPlayFolder(currentFolderPath, true)
                             },
                             shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                             modifier = Modifier
-                                .weight(1f)
                                 .height(46.dp)
                                 .testTag("folders_shuffle_btn")
                         ) {
@@ -438,7 +447,56 @@ fun MusicFoldersScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = str("folders_shuffle"),
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                haptics.click()
+                                onPlayFolderNext?.invoke(currentFolderPath)
+                                Toast.makeText(context, String.format(str("toast_added_next"), folderContent.totalTracksInTree.size), Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .height(46.dp)
+                                .testTag("folders_play_next_btn")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = str("btn_play_next"),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                haptics.click()
+                                onAddFolderToQueue?.invoke(currentFolderPath)
+                                Toast.makeText(context, String.format(str("toast_added_queue"), folderContent.totalTracksInTree.size), Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .height(46.dp)
+                                .testTag("folders_add_to_queue_btn")
+                        ) {
+                            Icon(Icons.Filled.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = str("btn_add_to_queue"),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                             )
                         }
                     }
@@ -620,6 +678,16 @@ fun MusicFoldersScreen(
                         onPlay = {
                             haptics.click()
                             onPlayFolder(subfolder.path, false)
+                        },
+                        onPlayNext = {
+                            haptics.click()
+                            onPlayFolderNext?.invoke(subfolder.path)
+                            Toast.makeText(context, String.format(str("toast_added_next"), subfolder.totalTracksCount), Toast.LENGTH_SHORT).show()
+                        },
+                        onAddToQueue = {
+                            haptics.click()
+                            onAddFolderToQueue?.invoke(subfolder.path)
+                            Toast.makeText(context, String.format(str("toast_added_queue"), subfolder.totalTracksCount), Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -696,6 +764,8 @@ fun SubFolderCard(
     str: (String) -> String,
     onOpen: () -> Unit,
     onPlay: () -> Unit,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -767,14 +837,40 @@ fun SubFolderCard(
                 if (subfolder.totalTracksCount > 0) {
                     IconButton(
                         onClick = onPlay,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(34.dp).testTag("subfolder_play_btn_${subfolder.name}")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.PlayCircleFilled,
                             contentDescription = "Play folder",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(24.dp)
                         )
+                    }
+                    if (onPlayNext != null) {
+                        IconButton(
+                            onClick = onPlayNext,
+                            modifier = Modifier.size(34.dp).testTag("subfolder_play_next_btn_${subfolder.name}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = "Play folder next",
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    if (onAddToQueue != null) {
+                        IconButton(
+                            onClick = onAddToQueue,
+                            modifier = Modifier.size(34.dp).testTag("subfolder_add_to_queue_btn_${subfolder.name}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.QueueMusic,
+                                contentDescription = "Add folder to queue",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
                 Icon(

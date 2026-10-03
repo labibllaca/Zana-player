@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -96,6 +97,8 @@ fun LibraryScreen(
     onPlayAll: (List<NaviromTrack>) -> Unit,
     onShuffleAll: (List<NaviromTrack>) -> Unit,
     onSmartShuffle: ((List<NaviromTrack>?) -> Unit)? = null,
+    onPlayTracksNext: ((List<NaviromTrack>) -> Unit)? = null,
+    onAddTracksToQueue: ((List<NaviromTrack>) -> Unit)? = null,
     onDownloadTracks: (List<NaviromTrack>) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -185,6 +188,14 @@ fun LibraryScreen(
             onPlayAll = { onPlayAll(selectedAlbumTracks) },
             onShuffleAll = { onShuffleAll(selectedAlbumTracks) },
             onSmartShuffle = { if (onSmartShuffle != null) onSmartShuffle(selectedAlbumTracks) else onShuffleAll(selectedAlbumTracks) },
+            onPlayTracksNext = {
+                onPlayTracksNext?.invoke(selectedAlbumTracks)
+                android.widget.Toast.makeText(context, String.format(str("toast_added_next"), selectedAlbumTracks.size), android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onAddTracksToQueue = {
+                onAddTracksToQueue?.invoke(selectedAlbumTracks)
+                android.widget.Toast.makeText(context, String.format(str("toast_added_queue"), selectedAlbumTracks.size), android.widget.Toast.LENGTH_SHORT).show()
+            },
             onDownloadAlbum = { onDownloadTracks(selectedAlbumTracks) },
             onToggleFavorite = onToggleFavorite,
             onDownloadTrack = onDownloadTrack,
@@ -219,6 +230,14 @@ fun LibraryScreen(
                 } else {
                     onShuffleAll(currentArtistSongs)
                 }
+            },
+            onPlayAllSongsNext = {
+                onPlayTracksNext?.invoke(currentArtistSongs)
+                android.widget.Toast.makeText(context, String.format(str("toast_added_next"), currentArtistSongs.size), android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onAddAllSongsToQueue = {
+                onAddTracksToQueue?.invoke(currentArtistSongs)
+                android.widget.Toast.makeText(context, String.format(str("toast_added_queue"), currentArtistSongs.size), android.widget.Toast.LENGTH_SHORT).show()
             },
             onToggleFavorite = onToggleFavorite,
             onDownloadTrack = onDownloadTrack,
@@ -1420,6 +1439,46 @@ fun LibraryScreen(
                                                 Icon(Icons.Filled.Shuffle, contentDescription = str("local_folder_shuffle"), modifier = Modifier.size(18.dp))
                                             }
 
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    haptics.click()
+                                                    if (!isFolderEnabled) {
+                                                        onToggleLocalFolder(folder.id)
+                                                    }
+                                                    onPlayTracksNext?.invoke(folder.tracks)
+                                                    android.widget.Toast.makeText(context, String.format(str("toast_added_next"), folder.tracks.size), android.widget.Toast.LENGTH_SHORT).show()
+                                                },
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(36.dp).testTag("local_folder_play_next_${folder.id.hashCode()}"),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                                ),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = str("folder_play_next"), modifier = Modifier.size(18.dp))
+                                            }
+
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    haptics.click()
+                                                    if (!isFolderEnabled) {
+                                                        onToggleLocalFolder(folder.id)
+                                                    }
+                                                    onAddTracksToQueue?.invoke(folder.tracks)
+                                                    android.widget.Toast.makeText(context, String.format(str("toast_added_queue"), folder.tracks.size), android.widget.Toast.LENGTH_SHORT).show()
+                                                },
+                                                shape = CircleShape,
+                                                modifier = Modifier.size(36.dp).testTag("local_folder_add_to_queue_${folder.id.hashCode()}"),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                                ),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Icon(Icons.Filled.QueueMusic, contentDescription = str("folder_add_to_queue"), modifier = Modifier.size(18.dp))
+                                            }
+
                                             IconButton(
                                                 onClick = {
                                                     haptics.click()
@@ -2406,6 +2465,8 @@ fun AlbumDetailView(
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
     onSmartShuffle: (() -> Unit)? = null,
+    onPlayTracksNext: (() -> Unit)? = null,
+    onAddTracksToQueue: (() -> Unit)? = null,
     onDownloadAlbum: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
@@ -2554,6 +2615,34 @@ fun AlbumDetailView(
                     isTonal = true,
                     testTag = "album_smart_shuffle_all"
                 )
+
+                FilledTonalButton(
+                    onClick = {
+                        haptics.click()
+                        onPlayTracksNext?.invoke()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.testTag("album_play_next_btn")
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = str("btn_play_next"), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(str("btn_play_next"))
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        haptics.click()
+                        onAddTracksToQueue?.invoke()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.testTag("album_add_to_queue_btn")
+                ) {
+                    Icon(Icons.Filled.QueueMusic, contentDescription = str("btn_add_to_queue"), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(str("btn_add_to_queue"))
+                }
 
                 OutlinedButton(
                     onClick = onDownloadAlbum,

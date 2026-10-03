@@ -12,6 +12,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.basicMarquee
+import androidx.palette.graphics.Palette
+import android.graphics.drawable.BitmapDrawable
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -298,6 +304,35 @@ fun FullPlayerModal(
     val cardColor = if (isDark) Color(0xFF000000) else Color.White
     val textOnCard = if (isDark) Color.White else Color.Black
     val textMutedOnCard = if (isDark) Color.LightGray else Color.Gray
+
+    var primaryCoverColor by remember(track.id) { mutableStateOf<Color?>(null) }
+    var secondaryCoverColor by remember(track.id) { mutableStateOf<Color?>(null) }
+    var tertiaryCoverColor by remember(track.id) { mutableStateOf<Color?>(null) }
+
+    LaunchedEffect(track.coverArtUrl) {
+        if (!track.coverArtUrl.isNullOrBlank()) {
+            try {
+                val loader = ImageLoader(context)
+                val request = ImageRequest.Builder(context)
+                    .data(track.coverArtUrl)
+                    .allowHardware(false)
+                    .build()
+                val result = loader.execute(request)
+                if (result is SuccessResult) {
+                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                    if (bitmap != null) {
+                        val palette = Palette.from(bitmap).generate()
+                        val c1 = palette.getVibrantColor(palette.getDominantColor(0xFF2C3E50.toInt()))
+                        val c2 = palette.getMutedColor(palette.getDarkVibrantColor(0xFF8E44AD.toInt()))
+                        val c3 = palette.getLightVibrantColor(palette.getLightMutedColor(0xFF2980B9.toInt()))
+                        primaryCoverColor = Color(c1)
+                        secondaryCoverColor = Color(c2)
+                        tertiaryCoverColor = Color(c3)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -1592,6 +1627,54 @@ fun FullPlayerModal(
 
         val maxArtworkSize = (maxHeight * 0.38f).coerceIn(140.dp, 360.dp)
 
+        // 3 major colors of current playing track rendered as 70% blurred background mesh
+        if (primaryCoverColor != null && secondaryCoverColor != null && tertiaryCoverColor != null) {
+            val c1 = primaryCoverColor!!
+            val c2 = secondaryCoverColor!!
+            val c3 = tertiaryCoverColor!!
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(70.dp)
+                    .graphicsLayer { alpha = 0.85f }
+            ) {
+                val w = size.width
+                val h = size.height
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c1.copy(alpha = 0.8f), Color.Transparent),
+                        center = Offset(w * 0.2f, h * 0.25f),
+                        radius = w * 0.85f
+                    ),
+                    radius = w * 0.85f,
+                    center = Offset(w * 0.2f, h * 0.25f)
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c2.copy(alpha = 0.75f), Color.Transparent),
+                        center = Offset(w * 0.8f, h * 0.55f),
+                        radius = w * 0.9f
+                    ),
+                    radius = w * 0.9f,
+                    center = Offset(w * 0.8f, h * 0.55f)
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(c3.copy(alpha = 0.7f), Color.Transparent),
+                        center = Offset(w * 0.4f, h * 0.85f),
+                        radius = w * 0.8f
+                    ),
+                    radius = w * 0.8f,
+                    center = Offset(w * 0.4f, h * 0.85f)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = if (isDark) 0.38f else 0.18f))
+            )
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1744,36 +1827,17 @@ fun FullPlayerModal(
                             // Artwork with vinyl effect - vinyl rotates cleanly without overlaid text
                             val artworkShape = if (isVinylEffectEnabled) CircleShape else RoundedCornerShape(32.dp)
 
-                            // Vinyl unblur animation: initially blurry and steadily unblurs within the first 10 seconds of playback
-                            val vinylBlurAnim = remember(track.id) {
-                                Animatable(if (currentPosMs < 10_000L) (1f - (currentPosMs.toFloat() / 10_000f)).coerceIn(0f, 1f) else 0f)
-                            }
+                            // Vinyl blur calculation: blurry in the first 10 seconds AND slowly gets blurry in the last 10 seconds of playback
+                            val startBlurFactor = if (currentPosMs < 10_000L) {
+                                (1f - (currentPosMs.toFloat() / 10_000f)).coerceIn(0f, 1f)
+                            } else 0f
 
-                            LaunchedEffect(track.id, playbackState.isPlaying) {
-                                if (currentPosMs >= 10_000L) {
-                                    vinylBlurAnim.snapTo(0f)
-                                } else {
-                                    val remainingMs = (10_000L - currentPosMs).coerceAtLeast(100L)
-                                    if (playbackState.isPlaying) {
-                                        vinylBlurAnim.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = tween(
-                                                durationMillis = remainingMs.toInt(),
-                                                easing = LinearEasing
-                                            )
-                                        )
-                                    }
-                                }
-                            }
+                            val remainingMsToEnd = totalDurationMs - currentPosMs
+                            val endBlurFactor = if (totalDurationMs > 10_000L && remainingMsToEnd in 0L..10_000L) {
+                                (1f - (remainingMsToEnd.toFloat() / 10_000f)).coerceIn(0f, 1f)
+                            } else 0f
 
-                            LaunchedEffect(currentPosMs) {
-                                val expectedFactor = if (currentPosMs >= 10_000L) 0f else (1f - (currentPosMs.toFloat() / 10_000f)).coerceIn(0f, 1f)
-                                if (kotlin.math.abs(vinylBlurAnim.value - expectedFactor) > 0.25f) {
-                                    vinylBlurAnim.snapTo(expectedFactor)
-                                }
-                            }
-
-                            val vinylBlurFactor = vinylBlurAnim.value.coerceIn(0f, 1f)
+                            val vinylBlurFactor = maxOf(startBlurFactor, endBlurFactor).coerceIn(0f, 1f)
                             val animatedVinylBlurDp = (vinylBlurFactor * 26f).dp
 
                             // Platter depression spring animation while vinyl is being scratched

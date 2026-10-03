@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -65,6 +66,8 @@ fun ArtistDetailView(
     onPlayAllSongs: () -> Unit,
     onShuffleAllSongs: () -> Unit,
     onSmartShuffleSongs: (() -> Unit)? = null,
+    onPlayAllSongsNext: (() -> Unit)? = null,
+    onAddAllSongsToQueue: (() -> Unit)? = null,
     onToggleFavorite: (String) -> Unit,
     onDownloadTrack: (NaviromTrack) -> Unit,
     onPlayNext: (NaviromTrack) -> Unit,
@@ -270,6 +273,42 @@ fun ArtistDetailView(
                                     Icon(
                                         imageVector = Icons.Filled.AutoAwesome,
                                         contentDescription = str("smart_shuffle"),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptics.toggle()
+                                        onPlayAllSongsNext?.invoke()
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .testTag("artist_play_next_btn"),
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                        contentDescription = str("btn_play_next"),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptics.toggle()
+                                        onAddAllSongsToQueue?.invoke()
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .testTag("artist_add_to_queue_btn"),
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.QueueMusic,
+                                        contentDescription = str("btn_add_to_queue"),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }

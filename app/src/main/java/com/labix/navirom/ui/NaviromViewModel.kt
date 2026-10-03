@@ -2486,8 +2486,32 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         playerController.playNext(track)
     }
 
+    fun playTracksNext(tracks: List<NaviromTrack>) {
+        if (tracks.isEmpty()) return
+        playerController.playTracksNext(tracks)
+    }
+
     fun addToQueue(track: NaviromTrack) {
         playerController.addToQueue(track)
+    }
+
+    fun addTracksToQueue(tracks: List<NaviromTrack>) {
+        if (tracks.isEmpty()) return
+        playerController.addTracksToQueue(tracks)
+    }
+
+    fun playFolderNext(folderPath: String) {
+        val tracksInFolder = getTracksUnderFolder(folderPath)
+        if (tracksInFolder.isNotEmpty()) {
+            playTracksNext(tracksInFolder)
+        }
+    }
+
+    fun addFolderToQueue(folderPath: String) {
+        val tracksInFolder = getTracksUnderFolder(folderPath)
+        if (tracksInFolder.isNotEmpty()) {
+            addTracksToQueue(tracksInFolder)
+        }
     }
 
     fun addToQueueBeginning(track: NaviromTrack) {

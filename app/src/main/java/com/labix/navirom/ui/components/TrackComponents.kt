@@ -1,6 +1,7 @@
 package com.labix.navirom.ui.components
 
 import android.widget.Toast
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -208,7 +209,13 @@ fun DualAudioPlayButton(
             Icon(icon, contentDescription = text, modifier = Modifier.size(20.dp))
             if (showText) {
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                )
             }
         }
     }
