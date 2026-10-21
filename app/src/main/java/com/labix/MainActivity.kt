@@ -39,6 +39,8 @@ import android.content.ContextWrapper
 import com.labix.navirom.diagnostics.AppDiagnostics
 import java.lang.ref.WeakReference
 
+import com.labix.navirom.shortcut.AppShortcutManager
+
 class MainActivity : ComponentActivity() {
     companion object {
         private var instanceRef: WeakReference<MainActivity>? = null
@@ -71,10 +73,21 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: NaviromViewModel by viewModels()
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Permission response handled */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instanceRef = WeakReference(this)
         AppDiagnostics.init(applicationContext)
+
+        // Request notification permission on Android 13+ to ensure playback controls appear in shade
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         // Configure Coil image caching to prevent memory leaks from album arts
         try {
@@ -104,10 +117,18 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // Handle quick-action launcher shortcuts
+        handleShortcutIntent(intent)
+        AppShortcutManager.updateDynamicShortcuts(this)
+
         setContent {
             val themeMode by viewModel.appThemeMode.collectAsStateWithLifecycle()
             val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
             val hasCompletedInitialSetup by viewModel.hasCompletedInitialSetup.collectAsStateWithLifecycle()
+
+            androidx.compose.runtime.LaunchedEffect(appLanguage) {
+                AppShortcutManager.updateDynamicShortcuts(this@MainActivity, appLanguage)
+            }
 
             val isSystemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
@@ -161,6 +182,26 @@ class MainActivity : ComponentActivity() {
             NaviromPlaybackService.stopService(this)
             finishAndRemoveTask()
             finishAffinity()
+            return
+        }
+        handleShortcutIntent(intent)
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            AppShortcutManager.ACTION_CONTINUE_LAST_PLAYED -> {
+                viewModel.continueLastPlayed()
+            }
+            AppShortcutManager.ACTION_START_RANDOM_SERVER -> {
+                viewModel.startRandomMixServer()
+            }
+            AppShortcutManager.ACTION_START_RANDOM_LOCAL -> {
+                viewModel.startRandomLocal()
+            }
+            AppShortcutManager.ACTION_CONNECT_LAST_SERVER -> {
+                viewModel.connectLastServer()
+            }
         }
     }
 

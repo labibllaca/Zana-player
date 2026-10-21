@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Zana</string>
+    <string name="shortcut_continue_short">Continue</string>
+    <string name="shortcut_continue_long">Continue from last played song</string>
+    <string name="shortcut_random_server_short">Random Mix</string>
+    <string name="shortcut_random_server_long">Start random mix server</string>
+    <string name="shortcut_random_local_short">Random Local</string>
+    <string name="shortcut_random_local_long">Start random local</string>
+    <string name="shortcut_connect_server_short">Connect Server</string>
+    <string name="shortcut_connect_server_long">Connect last server</string>
 </resources>

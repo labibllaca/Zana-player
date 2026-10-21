@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_continue_last_played"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_continue"
+        android:shortcutShortLabel="@string/shortcut_continue_short"
+        android:shortcutLongLabel="@string/shortcut_continue_long">
+        <intent
+            android:action="com.labix.ACTION_CONTINUE_LAST_PLAYED"
+            android:targetPackage="com.labix.navirom.audiom"
+            android:targetClass="com.labix.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_start_random_server"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_random_server"
+        android:shortcutShortLabel="@string/shortcut_random_server_short"
+        android:shortcutLongLabel="@string/shortcut_random_server_long">
+        <intent
+            android:action="com.labix.ACTION_START_RANDOM_SERVER"
+            android:targetPackage="com.labix.navirom.audiom"
+            android:targetClass="com.labix.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_start_random_local"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_random_local"
+        android:shortcutShortLabel="@string/shortcut_random_local_short"
+        android:shortcutLongLabel="@string/shortcut_random_local_long">
+        <intent
+            android:action="com.labix.ACTION_START_RANDOM_LOCAL"
+            android:targetPackage="com.labix.navirom.audiom"
+            android:targetClass="com.labix.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_connect_last_server"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_connect_server"
+        android:shortcutShortLabel="@string/shortcut_connect_server_short"
+        android:shortcutLongLabel="@string/shortcut_connect_server_long">
+        <intent
+            android:action="com.labix.ACTION_CONNECT_LAST_SERVER"
+            android:targetPackage="com.labix.navirom.audiom"
+            android:targetClass="com.labix.MainActivity" />
+    </shortcut>
+</shortcuts>

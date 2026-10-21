@@ -2672,6 +2672,134 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun continueLastPlayed() {
+        setTab(NaviromTab.LIBRARY)
+        playerController.continueLastPlayed()
+    }
+
+    fun startRandomMixServer() {
+        viewModelScope.launch {
+            setTab(NaviromTab.LIBRARY)
+            try {
+                val activeServer = serverConfigDao.getActiveServer()
+                if (activeServer != null && !_serverState.value.isConnected) {
+                    setServerConfig(activeServer)
+                    connectServer()
+                    delay(800)
+                }
+
+                val result = subsonicClient.getRandomTracks(size = 50)
+                result.onSuccess { tracks ->
+                    if (tracks.isNotEmpty()) {
+                        playerController.playTrackList(tracks.shuffled(), 0)
+                        return@launch
+                    }
+                }
+
+                // Fallback to quickMixTracks or cached tracks
+                val fallbackTracks = _quickMixTracks.value.ifEmpty {
+                    cachedTracks.value.map { entity ->
+                        NaviromTrack(
+                            id = entity.id,
+                            title = entity.title,
+                            artist = entity.artist,
+                            artistId = entity.artistId,
+                            album = entity.album,
+                            albumId = entity.albumId,
+                            durationSeconds = entity.durationSeconds,
+                            coverArtUrl = entity.coverArtUrl,
+                            streamUrl = subsonicClient.getStreamUrl(entity.id),
+                            localFilePath = entity.localFilePath,
+                            suffix = entity.format,
+                            year = entity.year,
+                            genre = entity.genre,
+                            bitRate = entity.bitRate,
+                            sizeBytes = entity.fileSizeBytes,
+                            isCached = true
+                        )
+                    }
+                }
+
+                if (fallbackTracks.isNotEmpty()) {
+                    playerController.playTrackList(fallbackTracks.shuffled(), 0)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to start random mix server", e)
+            }
+        }
+    }
+
+    fun startRandomLocal() {
+        viewModelScope.launch {
+            setTab(NaviromTab.LIBRARY)
+            setLibrarySubTab(LibrarySubTab.LIBRARIES)
+            try {
+                var localList = activeLocalTracks.value
+                if (localList.isEmpty()) {
+                    scanLocalAudio()
+                    delay(800)
+                    localList = activeLocalTracks.value
+                }
+                if (localList.isEmpty()) {
+                    localList = allDiscoveredLocalFolders.value.flatMap { it.tracks }
+                }
+                if (localList.isNotEmpty()) {
+                    playerController.playTrackList(localList.shuffled(), 0)
+                } else {
+                    // Fallback to cached tracks if no local files scanned yet
+                    val cached = cachedTracks.value.map { entity ->
+                        NaviromTrack(
+                            id = entity.id,
+                            title = entity.title,
+                            artist = entity.artist,
+                            artistId = entity.artistId,
+                            album = entity.album,
+                            albumId = entity.albumId,
+                            durationSeconds = entity.durationSeconds,
+                            coverArtUrl = entity.coverArtUrl,
+                            streamUrl = subsonicClient.getStreamUrl(entity.id),
+                            localFilePath = entity.localFilePath,
+                            suffix = entity.format,
+                            year = entity.year,
+                            genre = entity.genre,
+                            bitRate = entity.bitRate,
+                            sizeBytes = entity.fileSizeBytes,
+                            isCached = true
+                        )
+                    }
+                    if (cached.isNotEmpty()) {
+                        playerController.playTrackList(cached.shuffled(), 0)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to start random local music", e)
+            }
+        }
+    }
+
+    fun connectLastServer() {
+        viewModelScope.launch {
+            try {
+                val active = serverConfigDao.getActiveServer()
+                if (active != null) {
+                    setServerConfig(active)
+                    connectServer()
+                } else {
+                    val all = serverConfigDao.getAllServers().firstOrNull() ?: emptyList()
+                    val first = all.firstOrNull()
+                    if (first != null) {
+                        setServerConfig(first)
+                        connectServer()
+                    } else {
+                        setTab(NaviromTab.SETTINGS)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to connect to last server", e)
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         try {

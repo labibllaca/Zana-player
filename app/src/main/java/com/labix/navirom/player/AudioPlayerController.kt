@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import java.io.File
 
@@ -638,6 +639,8 @@ class AudioPlayerController(
         }
     }
 
+    private val playerStatePrefs = context.getSharedPreferences("navirom_player_state", Context.MODE_PRIVATE)
+
     init {
         initMediaPlayer()
         restoreQueueFromRoom()
@@ -653,7 +656,78 @@ class AudioPlayerController(
                 }
                 .collect { state ->
                     NaviromPlaybackService.updateService(context, state)
+                    val track = state.currentTrack
+                    if (track != null) {
+                        try {
+                            playerStatePrefs.edit()
+                                .putString("last_track_id", track.id)
+                                .putInt("last_queue_index", _currentIndex.value)
+                                .putLong("last_position_ms", state.currentPositionMs)
+                                .apply()
+                        } catch (_: Exception) {}
+                    }
                 }
+        }
+    }
+
+    fun continueLastPlayed() {
+        val state = _playbackState.value
+        if (state.isPlaying) {
+            return
+        }
+        if (state.currentTrack != null) {
+            resume()
+            return
+        }
+
+        val queueList = _queue.value
+        if (queueList.isNotEmpty()) {
+            val savedIdx = playerStatePrefs.getInt("last_queue_index", 0).coerceIn(0, queueList.size - 1)
+            val savedPos = playerStatePrefs.getLong("last_position_ms", 0L)
+            playTrackList(queueList, savedIdx)
+            if (savedPos > 1000L) {
+                seekTo(savedPos)
+            }
+            return
+        }
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                val db = NaviromDatabase.getDatabase(context)
+                val recentEntities = db.recentSongsDao().getRecentSongs(30).firstOrNull() ?: emptyList()
+                if (recentEntities.isNotEmpty()) {
+                    val tracks = recentEntities.map { entity ->
+                        val localPath = entity.localFilePath
+                        val isLocal = !localPath.isNullOrBlank() && File(localPath).exists()
+                        NaviromTrack(
+                            id = entity.id,
+                            title = entity.title,
+                            artist = entity.artist,
+                            artistId = entity.artistId,
+                            album = entity.album,
+                            albumId = entity.albumId,
+                            durationSeconds = entity.durationSeconds,
+                            coverArtUrl = entity.coverArtUrl,
+                            streamUrl = entity.streamUrl,
+                            localFilePath = if (isLocal) localPath else null,
+                            suffix = entity.suffix,
+                            year = entity.year,
+                            genre = entity.genre,
+                            bitRate = entity.bitRate,
+                            isCached = isLocal
+                        )
+                    }
+                    val savedPos = playerStatePrefs.getLong("last_position_ms", 0L)
+                    withContext(Dispatchers.Main) {
+                        playTrackList(tracks, 0)
+                        if (savedPos > 1000L) {
+                            seekTo(savedPos)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AudioPlayerController", "Failed to continue last played song", e)
+            }
         }
     }
 
