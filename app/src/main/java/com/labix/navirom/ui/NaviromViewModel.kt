@@ -448,15 +448,23 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     private val _songSortOrder = MutableStateFlow(SongSortOrder.NAME)
     val songSortOrder: StateFlow<SongSortOrder> = _songSortOrder.asStateFlow()
+    private val _isSongSortReversed = MutableStateFlow(false)
+    val isSongSortReversed: StateFlow<Boolean> = _isSongSortReversed.asStateFlow()
 
-    val librarySongs: StateFlow<List<NaviromTrack>> = combine(_rawLibrarySongs, activeLocalTracks, _songSortOrder) { serverSongs, localSongs, order ->
+    val librarySongs: StateFlow<List<NaviromTrack>> = combine(
+        _rawLibrarySongs,
+        activeLocalTracks,
+        _songSortOrder,
+        _isSongSortReversed
+    ) { serverSongs, localSongs, order, isReversed ->
         val combined = (serverSongs + localSongs).distinctBy { it.id }
-        when (order) {
+        val sorted = when (order) {
             SongSortOrder.NAME -> combined.sortedBy { it.title.lowercase() }
             SongSortOrder.DURATION -> combined.sortedByDescending { it.durationSeconds }
             SongSortOrder.RECENTLY_ADDED -> combined // Order as received from newest/last input
             SongSortOrder.ARTIST -> combined.sortedBy { it.artist.lowercase() }
         }
+        if (isReversed) sorted.reversed() else sorted
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _shakeNotificationMessage = MutableStateFlow<String?>(null)
@@ -2050,7 +2058,12 @@ class NaviromViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setSongSortOrder(order: SongSortOrder) {
-        _songSortOrder.value = order
+        if (_songSortOrder.value == order) {
+            _isSongSortReversed.value = !_isSongSortReversed.value
+        } else {
+            _songSortOrder.value = order
+            _isSongSortReversed.value = false
+        }
     }
 
     fun dismissShakeNotification() {

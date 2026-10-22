@@ -69,6 +69,7 @@ fun LibraryScreen(
     recentlyPlayedTracks: List<NaviromTrack> = emptyList(),
     librarySongs: List<NaviromTrack> = emptyList(),
     songSortOrder: SongSortOrder = SongSortOrder.NAME,
+    isSongSortReversed: Boolean = false,
     onSetSongSortOrder: (SongSortOrder) -> Unit = {},
     newestAlbums: List<NaviromAlbum> = emptyList(),
     mostPlayedAlbums: List<NaviromAlbum> = emptyList(),
@@ -984,7 +985,15 @@ fun LibraryScreen(
                 }
                 LibrarySubTab.SONGS -> {
                     // List view for songs in library with sorting controls
-                    val effectiveSongs = if (librarySongs.isNotEmpty()) librarySongs else quickMixTracks
+                    val effectiveSongs = if (librarySongs.isNotEmpty()) librarySongs else {
+                        val sorted = when (songSortOrder) {
+                            SongSortOrder.NAME -> quickMixTracks.sortedBy { it.title.lowercase() }
+                            SongSortOrder.DURATION -> quickMixTracks.sortedByDescending { it.durationSeconds }
+                            SongSortOrder.RECENTLY_ADDED -> quickMixTracks
+                            SongSortOrder.ARTIST -> quickMixTracks.sortedBy { it.artist.lowercase() }
+                        }
+                        if (isSongSortReversed) sorted.reversed() else sorted
+                    }
                     LazyColumn(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1073,8 +1082,17 @@ fun LibraryScreen(
                                         onClick = { onSetSongSortOrder(SongSortOrder.NAME) },
                                         label = { Text(str("sort_name"), style = MaterialTheme.typography.labelSmall) },
                                         leadingIcon = {
-                                            Icon(Icons.Filled.SortByAlpha, contentDescription = null, modifier = Modifier.size(14.dp))
+                                             Icon(Icons.Filled.SortByAlpha, contentDescription = null, modifier = Modifier.size(14.dp))
                                         },
+                                        trailingIcon = if (songSortOrder == SongSortOrder.NAME) {
+                                            {
+                                                Icon(
+                                                    imageVector = if (isSongSortReversed) Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
+                                                    contentDescription = if (isSongSortReversed) "Reversed" else "Normal",
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        } else null,
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.testTag("sort_name_chip")
                                     )
@@ -1084,8 +1102,17 @@ fun LibraryScreen(
                                         onClick = { onSetSongSortOrder(SongSortOrder.DURATION) },
                                         label = { Text(str("sort_duration"), style = MaterialTheme.typography.labelSmall) },
                                         leadingIcon = {
-                                            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(14.dp))
+                                             Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(14.dp))
                                         },
+                                        trailingIcon = if (songSortOrder == SongSortOrder.DURATION) {
+                                            {
+                                                Icon(
+                                                    imageVector = if (isSongSortReversed) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                                                    contentDescription = if (isSongSortReversed) "Reversed" else "Normal",
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        } else null,
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.testTag("sort_duration_chip")
                                     )
@@ -1095,8 +1122,17 @@ fun LibraryScreen(
                                         onClick = { onSetSongSortOrder(SongSortOrder.RECENTLY_ADDED) },
                                         label = { Text(str("sort_recent"), style = MaterialTheme.typography.labelSmall) },
                                         leadingIcon = {
-                                            Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(14.dp))
+                                             Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(14.dp))
                                         },
+                                        trailingIcon = if (songSortOrder == SongSortOrder.RECENTLY_ADDED) {
+                                            {
+                                                Icon(
+                                                    imageVector = if (isSongSortReversed) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                                                    contentDescription = if (isSongSortReversed) "Reversed" else "Normal",
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        } else null,
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.testTag("sort_recent_chip")
                                     )
@@ -1106,8 +1142,17 @@ fun LibraryScreen(
                                         onClick = { onSetSongSortOrder(SongSortOrder.ARTIST) },
                                         label = { Text(str("sort_artist"), style = MaterialTheme.typography.labelSmall) },
                                         leadingIcon = {
-                                            Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(14.dp))
+                                             Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(14.dp))
                                         },
+                                        trailingIcon = if (songSortOrder == SongSortOrder.ARTIST) {
+                                            {
+                                                Icon(
+                                                    imageVector = if (isSongSortReversed) Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
+                                                    contentDescription = if (isSongSortReversed) "Reversed" else "Normal",
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        } else null,
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.testTag("sort_artist_chip")
                                     )

@@ -94,6 +94,7 @@ fun NaviromApp(
     val recentlyPlayedTracks by viewModel.recentlyPlayedTracks.collectAsStateWithLifecycle()
     val librarySongs by viewModel.librarySongs.collectAsStateWithLifecycle()
     val songSortOrder by viewModel.songSortOrder.collectAsStateWithLifecycle()
+    val isSongSortReversed by viewModel.isSongSortReversed.collectAsStateWithLifecycle()
     val currentAlbumTracks by viewModel.currentAlbumTracks.collectAsStateWithLifecycle()
     val currentPlaylistTracks by viewModel.currentPlaylistTracks.collectAsStateWithLifecycle()
 
@@ -437,6 +438,7 @@ fun NaviromApp(
                             recentlyPlayedTracks = recentlyPlayedTracks,
                             librarySongs = librarySongs,
                             songSortOrder = songSortOrder,
+                            isSongSortReversed = isSongSortReversed,
                             onSetSongSortOrder = { viewModel.setSongSortOrder(it) },
                             selectedAlbumId = selectedAlbumId,
                             selectedAlbumTracks = currentAlbumTracks,
@@ -744,6 +746,7 @@ fun NaviromApp(
                         recentlyPlayedTracks = recentlyPlayedTracks,
                         librarySongs = librarySongs,
                         songSortOrder = songSortOrder,
+                        isSongSortReversed = isSongSortReversed,
                         onSetSongSortOrder = { viewModel.setSongSortOrder(it) },
                         selectedAlbumId = selectedAlbumId,
                         selectedAlbumTracks = currentAlbumTracks,
@@ -1106,6 +1109,7 @@ private fun TabContent(
     recentlyPlayedTracks: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
     librarySongs: List<com.labix.navirom.data.model.NaviromTrack> = emptyList(),
     songSortOrder: SongSortOrder = SongSortOrder.NAME,
+    isSongSortReversed: Boolean = false,
     onSetSongSortOrder: (SongSortOrder) -> Unit = {},
     selectedAlbumId: String?,
     selectedAlbumTracks: List<com.labix.navirom.data.model.NaviromTrack>,
@@ -1242,6 +1246,7 @@ private fun TabContent(
                 recentlyPlayedTracks = recentlyPlayedTracks,
                 librarySongs = librarySongs,
                 songSortOrder = songSortOrder,
+                isSongSortReversed = isSongSortReversed,
                 onSetSongSortOrder = onSetSongSortOrder,
                 selectedAlbumId = selectedAlbumId,
                 selectedAlbumTracks = selectedAlbumTracks,

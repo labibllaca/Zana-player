@@ -1976,6 +1976,69 @@ fun FullPlayerModal(
                                     }
                                 }
 
+                                // Stylistic vertical shadow behind the vinyl plane that provides rich elevated depth and turntable feel
+                                if (isVinylEffectEnabled) {
+                                    val verticalShadowAlpha = if (isDark) 0.60f else 0.40f
+                                    Canvas(
+                                        modifier = Modifier
+                                            .size(width = maxArtworkSize * 0.88f, height = maxArtworkSize * 1.22f)
+                                            .align(Alignment.Center)
+                                            .graphicsLayer {
+                                                scaleX = artworkScale * vinylPlatterScale
+                                                scaleY = artworkScale * vinylPlatterScale
+                                            }
+                                    ) {
+                                        val canvasWidth = size.width
+                                        val canvasHeight = size.height
+
+                                        // 1. Broad diffused ambient vertical shadow column
+                                        drawOval(
+                                            brush = Brush.verticalGradient(
+                                                0.0f to Color.Transparent,
+                                                0.16f to Color.Black.copy(alpha = verticalShadowAlpha * 0.20f),
+                                                0.36f to Color.Black.copy(alpha = verticalShadowAlpha * 0.60f),
+                                                0.50f to Color.Black.copy(alpha = verticalShadowAlpha * 0.85f),
+                                                0.64f to Color.Black.copy(alpha = verticalShadowAlpha * 0.60f),
+                                                0.84f to Color.Black.copy(alpha = verticalShadowAlpha * 0.20f),
+                                                1.0f to Color.Transparent
+                                            ),
+                                            topLeft = Offset(0f, 0f),
+                                            size = androidx.compose.ui.geometry.Size(canvasWidth, canvasHeight)
+                                        )
+
+                                        // 2. Focused mid-plane vertical shadow spine for tactile turntable depth
+                                        val coreWidth = canvasWidth * 0.42f
+                                        val coreLeft = (canvasWidth - coreWidth) / 2f
+                                        drawOval(
+                                            brush = Brush.verticalGradient(
+                                                0.0f to Color.Transparent,
+                                                0.20f to Color.Black.copy(alpha = verticalShadowAlpha * 0.35f),
+                                                0.50f to Color.Black.copy(alpha = verticalShadowAlpha * 0.95f),
+                                                0.80f to Color.Black.copy(alpha = verticalShadowAlpha * 0.35f),
+                                                1.0f to Color.Transparent
+                                            ),
+                                            topLeft = Offset(coreLeft, canvasHeight * 0.04f),
+                                            size = androidx.compose.ui.geometry.Size(coreWidth, canvasHeight * 0.92f)
+                                        )
+
+                                        // 3. Stylistic central vertical slit / recess accent
+                                        val slitWidth = 5.dp.toPx()
+                                        val slitLeft = (canvasWidth - slitWidth) / 2f
+                                        drawRoundRect(
+                                            brush = Brush.verticalGradient(
+                                                0.0f to Color.Transparent,
+                                                0.22f to Color.Black.copy(alpha = verticalShadowAlpha * 0.50f),
+                                                0.50f to Color.Black.copy(alpha = verticalShadowAlpha * 0.85f),
+                                                0.78f to Color.Black.copy(alpha = verticalShadowAlpha * 0.50f),
+                                                1.0f to Color.Transparent
+                                            ),
+                                            topLeft = Offset(slitLeft, canvasHeight * 0.08f),
+                                            size = androidx.compose.ui.geometry.Size(slitWidth, canvasHeight * 0.84f),
+                                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(slitWidth / 2f, slitWidth / 2f)
+                                        )
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
                                     .size(maxArtworkSize)
